@@ -1,14 +1,19 @@
 import { createRouter, createWebHistory } from 'vue-router'
 
-import { useFirebase } from '@/composables/useFirebase'
+import { UserRole } from '@vaccin-delivery/types'
 
-export type AppRole = 'APOTHEKER' | 'ADMIN' | 'BEZORGER'
+import {
+  useCurrentUser,
+  getDefaultRouteForRole,
+} from '@/composables/useCurrentUser'
+import { useFirebase } from '@/composables/useFirebase'
 
 declare module 'vue-router' {
   interface RouteMeta {
     requiresAuth?: boolean
     preventLoggedIn?: boolean
-    role?: AppRole
+    requiresProfile?: boolean
+    role?: UserRole
   }
 }
 
@@ -17,28 +22,62 @@ const router = createRouter({
   routes: [
     {
       path: '/',
-      redirect: '/admin',
+      redirect: () => {
+        const { isAuthenticated } = useFirebase()
+        const { isRegistered, role } = useCurrentUser()
+
+        if (!isAuthenticated.value) {
+          return '/auth/login'
+        }
+
+        if (!isRegistered.value) {
+          return '/auth/complete-profile'
+        }
+
+        return getDefaultRouteForRole(role.value)
+      },
     },
     {
       path: '/auth',
       component: () =>
         import('@/components/feature/auth/FeatureAuthLayout.vue'),
-      meta: { preventLoggedIn: true },
       children: [
         {
           path: 'login',
           name: 'auth-login',
+          meta: { preventLoggedIn: true },
           component: () => import('@/views/auth/ViewAuthLogin.vue'),
         },
         {
           path: 'register',
           name: 'auth-register',
+          meta: { preventLoggedIn: true },
           component: () => import('@/views/auth/ViewAuthRegister.vue'),
         },
         {
           path: 'forgot-password',
           name: 'auth-forgot-password',
+          meta: { preventLoggedIn: true },
           component: () => import('@/views/auth/ViewAuthForgotPassword.vue'),
+        },
+        {
+          path: 'complete-profile',
+          name: 'auth-complete-profile',
+          meta: { requiresAuth: true, requiresProfile: false },
+          component: () => import('@/views/auth/ViewAuthCompleteProfile.vue'),
+        },
+      ],
+    },
+    {
+      path: '/profile',
+      name: 'profile',
+      component: () =>
+        import('@/components/feature/profile/FeatureProfileLayout.vue'),
+      meta: { requiresAuth: true, requiresProfile: true },
+      children: [
+        {
+          path: '',
+          component: () => import('@/views/profile/ViewProfile.vue'),
         },
       ],
     },
@@ -46,7 +85,11 @@ const router = createRouter({
       path: '/apotheker',
       component: () =>
         import('@/components/feature/apotheker/FeatureApothekerLayout.vue'),
-      meta: { requiresAuth: true, role: 'APOTHEKER' },
+      meta: {
+        requiresAuth: true,
+        requiresProfile: true,
+        role: UserRole.Apotheker,
+      },
       children: [
         {
           path: '',
@@ -60,7 +103,7 @@ const router = createRouter({
       path: '/admin',
       component: () =>
         import('@/components/feature/admin/FeatureAdminLayout.vue'),
-      meta: { requiresAuth: true, role: 'ADMIN' },
+      meta: { requiresAuth: true, requiresProfile: true, role: UserRole.Admin },
       children: [
         {
           path: '',
@@ -73,7 +116,11 @@ const router = createRouter({
       path: '/bezorger',
       component: () =>
         import('@/components/feature/bezorger/FeatureBezorgerLayout.vue'),
-      meta: { requiresAuth: true, role: 'BEZORGER' },
+      meta: {
+        requiresAuth: true,
+        requiresProfile: true,
+        role: UserRole.Bezorger,
+      },
       children: [
         {
           path: '',
@@ -97,6 +144,16 @@ const router = createRouter({
 
 router.beforeEach(async to => {
   const { firebaseUser, waitForAuthRestoration } = useFirebase()
+  const {
+    loadCurrentUser,
+    loading: userLoading,
+    initialized: userInitialized,
+    isRegistered,
+    missingProfile,
+    role,
+    getDefaultRouteForRole: getRouteForRole,
+  } = useCurrentUser()
+
   await waitForAuthRestoration()
 
   const isAuthenticated = firebaseUser.value !== null
@@ -108,8 +165,48 @@ router.beforeEach(async to => {
     }
   }
 
-  if (to.meta.preventLoggedIn && isAuthenticated) {
-    return { path: '/admin' }
+  if (isAuthenticated) {
+    if (!userInitialized.value && !userLoading.value) {
+      try {
+        await loadCurrentUser()
+      } catch {
+        if (to.name !== 'auth-login') {
+          return { name: 'auth-login' }
+        }
+      }
+    } else if (userLoading.value) {
+      await loadCurrentUser()
+    }
+
+    const needsProfile = missingProfile.value || !isRegistered.value
+    const isCompleteProfileRoute = to.name === 'auth-complete-profile'
+
+    if (
+      needsProfile &&
+      !isCompleteProfileRoute &&
+      to.meta.requiresProfile !== false
+    ) {
+      return {
+        name: 'auth-complete-profile',
+        query: { redirect: to.fullPath },
+      }
+    }
+
+    if (!needsProfile && isCompleteProfileRoute) {
+      return { path: getRouteForRole(role.value) }
+    }
+
+    if (
+      to.meta.preventLoggedIn &&
+      isRegistered.value &&
+      to.name !== 'auth-complete-profile'
+    ) {
+      return { path: getRouteForRole(role.value) }
+    }
+
+    if (to.meta.role && role.value && to.meta.role !== role.value) {
+      return { name: 'forbidden' }
+    }
   }
 
   return true

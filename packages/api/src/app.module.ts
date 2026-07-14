@@ -8,6 +8,7 @@ import { join } from 'node:path'
 import { buildMongoUrl, envValidationSchema } from './config/env.validation'
 import { AuthenticationModule } from './authentication/authentication.module'
 import { HealthModule } from './health/health.module'
+import { UserModule } from './user/user.module'
 
 const isSchemaGeneration =
   process.argv.includes('--generate-schema-only') ||
@@ -69,7 +70,7 @@ const databaseImports = isSchemaGeneration
             type: 'mongodb' as const,
             url,
             synchronize: nodeEnv === 'development',
-            entities: [],
+            autoLoadEntities: true,
           }
         },
       }),
@@ -81,6 +82,7 @@ const databaseImports = isSchemaGeneration
     ...databaseImports,
     HealthModule,
     AuthenticationModule,
+    UserModule,
   ],
 })
 export class AppModule {}

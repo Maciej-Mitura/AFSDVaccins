@@ -47,6 +47,7 @@ import { ref } from 'vue'
 import { useRouter } from 'vue-router'
 
 import { clearApolloCache } from '@/composables/useGraphQL'
+import { useCurrentUser } from '@/composables/useCurrentUser'
 import { useFirebase } from '@/composables/useFirebase'
 
 defineProps<{
@@ -55,10 +56,11 @@ defineProps<{
 
 const router = useRouter()
 const { isAuthenticated, logout } = useFirebase()
+const { clearCurrentUser } = useCurrentUser()
 const loggingOut = ref(false)
 
 const devLinks = [
-  { label: 'Auth', to: '/auth/login' },
+  { label: 'Profiel', to: '/profile' },
   { label: 'Apotheker', to: '/apotheker' },
   { label: 'Admin', to: '/admin' },
   { label: 'Bezorger', to: '/bezorger' },
@@ -69,6 +71,7 @@ async function onLogout() {
 
   try {
     await logout()
+    clearCurrentUser()
     await clearApolloCache()
     await router.push({ name: 'auth-login' })
   } finally {

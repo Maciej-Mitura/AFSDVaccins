@@ -69,11 +69,13 @@ import { useRoute, useRouter } from 'vue-router'
 import type { FormSubmitEvent } from '@nuxt/ui'
 import * as z from 'zod'
 
+import { useCurrentUser } from '@/composables/useCurrentUser'
 import { useFirebase } from '@/composables/useFirebase'
 
 const route = useRoute()
 const router = useRouter()
 const { login } = useFirebase()
+const { loadCurrentUser, getDefaultRouteForRole } = useCurrentUser()
 
 const loading = ref(false)
 const formError = ref<string | null>(null)
@@ -102,8 +104,17 @@ async function onSubmit(event: FormSubmitEvent<LoginForm>) {
 
   try {
     await login(event.data.email, event.data.password)
+    await loadCurrentUser(true)
+
+    const { role, missingProfile } = useCurrentUser()
+
     const redirect =
-      typeof route.query.redirect === 'string' ? route.query.redirect : '/admin'
+      typeof route.query.redirect === 'string'
+        ? route.query.redirect
+        : missingProfile.value
+          ? '/auth/complete-profile'
+          : getDefaultRouteForRole(role.value)
+
     await router.push(redirect)
   } catch (error: unknown) {
     formError.value =

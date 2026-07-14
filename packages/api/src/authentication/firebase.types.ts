@@ -8,6 +8,7 @@ export type VerifiedFirebaseIdentity = {
 export type GraphqlRequestContext = {
   req: {
     user?: VerifiedFirebaseIdentity
+    applicationUser?: import('../user/user.entity').User
     headers?: {
       authorization?: string
     }

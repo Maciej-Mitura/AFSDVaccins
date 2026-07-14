@@ -7,11 +7,10 @@ screens.
 
 ## Current status
 
-**Phase 4 — Firebase authentication foundation complete.** The PWA supports
-Firebase email/password registration, login, logout, and password reset. Apollo
-attaches Firebase ID tokens as Bearer credentials. The API verifies tokens with
-Firebase Admin and exposes a protected `currentFirebaseUser` query. Application
-User records and role authorization begin in Phase 5.
+**Phase 5 — application users, profiles, and role-based access complete.** Firebase
+handles authentication; MongoDB stores application `User` records linked by
+`firebaseUid`. Self-registration creates `APOTHEKER` users. Role guards protect
+GraphQL operations; the PWA routes by identity, profile completion, and role.
 
 ## Planned stack
 
@@ -229,19 +228,74 @@ npm run dev:pwa
 
 ## Placeholder routes
 
-| Route                   | Purpose                      |
-| ----------------------- | ---------------------------- |
-| `/auth/login`           | Firebase login               |
-| `/auth/register`        | Firebase registration        |
-| `/auth/forgot-password` | Password reset request       |
-| `/apotheker`            | Apotheker dashboard          |
-| `/admin`                | Admin dashboard + API health |
-| `/bezorger`             | Bezorger dashboard           |
-| `/forbidden`            | Permission denied page       |
-| unknown paths           | 404 page                     |
+| Route                    | Purpose                                       |
+| ------------------------ | --------------------------------------------- |
+| `/auth/complete-profile` | Profile completion for Firebase-only accounts |
+| `/profile`               | View and edit own profile                     |
+| `/apotheker`             | Apotheker dashboard (role: APOTHEKER)         |
+| `/admin`                 | Admin dashboard (role: ADMIN)                 |
+| `/bezorger`              | Bezorger dashboard (role: BEZORGER)           |
+| `/forbidden`             | Permission denied page                        |
+| unknown paths            | 404 page                                      |
 
-The admin dashboard uses generated `HealthDocument` / `HealthQuery` and
-`CurrentFirebaseUserDocument` types from `@vaccin-delivery/types`.
+## Application User and roles (Phase 5)
+
+Firebase proves **who** someone is; MongoDB stores **what they may do** in the
+application.
+
+| Concept            | Source                       | Used for                     |
+| ------------------ | ---------------------------- | ---------------------------- |
+| Firebase identity  | Firebase Auth token          | Login, Bearer verification   |
+| Application `User` | MongoDB (`users` collection) | Profile, role, authorization |
+
+### Self-registration
+
+Public registration always creates role **`APOTHEKER`**. Clients cannot supply
+`role`, `firebaseUid`, or `email` in `createOwnUser`.
+
+### Profile completion
+
+If a Firebase account exists without a MongoDB `User` (for example a Phase 4
+test account), login redirects to `/auth/complete-profile` to call
+`createOwnUser`.
+
+### GraphQL operations added
+
+| Operation       | Auth            | Purpose                                      |
+| --------------- | --------------- | -------------------------------------------- |
+| `createOwnUser` | Firebase Bearer | Create application profile                   |
+| `currentUser`   | Firebase Bearer | Load MongoDB user (or `USER_NOT_REGISTERED`) |
+| `updateOwnUser` | Firebase Bearer | Update first/last name                       |
+| `apothekerArea` | APOTHEKER       | Phase 5 role proof                           |
+| `adminArea`     | ADMIN           | Phase 5 role proof                           |
+| `bezorgerArea`  | BEZORGER        | Phase 5 role proof                           |
+
+### Development role testing
+
+There is no public role-promotion mutation. For local testing of ADMIN or
+BEZORGER:
+
+1. Register or complete a profile (creates APOTHEKER).
+2. Open **MongoDB Compass** → database `vaccin-delivery` → collection `users`.
+3. Edit the `role` field to `ADMIN` or `BEZORGER`.
+4. Log out and back in (or refresh) so `currentUser` reloads.
+
+### Manual runtime test
+
+1. Start MongoDB and `npm run dev`.
+2. Log in with an existing Phase 4 Firebase account → expect redirect to
+   `/auth/complete-profile`.
+3. Submit first and last name → MongoDB user created with matching `firebaseUid`,
+   Firebase email, role `APOTHEKER`.
+4. Refresh → `currentUser` restores; `/apotheker` works; `/admin` → `/forbidden`.
+5. Update profile at `/profile` → persists after refresh.
+6. Log out → application user state clears.
+7. Register a new account → Firebase + MongoDB records created.
+
+PWA composables:
+
+- `useFirebase` — authentication identity
+- `useCurrentUser` — application profile and role
 
 ## API commands
 
@@ -285,5 +339,5 @@ npm run format:check
 
 ## Next phase
 
-**Phase 5 — Application User and roles** (`docs/implementation-roadmap.md`).
-MongoDB `User` entity, `createOwnUser`, role guards, and role-based redirects.
+**Phase 6 — operational settings and vaccine catalogue**
+(`docs/implementation-roadmap.md`).
