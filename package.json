@@ -1,0 +1,22 @@
+{
+  "name": "vaccin-delivery",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Vaccinatie-levering exam monorepo — vaccine ordering and delivery platform",
+  "workspaces": [
+    "packages/*"
+  ],
+  "engines": {
+    "node": ">=22.16.0",
+    "npm": ">=10.0.0"
+  },
+  "scripts": {
+    "format": "prettier --write \"**/*.{json,md,yml,yaml}\"",
+    "format:check": "prettier --check \"**/*.{json,md,yml,yaml}\"",
+    "workspaces": "npm query .workspace",
+    "workspaces:list": "npm ls --workspaces --depth=0"
+  },
+  "devDependencies": {
+    "prettier": "^3.6.2"
+  }
+}

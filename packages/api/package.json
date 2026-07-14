@@ -1,0 +1,6 @@
+{
+  "name": "@vaccin-delivery/api",
+  "version": "0.0.0",
+  "private": true,
+  "description": "NestJS GraphQL API — framework initialization begins in Phase 1"
+}
