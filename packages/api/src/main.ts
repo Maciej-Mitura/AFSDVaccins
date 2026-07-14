@@ -4,7 +4,19 @@ import { ConfigService } from '@nestjs/config'
 import { AppModule } from './app.module'
 import { EnvConfig } from './config/env.validation'
 
+async function generateSchemaOnly(): Promise<void> {
+  const app = await NestFactory.create(AppModule, { logger: false })
+  await app.init()
+  await app.close()
+  Logger.log('GraphQL schema generated at dist/schema.gql')
+}
+
 async function bootstrap(): Promise<void> {
+  if (process.argv.includes('--generate-schema-only')) {
+    await generateSchemaOnly()
+    return
+  }
+
   const app = await NestFactory.create(AppModule, {
     logger: new ConsoleLogger({
       prefix: 'VaccinDelivery',

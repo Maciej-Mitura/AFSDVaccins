@@ -1,6 +1,7 @@
 import gql from 'graphql-tag'
 
-export const HEALTH_QUERY = gql`
+/** Operation source consumed by GraphQL Code Generator. */
+export const healthQuerySource = gql`
   query Health {
     health {
       status
@@ -10,3 +11,6 @@ export const HEALTH_QUERY = gql`
     }
   }
 `
+
+export type { HealthQuery, HealthQueryVariables } from '@vaccin-delivery/types'
+export { HealthDocument as HEALTH_QUERY } from '@vaccin-delivery/types'

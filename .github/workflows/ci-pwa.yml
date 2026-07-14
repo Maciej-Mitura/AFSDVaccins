@@ -5,12 +5,16 @@ on:
     branches: [main, develop]
     paths:
       - 'packages/pwa/**'
+      - 'packages/types/**'
+      - 'packages/api/src/**'
       - 'package-lock.json'
       - '.github/workflows/ci-pwa.yml'
   pull_request:
     branches: [main, develop]
     paths:
       - 'packages/pwa/**'
+      - 'packages/types/**'
+      - 'packages/api/src/**'
       - 'package-lock.json'
       - '.github/workflows/ci-pwa.yml'
 
@@ -34,11 +38,17 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Generate API schema
+        run: npm run generate:schema
+
+      - name: Generate GraphQL types
+        run: npm run generate:types
+
       - name: Lint PWA
         run: npm run lint:pwa
 
       - name: Typecheck PWA
-        run: npm run typecheck:pwa
+        run: npm run typecheck --workspace=@vaccin-delivery/pwa
 
       - name: Build PWA
-        run: npm run build:pwa
+        run: npm run build --workspace=@vaccin-delivery/pwa

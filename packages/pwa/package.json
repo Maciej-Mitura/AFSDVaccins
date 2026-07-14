@@ -17,6 +17,7 @@
   "dependencies": {
     "@apollo/client": "^3.14.0",
     "@nuxt/ui": "^4.0.1",
+    "@vaccin-delivery/types": "0.0.0",
     "@vue/apollo-composable": "^4.2.2",
     "graphql": "^16.11.0",
     "graphql-tag": "^2.12.6",

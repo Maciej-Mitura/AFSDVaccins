@@ -54,13 +54,12 @@
 import { computed } from 'vue'
 import { useQuery } from '@vue/apollo-composable'
 
-import { HEALTH_QUERY } from '@/assets/graphql/health.query'
-import type { HealthQueryResult } from '@/assets/graphql/health.types'
+import { HEALTH_QUERY, type HealthQuery } from '@/assets/graphql/health.query'
 import CommonEmptyState from '@/components/common/CommonEmptyState.vue'
 import CommonErrorState from '@/components/common/CommonErrorState.vue'
 import CommonLoadingSkeleton from '@/components/common/CommonLoadingSkeleton.vue'
 
-const { result, loading, error } = useQuery<HealthQueryResult>(HEALTH_QUERY)
+const { result, loading, error } = useQuery<HealthQuery>(HEALTH_QUERY)
 
 const health = computed(() => result.value?.health)
 

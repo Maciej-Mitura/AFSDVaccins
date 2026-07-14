@@ -7,21 +7,23 @@ screens.
 
 ## Current status
 
-**Phase 2 — PWA foundation complete.** Vue 3 + Vite frontend with Nuxt UI, role
-route placeholders, Apollo HTTP client, and API health indicator. Firebase,
-generated GraphQL types, and domain screens are not implemented yet.
+**Phase 3 — shared GraphQL types complete.** The API emits a code-first schema,
+GraphQL Code Generator produces `@vaccin-delivery/types`, and the PWA health
+query uses generated operation types and a `TypedDocumentNode`. Firebase
+authentication has not started yet.
 
 ## Planned stack
 
-| Layer    | Technology                                      |
-| -------- | ----------------------------------------------- |
-| Monorepo | npm workspaces                                  |
-| API      | NestJS, code-first GraphQL, MongoDB via TypeORM |
-| Frontend | Vue 3, Vite, Nuxt UI, Apollo Client             |
-| Auth     | Firebase (client + Admin SDK) — Phase 4+        |
-| Realtime | GraphQL subscriptions (`graphql-ws`) — Phase 8+ |
-| Testing  | Jest, Supertest, Playwright                     |
-| Ops      | Docker Compose, GitHub Actions                  |
+| Layer    | Technology                                        |
+| -------- | ------------------------------------------------- |
+| Monorepo | npm workspaces                                    |
+| API      | NestJS, code-first GraphQL, MongoDB via TypeORM   |
+| Frontend | Vue 3, Vite, Nuxt UI, Apollo Client               |
+| Types    | GraphQL Code Generator → `@vaccin-delivery/types` |
+| Auth     | Firebase (client + Admin SDK) — Phase 4+          |
+| Realtime | GraphQL subscriptions (`graphql-ws`) — Phase 8+   |
+| Testing  | Jest, Supertest, Playwright                       |
+| Ops      | Docker Compose, GitHub Actions                    |
 
 ## Workspace packages
 
@@ -29,12 +31,44 @@ generated GraphQL types, and domain screens are not implemented yet.
 | ------------------------ | ---------------- | --------------------------------- |
 | `@vaccin-delivery/api`   | `packages/api`   | GraphQL API (Phase 1 complete)    |
 | `@vaccin-delivery/pwa`   | `packages/pwa`   | Vue PWA (Phase 2 complete)        |
-| `@vaccin-delivery/types` | `packages/types` | Shared generated types (Phase 3+) |
+| `@vaccin-delivery/types` | `packages/types` | Generated GraphQL types (Phase 3) |
 
 ## Package manager
 
 **npm only.** Use `package-lock.json` at the repository root. Do not add Bun,
 Lerna, or alternate lockfiles.
+
+## GraphQL type generation
+
+Generated artifacts are **not committed** (see `.gitignore`):
+
+| Output       | Path                             |
+| ------------ | -------------------------------- |
+| API schema   | `packages/api/dist/schema.gql`   |
+| Shared types | `packages/types/dist/graphql.ts` |
+
+### Commands
+
+```bash
+npm run generate:schema   # build API + emit schema.gql (no MongoDB required)
+npm run generate:types    # run GraphQL Code Generator
+npm run generate:graphql  # schema + types (run both)
+```
+
+### Clean clone workflow
+
+After `npm install`, generate types before PWA typecheck or build:
+
+```bash
+npm run generate:graphql
+npm run typecheck:pwa
+npm run build:pwa
+```
+
+Root `typecheck:pwa` and `build:pwa` run `generate:graphql` automatically.
+
+PWA GraphQL documents live in `packages/pwa/src/assets/graphql/`. Import
+generated types from `@vaccin-delivery/types` — do not hand-write response types.
 
 ## Source-of-truth documents
 
@@ -66,6 +100,7 @@ From the repository root:
 
 ```bash
 npm install
+npm run generate:graphql
 ```
 
 ## Environment setup
@@ -117,19 +152,19 @@ npm run dev:pwa
 
 ## Placeholder routes
 
-| Route                    | Purpose                    |
-| ------------------------ | -------------------------- |
-| `/auth/login`            | Auth placeholder           |
-| `/auth/register`         | Registration placeholder   |
-| `/auth/forgot-password`  | Password reset placeholder |
-| `/apotheker`             | Apotheker dashboard        |
-| `/admin`                 | Admin dashboard + API health |
-| `/bezorger`              | Bezorger dashboard         |
-| `/forbidden`             | Permission denied page     |
-| unknown paths            | 404 page                   |
+| Route                   | Purpose                      |
+| ----------------------- | ---------------------------- |
+| `/auth/login`           | Auth placeholder             |
+| `/auth/register`        | Registration placeholder     |
+| `/auth/forgot-password` | Password reset placeholder   |
+| `/apotheker`            | Apotheker dashboard          |
+| `/admin`                | Admin dashboard + API health |
+| `/bezorger`             | Bezorger dashboard           |
+| `/forbidden`            | Permission denied page       |
+| unknown paths           | 404 page                     |
 
-The admin dashboard queries the Phase 1 `health` GraphQL field and shows
-loading, success, or error states. No authentication headers are sent yet.
+The admin dashboard uses generated `HealthDocument` / `HealthQuery` types from
+`@vaccin-delivery/types`.
 
 ## API commands
 
@@ -139,6 +174,7 @@ npm run build:api
 npm run lint:api
 npm run typecheck:api
 npm run test:api
+npm run generate:schema
 ```
 
 ## PWA commands
@@ -150,20 +186,26 @@ npm run lint:pwa
 npm run typecheck:pwa
 ```
 
+## Types commands
+
+```bash
+npm run generate:types
+```
+
 ## Root commands
 
 ```bash
-npm run dev              # API + PWA concurrently
+npm run dev
+npm run generate:graphql
 npm run format
 npm run format:check
-npm run workspaces
 ```
 
 ## CI
 
 - `.github/workflows/ci-api.yml` — API lint, typecheck, test, build
-- `.github/workflows/ci-pwa.yml` — PWA lint, typecheck, build
+- `.github/workflows/ci-pwa.yml` — schema generation, type generation, PWA lint, typecheck, build
 
 ## Next phase
 
-**Phase 3 — Shared GraphQL types** (`docs/implementation-roadmap.md`).
+**Phase 4 — Firebase authentication** (`docs/implementation-roadmap.md`).
