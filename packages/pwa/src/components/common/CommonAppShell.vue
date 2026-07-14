@@ -5,11 +5,13 @@
         class="mx-auto flex max-w-5xl flex-col gap-4 px-4 py-4 sm:flex-row sm:items-center sm:justify-between"
       >
         <div>
-          <p class="text-xs uppercase tracking-wide text-muted">Vaccinatie-levering</p>
+          <p class="text-xs uppercase tracking-wide text-muted">
+            Vaccinatie-levering
+          </p>
           <h1 class="text-lg font-semibold">{{ title }}</h1>
         </div>
         <nav aria-label="Ontwikkel-navigatie">
-          <div class="flex flex-wrap gap-2">
+          <div class="flex flex-wrap items-center gap-2">
             <UButton
               v-for="link in devLinks"
               :key="link.to"
@@ -19,6 +21,16 @@
               color="neutral"
             >
               {{ link.label }}
+            </UButton>
+            <UButton
+              v-if="isAuthenticated"
+              color="neutral"
+              size="sm"
+              variant="outline"
+              :loading="loggingOut"
+              @click="onLogout"
+            >
+              Uitloggen
             </UButton>
           </div>
         </nav>
@@ -31,9 +43,19 @@
 </template>
 
 <script setup lang="ts">
+import { ref } from 'vue'
+import { useRouter } from 'vue-router'
+
+import { clearApolloCache } from '@/composables/useGraphQL'
+import { useFirebase } from '@/composables/useFirebase'
+
 defineProps<{
   title: string
 }>()
+
+const router = useRouter()
+const { isAuthenticated, logout } = useFirebase()
+const loggingOut = ref(false)
 
 const devLinks = [
   { label: 'Auth', to: '/auth/login' },
@@ -41,4 +63,16 @@ const devLinks = [
   { label: 'Admin', to: '/admin' },
   { label: 'Bezorger', to: '/bezorger' },
 ]
+
+async function onLogout() {
+  loggingOut.value = true
+
+  try {
+    await logout()
+    await clearApolloCache()
+    await router.push({ name: 'auth-login' })
+  } finally {
+    loggingOut.value = false
+  }
+}
 </script>

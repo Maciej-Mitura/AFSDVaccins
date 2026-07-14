@@ -6,6 +6,7 @@ import { TypeOrmModule } from '@nestjs/typeorm'
 import { Request, Response } from 'express'
 import { join } from 'node:path'
 import { buildMongoUrl, envValidationSchema } from './config/env.validation'
+import { AuthenticationModule } from './authentication/authentication.module'
 import { HealthModule } from './health/health.module'
 
 const isSchemaGeneration =
@@ -75,6 +76,11 @@ const databaseImports = isSchemaGeneration
     ]
 
 @Module({
-  imports: [...sharedImports, ...databaseImports, HealthModule],
+  imports: [
+    ...sharedImports,
+    ...databaseImports,
+    HealthModule,
+    AuthenticationModule,
+  ],
 })
 export class AppModule {}

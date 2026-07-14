@@ -14,6 +14,7 @@ export const envValidationSchema = Joi.object({
         'DB_HOST must be a MongoDB connection URL (mongodb:// or mongodb+srv://)',
     }),
   DB_NAME: Joi.string().min(1).required(),
+  GOOGLE_APPLICATION_CREDENTIALS: Joi.string().min(1).optional(),
 })
 
 export type EnvConfig = {
@@ -22,6 +23,7 @@ export type EnvConfig = {
   URL_FRONTEND: string
   DB_HOST: string
   DB_NAME: string
+  GOOGLE_APPLICATION_CREDENTIALS?: string
 }
 
 export const buildMongoUrl = (dbHost: string, dbName: string): string => {

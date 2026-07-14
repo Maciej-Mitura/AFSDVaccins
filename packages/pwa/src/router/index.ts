@@ -1,5 +1,7 @@
 import { createRouter, createWebHistory } from 'vue-router'
 
+import { useFirebase } from '@/composables/useFirebase'
+
 export type AppRole = 'APOTHEKER' | 'ADMIN' | 'BEZORGER'
 
 declare module 'vue-router' {
@@ -91,6 +93,26 @@ const router = createRouter({
       component: () => import('@/views/generic/ViewGeneric404.vue'),
     },
   ],
+})
+
+router.beforeEach(async to => {
+  const { firebaseUser, waitForAuthRestoration } = useFirebase()
+  await waitForAuthRestoration()
+
+  const isAuthenticated = firebaseUser.value !== null
+
+  if (to.meta.requiresAuth && !isAuthenticated) {
+    return {
+      name: 'auth-login',
+      query: { redirect: to.fullPath },
+    }
+  }
+
+  if (to.meta.preventLoggedIn && isAuthenticated) {
+    return { path: '/admin' }
+  }
+
+  return true
 })
 
 export default router

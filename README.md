@@ -7,10 +7,11 @@ screens.
 
 ## Current status
 
-**Phase 3 — shared GraphQL types complete.** The API emits a code-first schema,
-GraphQL Code Generator produces `@vaccin-delivery/types`, and the PWA health
-query uses generated operation types and a `TypedDocumentNode`. Firebase
-authentication has not started yet.
+**Phase 4 — Firebase authentication foundation complete.** The PWA supports
+Firebase email/password registration, login, logout, and password reset. Apollo
+attaches Firebase ID tokens as Bearer credentials. The API verifies tokens with
+Firebase Admin and exposes a protected `currentFirebaseUser` query. Application
+User records and role authorization begin in Phase 5.
 
 ## Planned stack
 
@@ -20,7 +21,7 @@ authentication has not started yet.
 | API      | NestJS, code-first GraphQL, MongoDB via TypeORM   |
 | Frontend | Vue 3, Vite, Nuxt UI, Apollo Client               |
 | Types    | GraphQL Code Generator → `@vaccin-delivery/types` |
-| Auth     | Firebase (client + Admin SDK) — Phase 4+          |
+| Auth     | Firebase (client + Admin SDK) — Phase 4 complete  |
 | Realtime | GraphQL subscriptions (`graphql-ws`) — Phase 8+   |
 | Testing  | Jest, Supertest, Playwright                       |
 | Ops      | Docker Compose, GitHub Actions                    |
@@ -105,17 +106,93 @@ npm run generate:graphql
 
 ## Environment setup
 
-**API:**
+**PWA** (`packages/pwa/.env` — public browser configuration, safe to expose in
+the client bundle):
+
+```bash
+cp packages/pwa/.env.example packages/pwa/.env
+```
+
+**API** (includes private Admin credential path):
 
 ```bash
 cp packages/api/.env.example packages/api/.env
 ```
 
-**PWA:**
+## Firebase setup (Phase 4)
+
+Firebase provides two separate configuration surfaces:
+
+| Surface         | Where                                           | Purpose              |
+| --------------- | ----------------------------------------------- | -------------------- |
+| Web app config  | `packages/pwa/.env` (`VITE_FIREBASE_*`)         | Browser SDK (public) |
+| Service account | File on disk + `GOOGLE_APPLICATION_CREDENTIALS` | Admin SDK (private)  |
+
+### 1. Create or select a Firebase project
+
+Use the [Firebase console](https://console.firebase.google.com/).
+
+### 2. Enable Authentication
+
+Open **Build → Authentication → Sign-in method** and enable **Email/Password**.
+
+### 3. Register a Web app
+
+In **Project settings → Your apps**, add a Web app and copy the SDK config.
+
+### 4. Configure the PWA
+
+Paste the values into `packages/pwa/.env`:
+
+```env
+VITE_FIREBASE_API_KEY=...
+VITE_FIREBASE_AUTH_DOMAIN=...
+VITE_FIREBASE_PROJECT_ID=...
+VITE_FIREBASE_STORAGE_BUCKET=...
+VITE_FIREBASE_MESSAGING_SENDER_ID=...
+VITE_FIREBASE_APP_ID=...
+```
+
+These are **not secrets** — they identify your Firebase project to the browser
+SDK.
+
+### 5. Generate a Firebase Admin service account
+
+In **Project settings → Service accounts**, click **Generate new private key**.
+Save the JSON file **outside Git** (for example `~/secrets/firebase-service-account.json`).
+
+Use `firebase-service-account.json.example` as a structural reference only.
+
+### 6. Configure the API
+
+Set the absolute path in `packages/api/.env`:
+
+```env
+GOOGLE_APPLICATION_CREDENTIALS=/absolute/path/to/firebase-service-account.json
+```
+
+Never commit the service-account JSON file.
+
+### 7. Authorized domains
+
+Ensure `localhost` appears under **Authentication → Settings → Authorized
+domains** for local development.
+
+### 8. Run the application
 
 ```bash
-cp packages/pwa/.env.example packages/pwa/.env
+docker compose -f infrastructure/docker-compose-dev.yml up -d
+npm run dev
 ```
+
+Verify:
+
+- Register and login at http://localhost:5173/auth/login
+- Admin dashboard shows `currentFirebaseUser` when authenticated
+- GraphQL `health` works without a token
+- GraphQL `currentFirebaseUser` requires `Authorization: Bearer <token>`
+
+Role-based redirects and MongoDB `User` creation are **Phase 5**.
 
 ## MongoDB
 
@@ -154,17 +231,17 @@ npm run dev:pwa
 
 | Route                   | Purpose                      |
 | ----------------------- | ---------------------------- |
-| `/auth/login`           | Auth placeholder             |
-| `/auth/register`        | Registration placeholder     |
-| `/auth/forgot-password` | Password reset placeholder   |
+| `/auth/login`           | Firebase login               |
+| `/auth/register`        | Firebase registration        |
+| `/auth/forgot-password` | Password reset request       |
 | `/apotheker`            | Apotheker dashboard          |
 | `/admin`                | Admin dashboard + API health |
 | `/bezorger`             | Bezorger dashboard           |
 | `/forbidden`            | Permission denied page       |
 | unknown paths           | 404 page                     |
 
-The admin dashboard uses generated `HealthDocument` / `HealthQuery` types from
-`@vaccin-delivery/types`.
+The admin dashboard uses generated `HealthDocument` / `HealthQuery` and
+`CurrentFirebaseUserDocument` types from `@vaccin-delivery/types`.
 
 ## API commands
 
@@ -208,4 +285,5 @@ npm run format:check
 
 ## Next phase
 
-**Phase 4 — Firebase authentication** (`docs/implementation-roadmap.md`).
+**Phase 5 — Application User and roles** (`docs/implementation-roadmap.md`).
+MongoDB `User` entity, `createOwnUser`, role guards, and role-based redirects.
