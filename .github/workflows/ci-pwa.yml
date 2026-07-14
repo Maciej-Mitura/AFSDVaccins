@@ -1,0 +1,44 @@
+name: CI PWA
+
+on:
+  push:
+    branches: [main, develop]
+    paths:
+      - 'packages/pwa/**'
+      - 'package-lock.json'
+      - '.github/workflows/ci-pwa.yml'
+  pull_request:
+    branches: [main, develop]
+    paths:
+      - 'packages/pwa/**'
+      - 'package-lock.json'
+      - '.github/workflows/ci-pwa.yml'
+
+jobs:
+  pwa:
+    runs-on: ubuntu-latest
+
+    env:
+      VITE_BACKEND_URL: http://localhost:3000/graphql
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: '.nvmrc'
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Lint PWA
+        run: npm run lint:pwa
+
+      - name: Typecheck PWA
+        run: npm run typecheck:pwa
+
+      - name: Build PWA
+        run: npm run build:pwa

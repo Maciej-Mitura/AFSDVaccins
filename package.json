@@ -15,13 +15,19 @@
     "format:check": "prettier --check \"**/*.{json,md,yml,yaml}\"",
     "workspaces": "npm query .workspace",
     "workspaces:list": "npm ls --workspaces --depth=0",
+    "dev": "concurrently -n api,pwa -c blue,green --kill-others-on-fail \"npm run dev:api\" \"npm run dev:pwa\"",
     "dev:api": "npm run dev --workspace=@vaccin-delivery/api",
+    "dev:pwa": "npm run dev --workspace=@vaccin-delivery/pwa",
     "build:api": "npm run build --workspace=@vaccin-delivery/api",
+    "build:pwa": "npm run build --workspace=@vaccin-delivery/pwa",
     "lint:api": "npm run lint --workspace=@vaccin-delivery/api",
+    "lint:pwa": "npm run lint --workspace=@vaccin-delivery/pwa",
     "typecheck:api": "npm run typecheck --workspace=@vaccin-delivery/api",
+    "typecheck:pwa": "npm run typecheck --workspace=@vaccin-delivery/pwa",
     "test:api": "npm run test --workspace=@vaccin-delivery/api"
   },
   "devDependencies": {
+    "concurrently": "^9.1.2",
     "prettier": "^3.6.2"
   }
 }
