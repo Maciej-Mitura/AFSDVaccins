@@ -17,8 +17,7 @@ void loadVaccines(false)
       </template>
 
       <p class="mb-4 text-sm text-muted">
-        Overzicht van beschikbare vaccins. Bestellen is beschikbaar in een
-        latere fase.
+        Overzicht van beschikbare vaccins voor bestellingen.
       </p>
 
       <CommonLoadingSkeleton v-if="loading && activeVaccines.length === 0" />

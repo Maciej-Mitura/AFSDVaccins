@@ -12,6 +12,8 @@ import CommonAppShell, {
 const apothekerNavLinks: AppShellLink[] = [
   { label: 'Dashboard', to: '/apotheker' },
   { label: 'Vaccins', to: '/apotheker/vaccines' },
+  { label: 'Nieuwe bestelling', to: '/apotheker/orders/new' },
+  { label: 'Mijn bestellingen', to: '/apotheker/orders' },
   { label: 'Profiel', to: '/profile' },
 ]
 </script>

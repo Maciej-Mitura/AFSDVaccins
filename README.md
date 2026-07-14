@@ -7,10 +7,13 @@ screens.
 
 ## Current status
 
-**Phase 6 — application settings and vaccine catalogue complete.** Global
-`ApplicationSettings` (singleton) and the vaccine catalogue are available through
-GraphQL. ADMIN manages settings and vaccines; APOTHEKER has a read-only active
-catalogue. Ordering and stock audit workflows are **Phase 7+**.
+**Phase 7 — pharmacist ordering and weekly controls complete.** APOTHEKER users
+can place vaccine orders within daily and weekly limits, view order history,
+cancel eligible `PENDING` orders, and see weekly usage warnings. ADMIN has a
+read-only order overview. Stock is **not** deducted when orders are placed.
+
+**Next phase:** Phase 8 — order notifications and first realtime slice (see
+`docs/implementation-roadmap.md`).
 
 ## Planned stack
 
@@ -366,6 +369,120 @@ PWA composables:
 8. Log in as APOTHEKER → `/apotheker/vaccines` shows active vaccines only.
 9. Confirm no management controls for APOTHEKER.
 10. Attempt an ADMIN mutation as APOTHEKER via GraphQL → `Forbidden`.
+
+## Pharmacist ordering and weekly controls (Phase 7)
+
+### Ordering workflow
+
+1. Authenticated **APOTHEKER** selects active vaccines and positive integer
+   quantities on `/apotheker/orders/new`.
+2. Server validates vaccines, limits, closing time, and derives ownership from
+   `@CurrentUser()` — clients never send `apothekerId`, `status`, or timestamps.
+3. Order is persisted as **`PENDING`** with embedded `orderLines`, server-calculated
+   `totalQuantity`, `isoWeek`, `isoYear`, and `deliveryDate`.
+4. **Stock is not deducted** in this phase.
+
+### Order statuses
+
+| Status      | Phase 7 behaviour                                          |
+| ----------- | ---------------------------------------------------------- |
+| `PENDING`   | Created by apotheker; may be cancelled by owner            |
+| `PLANNED`   | Enum exists; transitions deferred to route-planning        |
+| `DELIVERED` | Enum exists; completion deferred to delivery phases        |
+| `CANCELLED` | Set by apotheker for eligible orders; excluded from totals |
+
+### Ownership rules
+
+- `apothekerId` references the MongoDB `User._id` of the authenticated APOTHEKER.
+- `myOrders`, `myOrder`, `myWeeklyOrderSummary`, and `cancelOwnOrder` enforce
+  ownership server-side.
+- Cross-user order access returns generic `ORDER_NOT_FOUND`.
+
+### ISO week behaviour
+
+- ISO 8601 week (Monday–Sunday) in `ApplicationSettings.timezone`
+  (`Europe/Brussels` by default).
+- Both `isoWeek` and `isoYear` are derived server-side at submission.
+- Weekly totals aggregate non-`CANCELLED` orders in the same ISO week/year.
+
+### Closing-time enforcement
+
+- Uses `ApplicationSettings.orderingClosingTime` (default `14:00`) and
+  `timezone` with `Intl` (DST-safe; no fixed UTC offset).
+- **Phase 7 rule:** orders placed **after** closing time are rejected with
+  `ORDERING_CLOSED`.
+- `deliveryDate` is still computed for accepted orders (same local day before
+  closing; next local day would apply when post-closing acceptance is enabled in
+  later policy work).
+
+### Weekly warning versus hard limit
+
+| Concept                      | Source                         | Phase 7 behaviour                         |
+| ---------------------------- | ------------------------------ | ----------------------------------------- |
+| Weekly warning threshold     | `weeklyWarningPercentage` (90) | `warningReached` in `WeeklyOrderSummary`  |
+| Weekly hard limit            | Fiche: 200 doses/week          | `WEEKLY_LIMIT_EXCEEDED` blocks submission |
+| Daily hard limit per vaccine | Fiche: 50 doses/day/type       | `DAILY_LIMIT_EXCEEDED` blocks submission  |
+
+`weeklyDoseCap` is not yet configurable in `ApplicationSettings`; the hard weekly
+limit uses the fiche constant `200` via `order.constants.ts`.
+
+### Duplicate line handling
+
+Duplicate `vaccineId` entries in one submission are **merged deterministically**
+(quantities summed) in `OrderService` and mirrored in the PWA form.
+
+### Cancellation rules
+
+- APOTHEKER may cancel **own** `PENDING` orders only.
+- `PLANNED` / `DELIVERED` → `ORDER_CANNOT_BE_CANCELLED`.
+- Repeat cancel on `CANCELLED` order returns the order idempotently (no error).
+- Records are retained; `cancelledAt` is set.
+
+### ADMIN overview
+
+- `/admin/orders` lists all orders (read-only).
+- Filters: ISO year/week, status, apotheker.
+- No route planning, status transitions, or stock changes.
+
+### Concurrency limitation
+
+Two simultaneous submissions from the same apotheker may both pass the pre-insert
+limit read (documented MVP race; no MongoDB transactions or distributed locks).
+
+### GraphQL operations added
+
+| Operation              | Auth      | Purpose                   |
+| ---------------------- | --------- | ------------------------- |
+| `createOrder`          | APOTHEKER | Place order               |
+| `myOrders`             | APOTHEKER | Own order history         |
+| `myOrder`              | APOTHEKER | Own order detail          |
+| `myWeeklyOrderSummary` | APOTHEKER | Weekly usage summary      |
+| `cancelOwnOrder`       | APOTHEKER | Cancel eligible own order |
+| `orders`               | ADMIN     | All orders with filters   |
+| `order`                | ADMIN     | Single order inspection   |
+
+Domain errors: `ORDERING_CLOSED`, `ORDER_NOT_FOUND`, `ORDER_CANNOT_BE_CANCELLED`,
+`INVALID_ORDER_QUANTITY`, `WEEKLY_LIMIT_EXCEEDED`, `DAILY_LIMIT_EXCEEDED`,
+`VACCINE_NOT_FOUND`, `VACCINE_INACTIVE`.
+
+PWA composables:
+
+- `useOrders` — create, list, weekly summary, cancel, admin overview
+
+### Manual runtime test (Phase 7)
+
+1. Ensure at least two active vaccines exist (ADMIN `/admin/vaccines`).
+2. Log in as APOTHEKER.
+3. Open `/apotheker/orders/new` — only active vaccines selectable.
+4. Create a multi-line order → appears in `/apotheker/orders` and MongoDB `orders`.
+5. Confirm `PENDING`, correct `totalQuantity`, `isoWeek`/`isoYear`.
+6. Confirm `Vaccine.stockQuantity` unchanged.
+7. Confirm weekly summary updates; warning at ≥ 90% of 200.
+8. Cancel the order → `CANCELLED`; weekly total decreases.
+9. Log in as ADMIN → order visible at `/admin/orders`.
+10. APOTHEKER GraphQL `orders` query → `Forbidden`.
+11. Adjust closing time in `/admin/settings`, place order after deadline →
+    `ORDERING_CLOSED`; restore setting afterward.
 
 ## API commands
 

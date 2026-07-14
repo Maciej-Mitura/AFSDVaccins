@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common'
 import { InjectRepository } from '@nestjs/typeorm'
+import { ObjectId } from 'mongodb'
 import { MongoRepository } from 'typeorm'
 
 import { VerifiedFirebaseIdentity } from '../authentication/firebase.types'
@@ -64,6 +65,22 @@ export class UserService {
     })
 
     return this.userRepository.save(user)
+  }
+
+  async findUserById(id: string): Promise<User> {
+    if (!ObjectId.isValid(id)) {
+      throw new UserNotRegisteredException()
+    }
+
+    const user = await this.userRepository.findOne({
+      where: { _id: new ObjectId(id) },
+    })
+
+    if (!user) {
+      throw new UserNotRegisteredException()
+    }
+
+    return user
   }
 
   async updateOwnUser(

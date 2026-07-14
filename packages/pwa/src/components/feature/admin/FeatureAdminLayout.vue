@@ -11,6 +11,7 @@ import CommonAppShell, {
 
 const adminNavLinks: AppShellLink[] = [
   { label: 'Dashboard', to: '/admin' },
+  { label: 'Bestellingen', to: '/admin/orders' },
   { label: 'Vaccins', to: '/admin/vaccines' },
   { label: 'Instellingen', to: '/admin/settings' },
   { label: 'Profiel', to: '/profile' },

@@ -23,6 +23,7 @@ const userServiceProvider = isSchemaGeneration
             new Error('UserService is unavailable during schema generation'),
           ),
         createOwnUser: () => Promise.resolve(null),
+        findUserById: () => Promise.resolve(null),
         updateOwnUser: () => Promise.resolve(null),
       },
     }

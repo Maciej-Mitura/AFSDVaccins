@@ -1,10 +1,19 @@
-import { ConflictException, NotFoundException } from '@nestjs/common'
+import { BadRequestException, ConflictException, NotFoundException } from '@nestjs/common'
 
 export class VaccineNotFoundException extends NotFoundException {
   constructor() {
     super({
       message: 'Vaccine not found',
       error: 'VACCINE_NOT_FOUND',
+    })
+  }
+}
+
+export class VaccineInactiveException extends BadRequestException {
+  constructor() {
+    super({
+      message: 'Dit vaccin is niet beschikbaar voor bestelling.',
+      error: 'VACCINE_INACTIVE',
     })
   }
 }
