@@ -9,9 +9,7 @@ import {
 } from 'typeorm'
 
 import {
-  DEFAULT_ORDERING_CLOSING_TIME,
-  DEFAULT_TIMEZONE,
-  DEFAULT_WEEKLY_WARNING_PERCENTAGE,
+  APPLICATION_SETTINGS_FIELD_DEFAULTS,
   SETTINGS_SINGLETON_KEY,
 } from './settings.constants'
 
@@ -30,17 +28,25 @@ export class ApplicationSettings {
   @Column({ default: SETTINGS_SINGLETON_KEY })
   singletonKey!: string
 
-  @Column({ default: DEFAULT_TIMEZONE })
+  @Column({ default: APPLICATION_SETTINGS_FIELD_DEFAULTS.timezone })
   @Field()
   timezone!: string
 
-  @Column({ default: DEFAULT_ORDERING_CLOSING_TIME })
+  @Column({ default: APPLICATION_SETTINGS_FIELD_DEFAULTS.orderingClosingTime })
   @Field()
   orderingClosingTime!: string
 
-  @Column({ default: DEFAULT_WEEKLY_WARNING_PERCENTAGE })
+  @Column({ default: APPLICATION_SETTINGS_FIELD_DEFAULTS.weeklyWarningPercentage })
   @Field(() => Int)
   weeklyWarningPercentage!: number
+
+  @Column({ default: APPLICATION_SETTINGS_FIELD_DEFAULTS.weeklyDoseCap })
+  @Field(() => Int)
+  weeklyDoseCap!: number
+
+  @Column({ default: APPLICATION_SETTINGS_FIELD_DEFAULTS.dailyDoseCapPerType })
+  @Field(() => Int)
+  dailyDoseCapPerType!: number
 
   @CreateDateColumn()
   @Field()

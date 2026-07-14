@@ -30,6 +30,16 @@ const schema = z.object({
     .int('Moet een geheel getal zijn.')
     .min(1, 'Minimaal 1%.')
     .max(100, 'Maximaal 100%.'),
+  weeklyDoseCap: z
+    .number()
+    .int('Moet een geheel getal zijn.')
+    .min(1, 'Minimaal 1.')
+    .max(10000, 'Maximaal 10000.'),
+  dailyDoseCapPerType: z
+    .number()
+    .int('Moet een geheel getal zijn.')
+    .min(1, 'Minimaal 1.')
+    .max(10000, 'Maximaal 10000.'),
 })
 
 type SettingsForm = z.output<typeof schema>
@@ -37,6 +47,8 @@ type SettingsForm = z.output<typeof schema>
 const state = reactive<Partial<SettingsForm>>({
   orderingClosingTime: undefined,
   weeklyWarningPercentage: undefined,
+  weeklyDoseCap: undefined,
+  dailyDoseCapPerType: undefined,
 })
 
 void loadApplicationSettings().then(() => {
@@ -46,6 +58,8 @@ void loadApplicationSettings().then(() => {
 
   state.orderingClosingTime = settings.value.orderingClosingTime
   state.weeklyWarningPercentage = settings.value.weeklyWarningPercentage
+  state.weeklyDoseCap = settings.value.weeklyDoseCap
+  state.dailyDoseCapPerType = settings.value.dailyDoseCapPerType
 })
 
 async function onSubmit(event: FormSubmitEvent<SettingsForm>) {
@@ -57,6 +71,8 @@ async function onSubmit(event: FormSubmitEvent<SettingsForm>) {
     await updateApplicationSettings({
       orderingClosingTime: event.data.orderingClosingTime,
       weeklyWarningPercentage: event.data.weeklyWarningPercentage,
+      weeklyDoseCap: event.data.weeklyDoseCap,
+      dailyDoseCapPerType: event.data.dailyDoseCapPerType,
     })
     successMessage.value = 'Instellingen succesvol opgeslagen.'
   } catch (error: unknown) {
@@ -119,6 +135,27 @@ async function onSubmit(event: FormSubmitEvent<SettingsForm>) {
               type="number"
               min="1"
               max="100"
+            />
+          </UFormField>
+
+          <UFormField label="Weekmaximum (dosissen)" name="weeklyDoseCap">
+            <UInput
+              v-model.number="state.weeklyDoseCap"
+              type="number"
+              min="1"
+              max="10000"
+            />
+          </UFormField>
+
+          <UFormField
+            label="Dagmaximum per vaccintype (dosissen)"
+            name="dailyDoseCapPerType"
+          >
+            <UInput
+              v-model.number="state.dailyDoseCapPerType"
+              type="number"
+              min="1"
+              max="10000"
             />
           </UFormField>
 

@@ -7,6 +7,8 @@ export const applicationSettingsQuerySource = gql`
       timezone
       orderingClosingTime
       weeklyWarningPercentage
+      weeklyDoseCap
+      dailyDoseCapPerType
       createdAt
       updatedAt
     }
@@ -26,6 +28,8 @@ export const updateApplicationSettingsMutationSource = gql`
       timezone
       orderingClosingTime
       weeklyWarningPercentage
+      weeklyDoseCap
+      dailyDoseCapPerType
       updatedAt
     }
   }

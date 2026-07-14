@@ -7,10 +7,13 @@ screens.
 
 ## Current status
 
-**Phase 6 — application settings and vaccine catalogue complete.** Global
-`ApplicationSettings` (singleton) and the vaccine catalogue are available through
-GraphQL. ADMIN manages settings and vaccines; APOTHEKER has a read-only active
-catalogue. Ordering and stock audit workflows are **Phase 7+**.
+**Phase 7 — pharmacist ordering and weekly controls complete.** APOTHEKER users
+can place vaccine orders within daily and weekly limits, view order history,
+cancel eligible `PENDING` orders, and see weekly usage warnings. ADMIN has a
+read-only order overview. Stock is **not** deducted when orders are placed.
+
+**Next phase:** Phase 8 — order notifications and first realtime slice (see
+`docs/implementation-roadmap.md`).
 
 ## Planned stack
 
@@ -310,11 +313,17 @@ default`). Defaults:
 | Field                     | Default           | Meaning                                     |
 | ------------------------- | ----------------- | ------------------------------------------- |
 | `timezone`                | `Europe/Brussels` | IANA timezone (read-only in PWA this phase) |
-| `orderingClosingTime`     | `14:00`           | Local wall-clock order cutoff (HH:mm)       |
+| `orderingClosingTime`     | `14:00`           | Local wall-clock delivery cutoff (HH:mm)    |
 | `weeklyWarningPercentage` | `90`              | Weekly limit warning threshold (1–100)      |
+| `weeklyDoseCap`           | `200`             | Hard weekly dose limit per apotheker        |
+| `dailyDoseCapPerType`     | `50`              | Hard daily dose limit per vaccine type      |
 
 All authenticated users may read settings. Only **ADMIN** may update
-`orderingClosingTime` and `weeklyWarningPercentage`.
+`orderingClosingTime`, `weeklyWarningPercentage`, `weeklyDoseCap`, and
+`dailyDoseCapPerType`.
+
+Legacy singleton documents created before Phase 7 are automatically backfilled
+with missing defaults on read (one repair write per document).
 
 ### Vaccine catalogue
 
@@ -337,15 +346,15 @@ visible to ADMIN (`includeInactive: true`) but are hidden from APOTHEKER.
 
 ### GraphQL operations added
 
-| Operation                   | Auth                       | Purpose                 |
-| --------------------------- | -------------------------- | ----------------------- |
-| `applicationSettings`       | Firebase Bearer            | Read singleton settings |
-| `updateApplicationSettings` | ADMIN                      | Update closing time / % |
-| `vaccines`                  | APOTHEKER, ADMIN, BEZORGER | List catalogue          |
-| `vaccine`                   | APOTHEKER, ADMIN, BEZORGER | Load one vaccine        |
-| `createVaccine`             | ADMIN                      | Create catalogue entry  |
-| `updateVaccine`             | ADMIN                      | Update catalogue entry  |
-| `setVaccineActive`          | ADMIN                      | Activate / deactivate   |
+| Operation                   | Auth                       | Purpose                       |
+| --------------------------- | -------------------------- | ----------------------------- |
+| `applicationSettings`       | Firebase Bearer            | Read singleton settings       |
+| `updateApplicationSettings` | ADMIN                      | Update settings and dose caps |
+| `vaccines`                  | APOTHEKER, ADMIN, BEZORGER | List catalogue                |
+| `vaccine`                   | APOTHEKER, ADMIN, BEZORGER | Load one vaccine              |
+| `createVaccine`             | ADMIN                      | Create catalogue entry        |
+| `updateVaccine`             | ADMIN                      | Update catalogue entry        |
+| `setVaccineActive`          | ADMIN                      | Activate / deactivate         |
 
 Domain errors: `VACCINE_NOT_FOUND`, `VACCINE_ALREADY_EXISTS`, `SETTINGS_INVALID`.
 
@@ -366,6 +375,132 @@ PWA composables:
 8. Log in as APOTHEKER → `/apotheker/vaccines` shows active vaccines only.
 9. Confirm no management controls for APOTHEKER.
 10. Attempt an ADMIN mutation as APOTHEKER via GraphQL → `Forbidden`.
+
+## Pharmacist ordering and weekly controls (Phase 7)
+
+### Ordering workflow
+
+1. Authenticated **APOTHEKER** selects active vaccines and positive integer
+   quantities on `/apotheker/orders/new`.
+2. Server validates vaccines, limits, closing time, and derives ownership from
+   `@CurrentUser()` — clients never send `apothekerId`, `status`, or timestamps.
+3. Order is persisted as **`PENDING`** with embedded `orderLines`, server-calculated
+   `totalQuantity`, `isoWeek`, `isoYear`, and `deliveryDate`.
+4. **Stock is not deducted** in this phase.
+
+### Order statuses
+
+| Status      | Phase 7 behaviour                                          |
+| ----------- | ---------------------------------------------------------- |
+| `PENDING`   | Created by apotheker; may be cancelled by owner            |
+| `PLANNED`   | Enum exists; transitions deferred to route-planning        |
+| `DELIVERED` | Enum exists; completion deferred to delivery phases        |
+| `CANCELLED` | Set by apotheker for eligible orders; excluded from totals |
+
+### Ownership rules
+
+- `apothekerId` references the MongoDB `User._id` of the authenticated APOTHEKER.
+- `myOrders`, `myOrder`, `myWeeklyOrderSummary`, and `cancelOwnOrder` enforce
+  ownership server-side.
+- Cross-user order access returns generic `ORDER_NOT_FOUND`.
+
+### ISO week behaviour
+
+- ISO 8601 week (Monday–Sunday) derived from the server-calculated
+  **`deliveryDate`** (not submission time).
+- Both `isoWeek` and `isoYear` are stored on each order at creation.
+- Weekly totals aggregate non-`CANCELLED` orders in the same ISO week/year.
+
+### Closing-time and delivery-date policy
+
+Uses `ApplicationSettings.orderingClosingTime` (default `14:00`) and
+`timezone` with `Intl` (DST-safe; no fixed UTC offset). Implemented in
+`delivery-date.util.ts`:
+
+| Local submission time | Result                                      |
+| --------------------- | ------------------------------------------- |
+| Before closing        | Accepted; `deliveryDate` = today (local)    |
+| Exactly at closing    | Accepted; `deliveryDate` = tomorrow (local) |
+| After closing         | Accepted; `deliveryDate` = tomorrow (local) |
+
+Closing time determines **delivery date**, not whether ordering is allowed.
+
+### Limit aggregation date
+
+Daily and weekly hard limits are calculated against the computed
+**`deliveryDate`** because an order represents doses to be delivered on that
+date (per fiche). Cancelled orders are excluded. Multiple orders for the same
+delivery date accumulate.
+
+### Weekly warning versus hard limit
+
+| Concept                      | Source                         | Phase 7 behaviour                         |
+| ---------------------------- | ------------------------------ | ----------------------------------------- |
+| Weekly warning threshold     | `weeklyWarningPercentage` (90) | `warningReached` in `WeeklyOrderSummary`  |
+| Weekly hard limit            | `weeklyDoseCap` (200)          | `WEEKLY_LIMIT_EXCEEDED` blocks submission |
+| Daily hard limit per vaccine | `dailyDoseCapPerType` (50)     | `DAILY_LIMIT_EXCEEDED` blocks submission  |
+
+Both hard limits are configurable by ADMIN in `/admin/settings`.
+
+### Duplicate line handling
+
+Duplicate `vaccineId` entries in one submission are **merged deterministically**
+(quantities summed) in `OrderService` and mirrored in the PWA form.
+
+### Cancellation rules
+
+- APOTHEKER may cancel **own** `PENDING` orders only.
+- `PLANNED` / `DELIVERED` → `ORDER_CANNOT_BE_CANCELLED`.
+- Repeat cancel on `CANCELLED` order returns the order idempotently (no error).
+- Records are retained; `cancelledAt` is set.
+
+### ADMIN overview
+
+- `/admin/orders` lists all orders (read-only).
+- Filters: ISO year/week, status, apotheker.
+- No route planning, status transitions, or stock changes.
+
+### Concurrency limitation
+
+Two simultaneous submissions from the same apotheker may both pass the pre-insert
+limit read (documented MVP race; no MongoDB transactions or distributed locks).
+
+### GraphQL operations added
+
+| Operation              | Auth      | Purpose                   |
+| ---------------------- | --------- | ------------------------- |
+| `createOrder`          | APOTHEKER | Place order               |
+| `myOrders`             | APOTHEKER | Own order history         |
+| `myOrder`              | APOTHEKER | Own order detail          |
+| `myWeeklyOrderSummary` | APOTHEKER | Weekly usage summary      |
+| `cancelOwnOrder`       | APOTHEKER | Cancel eligible own order |
+| `orders`               | ADMIN     | All orders with filters   |
+| `order`                | ADMIN     | Single order inspection   |
+
+Domain errors: `ORDER_NOT_FOUND`, `ORDER_CANNOT_BE_CANCELLED`,
+`INVALID_ORDER_QUANTITY`, `WEEKLY_LIMIT_EXCEEDED`, `DAILY_LIMIT_EXCEEDED`,
+`VACCINE_NOT_FOUND`, `VACCINE_INACTIVE`.
+
+PWA composables:
+
+- `useOrders` — create, list, weekly summary, cancel, admin overview
+
+### Manual runtime test (Phase 7)
+
+1. Ensure at least two active vaccines exist (ADMIN `/admin/vaccines`).
+2. Log in as APOTHEKER.
+3. Set closing time a few minutes **after** current Brussels time in
+   `/admin/settings`.
+4. Create an order → confirm `deliveryDate` is **today** in order history.
+5. Set closing time a few minutes **before** current Brussels time.
+6. Create another valid order → confirm it is **accepted** with
+   `deliveryDate` = **tomorrow**.
+7. Confirm neither order changes `Vaccine.stockQuantity`.
+8. Restore closing time to `14:00`.
+9. Confirm weekly summary updates; warning at ≥ 90% of `weeklyDoseCap`.
+10. Cancel an order → `CANCELLED`; weekly total decreases.
+11. Log in as ADMIN → both orders visible at `/admin/orders` with delivery dates.
+12. APOTHEKER GraphQL `orders` query → `Forbidden`.
 
 ## API commands
 

@@ -93,6 +93,10 @@ export class VaccineService {
     })
   }
 
+  async findVaccineEntityById(id: string): Promise<Vaccine> {
+    return this.requireById(id)
+  }
+
   async findVaccineById(id: string, role: UserRole): Promise<Vaccine> {
     const vaccine = await this.requireById(id)
 

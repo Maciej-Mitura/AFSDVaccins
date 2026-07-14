@@ -103,6 +103,17 @@ const router = createRouter({
           component: () =>
             import('@/views/apotheker/ViewApothekerVaccines.vue'),
         },
+        {
+          path: 'orders/new',
+          name: 'apotheker-create-order',
+          component: () =>
+            import('@/views/apotheker/ViewApothekerCreateOrder.vue'),
+        },
+        {
+          path: 'orders',
+          name: 'apotheker-orders',
+          component: () => import('@/views/apotheker/ViewApothekerOrders.vue'),
+        },
       ],
     },
     {
@@ -125,6 +136,11 @@ const router = createRouter({
           path: 'vaccines',
           name: 'admin-vaccines',
           component: () => import('@/views/admin/ViewAdminVaccines.vue'),
+        },
+        {
+          path: 'orders',
+          name: 'admin-orders',
+          component: () => import('@/views/admin/ViewAdminOrders.vue'),
         },
       ],
     },

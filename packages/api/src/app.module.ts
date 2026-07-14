@@ -8,6 +8,7 @@ import { join } from 'node:path'
 import { buildMongoUrl, envValidationSchema } from './config/env.validation'
 import { AuthenticationModule } from './authentication/authentication.module'
 import { HealthModule } from './health/health.module'
+import { OrderModule } from './order/order.module'
 import { SettingsModule } from './settings/settings.module'
 import { UserModule } from './user/user.module'
 import { VaccineModule } from './vaccine/vaccine.module'
@@ -87,6 +88,7 @@ const databaseImports = isSchemaGeneration
     UserModule,
     SettingsModule,
     VaccineModule,
+    OrderModule,
   ],
 })
 export class AppModule {}

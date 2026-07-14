@@ -17,6 +17,7 @@ const vaccineServiceProvider = isSchemaGeneration
       useValue: {
         createVaccine: () => Promise.resolve(null),
         findVaccines: () => Promise.resolve([]),
+        findVaccineEntityById: () => Promise.resolve(null),
         findVaccineById: () => Promise.resolve(null),
         updateVaccine: () => Promise.resolve(null),
         setVaccineActive: () => Promise.resolve(null),
