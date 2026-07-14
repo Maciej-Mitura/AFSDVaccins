@@ -19,6 +19,7 @@ dist/
 packages/api/dist/
 packages/pwa/dist/
 packages/types/dist/
+*.tsbuildinfo
 
 # Test and coverage reports
 coverage/

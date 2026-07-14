@@ -1,0 +1,44 @@
+name: CI API
+
+on:
+  push:
+    branches: [main, develop]
+    paths:
+      - 'packages/api/**'
+      - 'package-lock.json'
+      - '.github/workflows/ci-api.yml'
+  pull_request:
+    branches: [main, develop]
+    paths:
+      - 'packages/api/**'
+      - 'package-lock.json'
+      - '.github/workflows/ci-api.yml'
+
+jobs:
+  api:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: '.nvmrc'
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Lint API
+        run: npm run lint:api
+
+      - name: Typecheck API
+        run: npm run typecheck:api
+
+      - name: Test API
+        run: npm run test:api
+
+      - name: Build API
+        run: npm run build:api

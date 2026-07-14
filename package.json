@@ -14,7 +14,12 @@
     "format": "prettier --write \"**/*.{json,md,yml,yaml}\"",
     "format:check": "prettier --check \"**/*.{json,md,yml,yaml}\"",
     "workspaces": "npm query .workspace",
-    "workspaces:list": "npm ls --workspaces --depth=0"
+    "workspaces:list": "npm ls --workspaces --depth=0",
+    "dev:api": "npm run dev --workspace=@vaccin-delivery/api",
+    "build:api": "npm run build --workspace=@vaccin-delivery/api",
+    "lint:api": "npm run lint --workspace=@vaccin-delivery/api",
+    "typecheck:api": "npm run typecheck --workspace=@vaccin-delivery/api",
+    "test:api": "npm run test --workspace=@vaccin-delivery/api"
   },
   "devDependencies": {
     "prettier": "^3.6.2"

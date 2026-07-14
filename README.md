@@ -7,10 +7,9 @@ screens.
 
 ## Current status
 
-**Phase 0 — repository foundation only.** This monorepo contains workspace
-boundaries, tooling, and approved design documents. No application framework
-(NestJS, Vue, Firebase, MongoDB, Docker, or domain code) has been initialized
-yet.
+**Phase 1 — API foundation complete.** The NestJS GraphQL API runs with MongoDB
+via TypeORM, environment validation, and a public health check. The PWA has not
+been initialized yet.
 
 ## Planned stack
 
@@ -28,7 +27,7 @@ yet.
 
 | Package                  | Path             | Purpose                           |
 | ------------------------ | ---------------- | --------------------------------- |
-| `@vaccin-delivery/api`   | `packages/api`   | GraphQL API (Phase 1+)            |
+| `@vaccin-delivery/api`   | `packages/api`   | GraphQL API (Phase 1 complete)    |
 | `@vaccin-delivery/pwa`   | `packages/pwa`   | Vue PWA (Phase 2+)                |
 | `@vaccin-delivery/types` | `packages/types` | Shared generated types (Phase 3+) |
 
@@ -62,19 +61,81 @@ Agent rules: `AGENTS.md` at the repository root.
 
 Use Node **22.16.0** (Active LTS). See `.nvmrc` and `package.json` `engines`.
 
-## Available commands (Phase 0)
+## Installation
+
+From the repository root:
 
 ```bash
-npm install          # install root devDependencies (Prettier)
-npm run format       # format JSON and Markdown files
-npm run format:check # verify formatting
-npm run workspaces   # inspect workspace configuration
-npm run workspaces:list
+npm install
 ```
 
-Application commands (`dev`, `build`, `test`, seed, Docker) will be added in
-later roadmap phases.
+## API setup
+
+1. Copy the environment template:
+
+   ```bash
+   cp packages/api/.env.example packages/api/.env
+   ```
+
+2. Start MongoDB (choose one option):
+
+   **Option A — Docker Compose (recommended for development):**
+
+   ```bash
+   docker compose -f infrastructure/docker-compose-dev.yml up -d
+   ```
+
+   **Option B — existing local MongoDB** on `mongodb://localhost:27017`.
+
+3. Start the API:
+
+   ```bash
+   npm run dev:api
+   ```
+
+## API endpoints
+
+| Resource           | URL                           |
+| ------------------ | ----------------------------- |
+| GraphQL / GraphiQL | http://localhost:3000/graphql |
+| REST health        | http://localhost:3000/health  |
+
+### Health GraphQL query
+
+```graphql
+query {
+  health {
+    status
+    service
+    timestamp
+    environment
+  }
+}
+```
+
+## API commands
+
+```bash
+npm run dev:api        # start API in watch mode
+npm run build:api      # compile API
+npm run lint:api       # ESLint
+npm run typecheck:api  # TypeScript check
+npm run test:api       # Jest unit tests
+```
+
+## Root commands
+
+```bash
+npm run format         # format JSON and Markdown files
+npm run format:check   # verify formatting
+npm run workspaces     # inspect workspace configuration
+```
+
+## CI
+
+`.github/workflows/ci-api.yml` runs lint, typecheck, test, and build for the API
+package on pushes and pull requests to `main` and `develop`.
 
 ## Next phase
 
-**Phase 1 — NestJS API foundation** (`docs/implementation-roadmap.md`).
+**Phase 2 — Vue PWA foundation** (`docs/implementation-roadmap.md`).

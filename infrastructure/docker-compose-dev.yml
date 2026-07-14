@@ -1,0 +1,19 @@
+services:
+  mongo:
+    image: mongo:7
+    container_name: vaccin-delivery-mongo-dev
+    ports:
+      - '27017:27017'
+    volumes:
+      - vaccin-delivery-mongo-data:/data/db
+    environment:
+      MONGO_INITDB_DATABASE: vaccin-delivery
+    healthcheck:
+      test: ['CMD', 'mongosh', '--eval', "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+volumes:
+  vaccin-delivery-mongo-data:
