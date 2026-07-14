@@ -21,6 +21,7 @@ declare module 'vue' {
     FeatureApothekerLayout: typeof import('./src/components/feature/apotheker/FeatureApothekerLayout.vue')['default']
     FeatureAuthLayout: typeof import('./src/components/feature/auth/FeatureAuthLayout.vue')['default']
     FeatureBezorgerLayout: typeof import('./src/components/feature/bezorger/FeatureBezorgerLayout.vue')['default']
+    FeatureProfileLayout: typeof import('./src/components/feature/profile/FeatureProfileLayout.vue')['default']
     RouterLink: typeof import('vue-router')['RouterLink']
     RouterView: typeof import('vue-router')['RouterView']
     UAlert: typeof import('./node_modules/@nuxt/ui/dist/runtime/components/Alert.vue')['default']
