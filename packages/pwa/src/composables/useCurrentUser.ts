@@ -41,7 +41,7 @@ function isUserNotRegisteredError(error: unknown): boolean {
   })
 }
 
-function mapGraphQLError(error: unknown): string {
+export function mapGraphQLError(error: unknown): string {
   if (error instanceof ApolloError) {
     const message = error.graphQLErrors[0]?.message
     if (message) {

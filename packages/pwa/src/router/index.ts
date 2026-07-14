@@ -97,6 +97,12 @@ const router = createRouter({
           component: () =>
             import('@/views/apotheker/ViewApothekerDashboard.vue'),
         },
+        {
+          path: 'vaccines',
+          name: 'apotheker-vaccines',
+          component: () =>
+            import('@/views/apotheker/ViewApothekerVaccines.vue'),
+        },
       ],
     },
     {
@@ -109,6 +115,16 @@ const router = createRouter({
           path: '',
           name: 'admin-dashboard',
           component: () => import('@/views/admin/ViewAdminDashboard.vue'),
+        },
+        {
+          path: 'settings',
+          name: 'admin-settings',
+          component: () => import('@/views/admin/ViewAdminSettings.vue'),
+        },
+        {
+          path: 'vaccines',
+          name: 'admin-vaccines',
+          component: () => import('@/views/admin/ViewAdminVaccines.vue'),
         },
       ],
     },

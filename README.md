@@ -7,10 +7,10 @@ screens.
 
 ## Current status
 
-**Phase 5 — application users, profiles, and role-based access complete.** Firebase
-handles authentication; MongoDB stores application `User` records linked by
-`firebaseUid`. Self-registration creates `APOTHEKER` users. Role guards protect
-GraphQL operations; the PWA routes by identity, profile completion, and role.
+**Phase 6 — application settings and vaccine catalogue complete.** Global
+`ApplicationSettings` (singleton) and the vaccine catalogue are available through
+GraphQL. ADMIN manages settings and vaccines; APOTHEKER has a read-only active
+catalogue. Ordering and stock audit workflows are **Phase 7+**.
 
 ## Planned stack
 
@@ -233,7 +233,10 @@ npm run dev:pwa
 | `/auth/complete-profile` | Profile completion for Firebase-only accounts |
 | `/profile`               | View and edit own profile                     |
 | `/apotheker`             | Apotheker dashboard (role: APOTHEKER)         |
+| `/apotheker/vaccines`    | Read-only active vaccine catalogue            |
 | `/admin`                 | Admin dashboard (role: ADMIN)                 |
+| `/admin/vaccines`        | Vaccine catalogue management (ADMIN)          |
+| `/admin/settings`        | Application settings (ADMIN)                  |
 | `/bezorger`              | Bezorger dashboard (role: BEZORGER)           |
 | `/forbidden`             | Permission denied page                        |
 | unknown paths            | 404 page                                      |
@@ -297,6 +300,73 @@ PWA composables:
 - `useFirebase` — authentication identity
 - `useCurrentUser` — application profile and role
 
+## Application settings and vaccine catalogue (Phase 6)
+
+### Application settings
+
+Global configuration stored as a **singleton** MongoDB record (`singletonKey:
+default`). Defaults:
+
+| Field                     | Default           | Meaning                                     |
+| ------------------------- | ----------------- | ------------------------------------------- |
+| `timezone`                | `Europe/Brussels` | IANA timezone (read-only in PWA this phase) |
+| `orderingClosingTime`     | `14:00`           | Local wall-clock order cutoff (HH:mm)       |
+| `weeklyWarningPercentage` | `90`              | Weekly limit warning threshold (1–100)      |
+
+All authenticated users may read settings. Only **ADMIN** may update
+`orderingClosingTime` and `weeklyWarningPercentage`.
+
+### Vaccine catalogue
+
+| Field                   | Purpose                                            |
+| ----------------------- | -------------------------------------------------- |
+| `name`                  | Display name (unique case-insensitively)           |
+| `description`           | Short explanatory text                             |
+| `manufacturer`          | Producer name                                      |
+| `stockQuantity`         | Authoritative stock count (integer, ≥ 0)           |
+| `stockWarningThreshold` | Per-vaccine low-stock threshold                    |
+| `active`                | Whether the vaccine is available for future orders |
+
+**Stock boundary:** `stockQuantity` exists on `Vaccine` as the authoritative value.
+ADMIN may set an initial or corrected quantity via vaccine management during this
+phase. Later stock mutations must go through `StockService` / `StockAdjustment`
+(Phase 7+) — no stock history or reservation logic exists yet.
+
+**Active/inactive:** Prefer deactivation over deletion. Inactive vaccines remain
+visible to ADMIN (`includeInactive: true`) but are hidden from APOTHEKER.
+
+### GraphQL operations added
+
+| Operation                   | Auth                       | Purpose                 |
+| --------------------------- | -------------------------- | ----------------------- |
+| `applicationSettings`       | Firebase Bearer            | Read singleton settings |
+| `updateApplicationSettings` | ADMIN                      | Update closing time / % |
+| `vaccines`                  | APOTHEKER, ADMIN, BEZORGER | List catalogue          |
+| `vaccine`                   | APOTHEKER, ADMIN, BEZORGER | Load one vaccine        |
+| `createVaccine`             | ADMIN                      | Create catalogue entry  |
+| `updateVaccine`             | ADMIN                      | Update catalogue entry  |
+| `setVaccineActive`          | ADMIN                      | Activate / deactivate   |
+
+Domain errors: `VACCINE_NOT_FOUND`, `VACCINE_ALREADY_EXISTS`, `SETTINGS_INVALID`.
+
+PWA composables:
+
+- `useApplicationSettings` — load and update settings
+- `useVaccines` — list and manage vaccines (ADMIN mutations)
+
+### Manual runtime test (Phase 6)
+
+1. Log in as ADMIN (promote role in MongoDB if needed).
+2. Open `/admin/settings` — confirm defaults: Europe/Brussels, 14:00, 90.
+3. Change closing time or warning percentage, save, refresh — confirm persistence.
+4. Open `/admin/vaccines` — create at least two vaccines.
+5. Confirm duplicate normalized names are rejected.
+6. Edit one vaccine; deactivate another.
+7. Confirm ADMIN still sees inactive entries.
+8. Log in as APOTHEKER → `/apotheker/vaccines` shows active vaccines only.
+9. Confirm no management controls for APOTHEKER.
+10. Attempt an ADMIN mutation as APOTHEKER via GraphQL → `Forbidden`.
+
 ## API commands
 
 ```bash
@@ -339,5 +409,5 @@ npm run format:check
 
 ## Next phase
 
-**Phase 6 — operational settings and vaccine catalogue**
-(`docs/implementation-roadmap.md`).
+**Phase 7 — ordering** (`docs/implementation-roadmap.md`): order placement, weekly
+limits, and stock reservation workflows.

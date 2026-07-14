@@ -8,7 +8,9 @@ import { join } from 'node:path'
 import { buildMongoUrl, envValidationSchema } from './config/env.validation'
 import { AuthenticationModule } from './authentication/authentication.module'
 import { HealthModule } from './health/health.module'
+import { SettingsModule } from './settings/settings.module'
 import { UserModule } from './user/user.module'
+import { VaccineModule } from './vaccine/vaccine.module'
 
 const isSchemaGeneration =
   process.argv.includes('--generate-schema-only') ||
@@ -83,6 +85,8 @@ const databaseImports = isSchemaGeneration
     HealthModule,
     AuthenticationModule,
     UserModule,
+    SettingsModule,
+    VaccineModule,
   ],
 })
 export class AppModule {}
