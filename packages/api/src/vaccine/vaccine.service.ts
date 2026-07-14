@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common'
 import { InjectRepository } from '@nestjs/typeorm'
+import { ObjectId } from 'mongodb'
 import { MongoRepository } from 'typeorm'
 
 import { UserRole } from '../user/user-role.enum'
@@ -27,8 +28,12 @@ export class VaccineService {
   }
 
   private async requireById(id: string): Promise<Vaccine> {
+    if (!ObjectId.isValid(id)) {
+      throw new VaccineNotFoundException()
+    }
+
     const vaccine = await this.vaccineRepository.findOne({
-      where: { _id: id },
+      where: { _id: new ObjectId(id) },
     })
 
     if (!vaccine) {
@@ -44,7 +49,7 @@ export class VaccineService {
   ): Promise<void> {
     const existing = await this.findByNormalizedName(normalizedName)
 
-    if (existing && existing._id !== excludeId) {
+    if (existing && existing._id.toString() !== excludeId) {
       throw new VaccineAlreadyExistsException()
     }
   }

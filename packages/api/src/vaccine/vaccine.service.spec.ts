@@ -1,6 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing'
 import { getRepositoryToken } from '@nestjs/typeorm'
-import { MongoRepository } from 'typeorm'
+import { ObjectId } from 'mongodb'
+import { FindOptionsWhere, MongoRepository } from 'typeorm'
 
 import { UserRole } from '../user/user-role.enum'
 import {
@@ -17,6 +18,7 @@ describe('VaccineService', () => {
   >
 
   const vaccineId = '507f1f77bcf86cd799439011'
+  const nonexistentVaccineId = '6a569d2cbb2590db980429cd'
 
   const activeVaccine: Vaccine = {
     _id: vaccineId,
@@ -30,6 +32,32 @@ describe('VaccineService', () => {
     active: true,
     createdAt: new Date('2026-07-14T12:00:00.000Z'),
     updatedAt: new Date('2026-07-14T12:00:00.000Z'),
+  }
+
+  function matchesObjectIdLookup(
+    options: Parameters<MongoRepository<Vaccine>['findOne']>[0],
+    id: string,
+  ): boolean {
+    const where = options?.where
+
+    if (!where || Array.isArray(where)) {
+      return false
+    }
+
+    const lookupId = (where as FindOptionsWhere<Vaccine>)._id
+    return lookupId instanceof ObjectId && lookupId.toString() === id
+  }
+
+  function mockVaccineLookup(vaccine: Vaccine | null): void {
+    repository.findOne.mockImplementation(options => {
+      if (!vaccine) {
+        return Promise.resolve(null)
+      }
+
+      return Promise.resolve(
+        matchesObjectIdLookup(options, vaccine._id.toString()) ? vaccine : null,
+      )
+    })
   }
 
   beforeEach(async () => {
@@ -116,8 +144,23 @@ describe('VaccineService', () => {
     expect(result).toHaveLength(2)
   })
 
+  it('converts a valid GraphQL string ID to ObjectId for lookup', async () => {
+    mockVaccineLookup(activeVaccine)
+    repository.save.mockImplementation(value =>
+      Promise.resolve(value as Vaccine),
+    )
+
+    await service.updateVaccine(vaccineId, {
+      description: 'Updated description',
+    })
+
+    expect(repository.findOne).toHaveBeenCalledWith({
+      where: { _id: new ObjectId(vaccineId) },
+    })
+  })
+
   it('updates approved fields', async () => {
-    repository.findOne.mockResolvedValue({ ...activeVaccine } as Vaccine)
+    mockVaccineLookup(activeVaccine)
     repository.save.mockImplementation(value =>
       Promise.resolve(value as Vaccine),
     )
@@ -133,29 +176,64 @@ describe('VaccineService', () => {
     expect(result.stockWarningThreshold).toBe(8)
   })
 
-  it('activates and deactivates vaccines', async () => {
-    repository.findOne.mockResolvedValue({ ...activeVaccine } as Vaccine)
+  it('deactivates an existing vaccine', async () => {
+    mockVaccineLookup(activeVaccine)
     repository.save.mockImplementation(value =>
       Promise.resolve(value as Vaccine),
     )
 
     const deactivated = await service.setVaccineActive(vaccineId, false)
+
+    expect(repository.findOne).toHaveBeenCalledWith({
+      where: { _id: new ObjectId(vaccineId) },
+    })
     expect(deactivated.active).toBe(false)
   })
 
-  it('returns VACCINE_NOT_FOUND for missing vaccines', async () => {
-    repository.findOne.mockResolvedValue(null)
+  it('reactivates an existing vaccine', async () => {
+    mockVaccineLookup({ ...activeVaccine, active: false } as Vaccine)
+    repository.save.mockImplementation(value =>
+      Promise.resolve(value as Vaccine),
+    )
 
+    const reactivated = await service.setVaccineActive(vaccineId, true)
+
+    expect(reactivated.active).toBe(true)
+  })
+
+  it('finds vaccines by string ID through the shared lookup path', async () => {
+    mockVaccineLookup(activeVaccine)
+
+    const result = await service.findVaccineById(vaccineId, UserRole.ADMIN)
+
+    expect(repository.findOne).toHaveBeenCalledWith({
+      where: { _id: new ObjectId(vaccineId) },
+    })
+    expect(result).toEqual(activeVaccine)
+  })
+
+  it('returns VACCINE_NOT_FOUND for malformed IDs', async () => {
     await expect(
       service.updateVaccine('missing-id', { description: 'x' }),
     ).rejects.toBeInstanceOf(VaccineNotFoundException)
+
+    expect(repository.findOne).not.toHaveBeenCalled()
+  })
+
+  it('returns VACCINE_NOT_FOUND for valid but nonexistent ObjectIds', async () => {
+    mockVaccineLookup(null)
+
+    await expect(
+      service.setVaccineActive(nonexistentVaccineId, false),
+    ).rejects.toBeInstanceOf(VaccineNotFoundException)
+
+    expect(repository.findOne).toHaveBeenCalledWith({
+      where: { _id: new ObjectId(nonexistentVaccineId) },
+    })
   })
 
   it('hides inactive vaccines from APOTHEKER by id', async () => {
-    repository.findOne.mockResolvedValue({
-      ...activeVaccine,
-      active: false,
-    } as Vaccine)
+    mockVaccineLookup({ ...activeVaccine, active: false } as Vaccine)
 
     await expect(
       service.findVaccineById(vaccineId, UserRole.APOTHEKER),
