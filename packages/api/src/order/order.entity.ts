@@ -9,6 +9,7 @@ import {
 } from 'typeorm'
 
 import { OrderLine } from './order-line.entity'
+import { OrderStatusHistoryEntry } from './order-status-history.type'
 import { OrderStatus } from './order-status.enum'
 
 @Entity('orders')
@@ -57,6 +58,14 @@ export class Order {
   @Column({ nullable: true })
   @Field(() => Date, { nullable: true })
   cancelledAt?: Date | null
+
+  @Column({ default: [] })
+  @Field(() => [OrderStatusHistoryEntry], { defaultValue: [] })
+  statusHistory?: OrderStatusHistoryEntry[]
+
+  @Column({ nullable: true })
+  @Field(() => Date, { nullable: true })
+  stockDecrementedAt?: Date | null
 
   @Column()
   @Field()

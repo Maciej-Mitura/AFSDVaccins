@@ -72,4 +72,12 @@ export class StockAdjustmentRepository {
 
     return savedAdjustment
   }
+
+  async findByIdempotencyKey(
+    idempotencyKey: string,
+  ): Promise<StockAdjustment | null> {
+    return this.stockAdjustmentRepository.findOne({
+      where: { idempotencyKey },
+    })
+  }
 }

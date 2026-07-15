@@ -14,6 +14,7 @@ import { PubSub } from 'graphql-subscriptions'
 
 import { AuthorizationGuard } from '../authentication/authorization.guard'
 import {
+  ADMIN_OPERATIONS_FEED_EVENT,
   ORDER_CREATED_EVENT,
   ORDER_UPDATED_EVENT,
   PUB_SUB,
@@ -24,8 +25,11 @@ import { RolesGuard } from '../user/guards/roles.guard'
 import { User } from '../user/user.entity'
 import { UserRole } from '../user/user-role.enum'
 import { UserService } from '../user/user.service'
+import { AdminDailyOrderOverview } from './admin-daily-order-overview.type'
+import { AdminOperationsFeedEvent } from './admin-operations-feed.type'
+import { filterAdminOperationsFeedEvent } from './admin-operations-feed.filter'
+import { AdminWeeklyStatistics } from './admin-weekly-statistics.type'
 import { CreateOrderInput } from './dto/create-order.input'
-import { OrderFilterInput } from './dto/order-filter.input'
 import {
   filterOrderCreatedEvent,
   filterOrderUpdatedEvent,
@@ -107,6 +111,8 @@ export class OrderResolver {
 
   @Query(() => [Order], {
     description: 'Returns all orders for administrative overview',
+    name: 'orders',
+    deprecationReason: 'Use adminOrders instead',
   })
   @UseGuards(AuthorizationGuard, RolesGuard)
   @Roles(UserRole.ADMIN)
@@ -118,14 +124,58 @@ export class OrderResolver {
     @Args('apothekerId', { type: () => ID, nullable: true })
     apothekerId?: string,
   ): Promise<Order[]> {
-    const filter: OrderFilterInput = {
+    return this.orderService.findOrders({
       isoYear,
       isoWeek,
       status,
       apothekerId,
-    }
+    })
+  }
 
-    return this.orderService.findOrders(filter)
+  @Query(() => [Order], {
+    description: 'Returns filtered orders for administrative management',
+  })
+  @UseGuards(AuthorizationGuard, RolesGuard)
+  @Roles(UserRole.ADMIN)
+  adminOrders(
+    @Args('deliveryDate', { nullable: true }) deliveryDate?: string,
+    @Args('isoYear', { type: () => Int, nullable: true }) isoYear?: number,
+    @Args('isoWeek', { type: () => Int, nullable: true }) isoWeek?: number,
+    @Args('status', { type: () => OrderStatus, nullable: true })
+    status?: OrderStatus,
+    @Args('apothekerId', { type: () => ID, nullable: true })
+    apothekerId?: string,
+  ): Promise<Order[]> {
+    return this.orderService.findOrders({
+      deliveryDate,
+      isoYear,
+      isoWeek,
+      status,
+      apothekerId,
+    })
+  }
+
+  @Query(() => AdminDailyOrderOverview, {
+    description: 'Returns aggregated order overview for a delivery date',
+  })
+  @UseGuards(AuthorizationGuard, RolesGuard)
+  @Roles(UserRole.ADMIN)
+  adminDailyOrderOverview(
+    @Args('deliveryDate') deliveryDate: string,
+  ): Promise<AdminDailyOrderOverview> {
+    return this.orderService.getAdminDailyOrderOverview(deliveryDate)
+  }
+
+  @Query(() => AdminWeeklyStatistics, {
+    description: 'Returns aggregated weekly order statistics',
+  })
+  @UseGuards(AuthorizationGuard, RolesGuard)
+  @Roles(UserRole.ADMIN)
+  adminWeeklyStatistics(
+    @Args('isoYear', { type: () => Int }) isoYear: number,
+    @Args('isoWeek', { type: () => Int }) isoWeek: number,
+  ): Promise<AdminWeeklyStatistics> {
+    return this.orderService.getAdminWeeklyStatistics(isoYear, isoWeek)
   }
 
   @Query(() => Order, {
@@ -135,6 +185,33 @@ export class OrderResolver {
   @Roles(UserRole.ADMIN)
   order(@Args('id', { type: () => ID }) id: string): Promise<Order> {
     return this.orderService.findOrderById(id)
+  }
+
+  @Mutation(() => Order, {
+    description: 'Updates order status according to the admin state machine',
+  })
+  @UseGuards(AuthorizationGuard, RolesGuard)
+  @Roles(UserRole.ADMIN)
+  updateOrderStatus(
+    @CurrentUser() user: User,
+    @Args('id', { type: () => ID }) id: string,
+    @Args('status', { type: () => OrderStatus }) status: OrderStatus,
+    @Args('reason', { nullable: true }) reason?: string,
+  ): Promise<Order> {
+    return this.orderService.updateOrderStatus(user, id, status, reason)
+  }
+
+  @Mutation(() => Order, {
+    description: 'Cancels an eligible order as administrator',
+  })
+  @UseGuards(AuthorizationGuard, RolesGuard)
+  @Roles(UserRole.ADMIN)
+  cancelOrder(
+    @CurrentUser() user: User,
+    @Args('id', { type: () => ID }) id: string,
+    @Args('reason', { nullable: true }) reason?: string,
+  ): Promise<Order> {
+    return this.orderService.cancelOrder(user, id, reason)
   }
 
   @Subscription(() => Order, {
@@ -157,6 +234,18 @@ export class OrderResolver {
   @Roles(UserRole.APOTHEKER, UserRole.ADMIN)
   orderUpdated() {
     return this.pubSub.asyncIterableIterator(ORDER_UPDATED_EVENT)
+  }
+
+  @Subscription(() => AdminOperationsFeedEvent, {
+    description: 'Live operational events for administrators',
+    filter: filterAdminOperationsFeedEvent,
+    resolve: (payload: { adminOperationsFeed: AdminOperationsFeedEvent }) =>
+      payload.adminOperationsFeed,
+  })
+  @UseGuards(AuthorizationGuard, RolesGuard)
+  @Roles(UserRole.ADMIN)
+  adminOperationsFeed() {
+    return this.pubSub.asyncIterableIterator(ADMIN_OPERATIONS_FEED_EVENT)
   }
 
   @ResolveField(() => User, {

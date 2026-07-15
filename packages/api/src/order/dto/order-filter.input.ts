@@ -24,4 +24,10 @@ export class OrderFilterInput {
   @IsString()
   @IsNotEmpty()
   apothekerId?: string
+
+  @Field({ nullable: true })
+  @IsOptional()
+  @IsString()
+  @IsNotEmpty()
+  deliveryDate?: string
 }

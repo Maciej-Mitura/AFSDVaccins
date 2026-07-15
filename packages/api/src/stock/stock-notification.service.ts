@@ -1,5 +1,14 @@
-import { Injectable } from '@nestjs/common'
+import { Inject, Injectable } from '@nestjs/common'
+import { PubSub } from 'graphql-subscriptions'
 
+import {
+  ADMIN_OPERATIONS_FEED_EVENT,
+  PUB_SUB,
+} from '../common/pubsub/pubsub.constants'
+import {
+  AdminOperationsEventType,
+  AdminOperationsFeedEvent,
+} from '../order/admin-operations-feed.type'
 import { NotificationType } from '../notifications/notification-type.enum'
 import { NotificationService } from '../notifications/notification.service'
 import { UserRole } from '../user/user-role.enum'
@@ -11,6 +20,7 @@ export class StockNotificationService {
   constructor(
     private readonly notificationService: NotificationService,
     private readonly userService: UserService,
+    @Inject(PUB_SUB) private readonly pubSub: PubSub,
   ) {}
 
   hasEnteredLowStock(
@@ -61,5 +71,16 @@ export class StockNotificationService {
         }),
       ),
     )
+
+    const feedEvent: AdminOperationsFeedEvent = {
+      eventType: AdminOperationsEventType.LOW_STOCK,
+      occurredAt: new Date(),
+      vaccine,
+      message: `${vaccine.name} heeft nog ${quantityAfter} dosissen (drempel: ${vaccine.stockWarningThreshold}).`,
+    }
+
+    await this.pubSub.publish(ADMIN_OPERATIONS_FEED_EVENT, {
+      adminOperationsFeed: feedEvent,
+    })
   }
 }

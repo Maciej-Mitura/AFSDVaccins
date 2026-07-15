@@ -12,11 +12,24 @@ import {
   type OrderUpdatedSubscription,
 } from '@/assets/graphql/order.subscription'
 import {
+  ADMIN_DAILY_ORDER_OVERVIEW_QUERY,
+  ADMIN_ORDERS_QUERY,
+  ADMIN_WEEKLY_STATISTICS_QUERY,
+  CANCEL_ORDER_MUTATION,
   CANCEL_OWN_ORDER_MUTATION,
   CREATE_ORDER_MUTATION,
   MY_ORDERS_QUERY,
   MY_WEEKLY_ORDER_SUMMARY_QUERY,
   ORDERS_QUERY,
+  UPDATE_ORDER_STATUS_MUTATION,
+  type AdminDailyOrderOverviewQuery,
+  type AdminDailyOrderOverviewQueryVariables,
+  type AdminOrdersQuery,
+  type AdminOrdersQueryVariables,
+  type AdminWeeklyStatisticsQuery,
+  type AdminWeeklyStatisticsQueryVariables,
+  type CancelOrderMutation,
+  type CancelOrderMutationVariables,
   type CancelOwnOrderMutation,
   type CreateOrderMutation,
   type CreateOrderMutationVariables,
@@ -24,16 +37,24 @@ import {
   type MyWeeklyOrderSummaryQuery,
   type OrdersQuery,
   type OrdersQueryVariables,
+  type UpdateOrderStatusMutation,
+  type UpdateOrderStatusMutationVariables,
 } from '@/assets/graphql/order'
 import { mapGraphQLError } from '@/composables/useCurrentUser'
 import useGraphQL from '@/composables/useGraphQL'
 
 export type OrderListItem = MyOrdersQuery['myOrders'][number]
-export type AdminOrderListItem = OrdersQuery['orders'][number]
+export type AdminOrderListItem = AdminOrdersQuery['adminOrders'][number]
+export type AdminDailyOverview =
+  AdminDailyOrderOverviewQuery['adminDailyOrderOverview']
+export type AdminWeeklyStats =
+  AdminWeeklyStatisticsQuery['adminWeeklyStatistics']
 export type WeeklyOrderSummary = MyWeeklyOrderSummaryQuery['myWeeklyOrderSummary']
 
 const myOrders = ref<OrderListItem[]>([])
 const adminOrders = ref<AdminOrderListItem[]>([])
+const dailyOverview = ref<AdminDailyOverview | null>(null)
+const weeklyStatistics = ref<AdminWeeklyStats | null>(null)
 const weeklySummary = ref<WeeklyOrderSummary | null>(null)
 const loading = ref(false)
 const errorMessage = ref<string | null>(null)
@@ -69,7 +90,7 @@ function upsertAdminOrder(order: AdminOrderListItem): void {
 
 function orderMatchesAdminFilters(
   order: AdminOrderListItem,
-  filters: OrdersQueryVariables,
+  filters: AdminOrdersQueryVariables,
 ): boolean {
   if (filters.isoYear !== undefined && order.isoYear !== filters.isoYear) {
     return false
@@ -222,25 +243,137 @@ export function useOrders() {
   }
 
   async function loadAdminOrders(
-    variables: OrdersQueryVariables = {},
+    variables: AdminOrdersQueryVariables = {},
   ): Promise<void> {
     loading.value = true
     errorMessage.value = null
 
     try {
-      const result = await apolloClient.query<OrdersQuery>({
-        query: ORDERS_QUERY,
+      const result = await apolloClient.query<AdminOrdersQuery>({
+        query: ADMIN_ORDERS_QUERY,
         variables,
         fetchPolicy: 'network-only',
       })
 
-      adminOrders.value = result.data.orders
+      adminOrders.value = result.data.adminOrders
     } catch (error: unknown) {
       errorMessage.value = mapGraphQLError(error)
       throw error
     } finally {
       loading.value = false
     }
+  }
+
+  async function loadAdminDailyOverview(
+    deliveryDate: string,
+  ): Promise<AdminDailyOverview> {
+    loading.value = true
+    errorMessage.value = null
+
+    try {
+      const result = await apolloClient.query<AdminDailyOrderOverviewQuery>({
+        query: ADMIN_DAILY_ORDER_OVERVIEW_QUERY,
+        variables: { deliveryDate } satisfies AdminDailyOrderOverviewQueryVariables,
+        fetchPolicy: 'network-only',
+      })
+
+      dailyOverview.value = result.data.adminDailyOrderOverview
+      return result.data.adminDailyOrderOverview
+    } catch (error: unknown) {
+      errorMessage.value = mapGraphQLError(error)
+      throw error
+    } finally {
+      loading.value = false
+    }
+  }
+
+  async function loadAdminWeeklyStatistics(
+    isoYear: number,
+    isoWeek: number,
+  ): Promise<AdminWeeklyStats> {
+    loading.value = true
+    errorMessage.value = null
+
+    try {
+      const result = await apolloClient.query<AdminWeeklyStatisticsQuery>({
+        query: ADMIN_WEEKLY_STATISTICS_QUERY,
+        variables: { isoYear, isoWeek },
+        fetchPolicy: 'network-only',
+      })
+
+      weeklyStatistics.value = result.data.adminWeeklyStatistics
+      return result.data.adminWeeklyStatistics
+    } catch (error: unknown) {
+      errorMessage.value = mapGraphQLError(error)
+      throw error
+    } finally {
+      loading.value = false
+    }
+  }
+
+  async function updateOrderStatus(
+    id: string,
+    status: UpdateOrderStatusMutationVariables['status'],
+    reason?: string,
+  ): Promise<AdminOrderListItem> {
+    loading.value = true
+    errorMessage.value = null
+
+    try {
+      const result = await apolloClient.mutate<UpdateOrderStatusMutation>({
+        mutation: UPDATE_ORDER_STATUS_MUTATION,
+        variables: { id, status, reason },
+      })
+
+      if (!result.data?.updateOrderStatus) {
+        throw new Error('Kon de bestellingsstatus niet bijwerken.')
+      }
+
+      const updated = result.data.updateOrderStatus as AdminOrderListItem
+      upsertAdminOrder(updated)
+      return updated
+    } catch (error: unknown) {
+      errorMessage.value = mapGraphQLError(error)
+      throw error
+    } finally {
+      loading.value = false
+    }
+  }
+
+  async function cancelOrderAsAdmin(
+    id: string,
+    reason?: string,
+  ): Promise<AdminOrderListItem> {
+    loading.value = true
+    errorMessage.value = null
+
+    try {
+      const result = await apolloClient.mutate<CancelOrderMutation>({
+        mutation: CANCEL_ORDER_MUTATION,
+        variables: { id, reason },
+      })
+
+      if (!result.data?.cancelOrder) {
+        throw new Error('Kon de bestelling niet annuleren.')
+      }
+
+      const cancelled = result.data.cancelOrder as AdminOrderListItem
+      upsertAdminOrder(cancelled)
+      return cancelled
+    } catch (error: unknown) {
+      errorMessage.value = mapGraphQLError(error)
+      throw error
+    } finally {
+      loading.value = false
+    }
+  }
+
+  function isInvalidOrderStatusTransitionError(error: unknown): boolean {
+    return extractGraphQLErrorCode(error) === 'INVALID_ORDER_STATUS_TRANSITION'
+  }
+
+  function isInsufficientStockError(error: unknown): boolean {
+    return extractGraphQLErrorCode(error) === 'INSUFFICIENT_STOCK'
   }
 
   function isOrderCannotBeCancelledError(error: unknown): boolean {
@@ -300,7 +433,7 @@ export function useOrders() {
   }
 
   function subscribeToAdminOrderEvents(
-    filters: OrdersQueryVariables = {},
+    filters: AdminOrdersQueryVariables = {},
   ): () => void {
     stopAdminOrderSubscriptions()
 
@@ -346,6 +479,8 @@ export function useOrders() {
   return {
     myOrders,
     adminOrders,
+    dailyOverview,
+    weeklyStatistics,
     weeklySummary,
     loading,
     errorMessage,
@@ -355,6 +490,10 @@ export function useOrders() {
     createOrder,
     cancelOwnOrder,
     loadAdminOrders,
+    loadAdminDailyOverview,
+    loadAdminWeeklyStatistics,
+    updateOrderStatus,
+    cancelOrderAsAdmin,
     subscribeToMyOrderEvents,
     subscribeToAdminOrderEvents,
     stopMyOrderSubscriptions,
@@ -363,6 +502,8 @@ export function useOrders() {
     isDailyLimitExceededError,
     isVaccineInactiveError,
     isOrderCannotBeCancelledError,
+    isInvalidOrderStatusTransitionError,
+    isInsufficientStockError,
     mapGraphQLError,
   }
 }

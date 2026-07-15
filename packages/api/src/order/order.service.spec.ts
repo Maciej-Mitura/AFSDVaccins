@@ -22,7 +22,9 @@ import {
   WeeklyLimitExceededException,
 } from './exceptions/order.exceptions'
 import { OrderNotificationService } from '../notifications/order-notification.service'
+import { StockService } from '../stock/stock.service'
 import { OrderEventsService } from './order-events.service'
+import { OrderNormalizationService } from './order-normalization.service'
 import { Order } from './order.entity'
 import { OrderStatus } from './order-status.enum'
 import { OrderService } from './order.service'
@@ -45,7 +47,10 @@ describe('OrderService', () => {
     >
   >
   let orderEventsService: jest.Mocked<
-    Pick<OrderEventsService, 'publishOrderCreated' | 'publishOrderUpdated'>
+    Pick<
+      OrderEventsService,
+      'publishOrderCreated' | 'publishOrderUpdated' | 'publishOrderStatusChanged'
+    >
   >
 
   const apothekerId = '507f1f77bcf86cd799439011'
@@ -145,6 +150,7 @@ describe('OrderService', () => {
     orderEventsService = {
       publishOrderCreated: jest.fn().mockResolvedValue(undefined),
       publishOrderUpdated: jest.fn().mockResolvedValue(undefined),
+      publishOrderStatusChanged: jest.fn().mockResolvedValue(undefined),
     }
 
     orderNotificationService = {
@@ -174,6 +180,21 @@ describe('OrderService', () => {
         {
           provide: OrderNotificationService,
           useValue: orderNotificationService,
+        },
+        {
+          provide: OrderNormalizationService,
+          useValue: {
+            normalizeOrderIfNeeded: jest.fn((order: Order) => Promise.resolve(order)),
+            normalizeOrdersIfNeeded: jest.fn((orders: Order[]) =>
+              Promise.resolve(orders),
+            ),
+          },
+        },
+        {
+          provide: StockService,
+          useValue: {
+            applyDeliveryDecrement: jest.fn(),
+          },
         },
         {
           provide: CLOCK,
@@ -241,7 +262,7 @@ describe('OrderService', () => {
 
     expect(orderEventsService.publishOrderCreated).toHaveBeenCalledTimes(1)
     expect(orderNotificationService.handleOrderCreated).toHaveBeenCalledTimes(1)
-    expect(orderEventsService.publishOrderUpdated).not.toHaveBeenCalled()
+    expect(orderEventsService.publishOrderStatusChanged).not.toHaveBeenCalled()
   })
 
   it('does not create notifications when validation fails', async () => {
@@ -489,7 +510,7 @@ describe('OrderService', () => {
 
     expect(result.status).toBe(OrderStatus.CANCELLED)
     expect(result.cancelledAt).toEqual(now)
-    expect(orderEventsService.publishOrderUpdated).toHaveBeenCalledTimes(1)
+    expect(orderEventsService.publishOrderStatusChanged).toHaveBeenCalledTimes(1)
     expect(
       orderNotificationService.createOrderCancelledNotification,
     ).toHaveBeenCalledTimes(1)
@@ -508,7 +529,7 @@ describe('OrderService', () => {
 
     expect(result).toEqual(cancelled)
     expect(repository.save).not.toHaveBeenCalled()
-    expect(orderEventsService.publishOrderUpdated).not.toHaveBeenCalled()
+    expect(orderEventsService.publishOrderStatusChanged).not.toHaveBeenCalled()
     expect(
       orderNotificationService.createOrderCancelledNotification,
     ).not.toHaveBeenCalled()

@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common'
 import { TypeOrmModule } from '@nestjs/typeorm'
 
 import { AuthenticationModule } from '../authentication/authentication.module'
+import { PubSubModule } from '../common/pubsub/pubsub.module'
 import { NotificationsModule } from '../notifications/notifications.module'
 import { UserModule } from '../user/user.module'
 import { Vaccine } from '../vaccine/vaccine.entity'
@@ -23,6 +24,7 @@ const stockServiceProvider = isSchemaGeneration
       provide: StockService,
       useValue: {
         adjustVaccineStock: () => Promise.resolve(null),
+        applyDeliveryDecrement: () => Promise.resolve(null),
         findStockAdjustments: () => Promise.resolve([]),
         findVaccineStockHistory: () => Promise.resolve([]),
       },
@@ -78,6 +80,7 @@ const persistenceImports = isSchemaGeneration
 @Module({
   imports: [
     AuthenticationModule,
+    PubSubModule,
     UserModule,
     VaccineModule,
     NotificationsModule,

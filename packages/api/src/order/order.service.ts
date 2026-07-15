@@ -3,9 +3,10 @@ import { InjectRepository } from '@nestjs/typeorm'
 import { ObjectId } from 'mongodb'
 import { MongoRepository } from 'typeorm'
 
+import { OrderNotificationService } from '../notifications/order-notification.service'
 import { ApplicationSettings } from '../settings/settings.entity'
 import { SettingsService } from '../settings/settings.service'
-import { OrderNotificationService } from '../notifications/order-notification.service'
+import { StockService } from '../stock/stock.service'
 import { User } from '../user/user.entity'
 import { UserRole } from '../user/user-role.enum'
 import {
@@ -14,6 +15,13 @@ import {
 } from '../vaccine/exceptions/vaccine.exceptions'
 import { Vaccine } from '../vaccine/vaccine.entity'
 import { VaccineService } from '../vaccine/vaccine.service'
+import {
+  AdminDailyOrderOverview,
+  AdminDailyPharmacistSummary,
+  AdminDailyVaccineQuantity,
+  AdminOrderStatusCount,
+} from './admin-daily-order-overview.type'
+import { AdminWeeklyStatistics } from './admin-weekly-statistics.type'
 import { CLOCK } from './clock.provider'
 import type { Clock } from './clock.provider'
 import {
@@ -26,6 +34,7 @@ import { OrderFilterInput } from './dto/order-filter.input'
 import {
   DailyLimitExceededException,
   InvalidOrderQuantityException,
+  InvalidOrderStatusTransitionException,
   OrderCannotBeCancelledException,
   OrderNotFoundException,
   OrderNotOwnedException,
@@ -33,6 +42,12 @@ import {
 } from './exceptions/order.exceptions'
 import { OrderLine } from './order-line.entity'
 import { OrderEventsService } from './order-events.service'
+import { OrderNormalizationService } from './order-normalization.service'
+import { OrderStatusHistoryEntry } from './order-status-history.type'
+import {
+  canAdminCancelOrder,
+  canTransitionOrderStatus,
+} from './order-status.policy'
 import { Order } from './order.entity'
 import { OrderStatus } from './order-status.enum'
 import { WeeklyOrderSummary } from './weekly-order-summary.type'
@@ -51,6 +66,8 @@ export class OrderService {
     private readonly settingsService: SettingsService,
     private readonly orderEventsService: OrderEventsService,
     private readonly orderNotificationService: OrderNotificationService,
+    private readonly orderNormalizationService: OrderNormalizationService,
+    private readonly stockService: StockService,
     @Inject(CLOCK) private readonly clock: Clock,
   ) {}
 
@@ -68,6 +85,52 @@ export class OrderService {
     }
 
     return order
+  }
+
+  private async requireNormalizedById(id: string): Promise<Order> {
+    const order = await this.requireById(id)
+    return this.orderNormalizationService.normalizeOrderIfNeeded(order)
+  }
+
+  private buildInitialStatusHistoryEntry(
+    order: Order,
+    changedByUserId: string,
+  ): OrderStatusHistoryEntry {
+    return {
+      fromStatus: null,
+      toStatus: OrderStatus.PENDING,
+      changedAt: order.submittedAt ?? this.clock.now(),
+      changedByUserId,
+      reason: null,
+    }
+  }
+
+  private appendStatusHistory(
+    order: Order,
+    fromStatus: OrderStatus,
+    toStatus: OrderStatus,
+    changedByUserId: string,
+    reason?: string | null,
+  ): void {
+    if (!Array.isArray(order.statusHistory)) {
+      order.statusHistory = []
+    }
+
+    order.statusHistory.push({
+      fromStatus,
+      toStatus,
+      changedAt: this.clock.now(),
+      changedByUserId,
+      reason: reason ?? null,
+    })
+  }
+
+  private isDeliveryAlreadyProcessed(order: Order): boolean {
+    return (
+      order.status === OrderStatus.DELIVERED &&
+      order.stockDecrementedAt !== null &&
+      order.stockDecrementedAt !== undefined
+    )
   }
 
   private normalizeLines(
@@ -161,10 +224,12 @@ export class OrderService {
   }
 
   private async findOrdersForApotheker(apothekerId: string): Promise<Order[]> {
-    return this.orderRepository.find({
+    const orders = await this.orderRepository.find({
       where: { apothekerId },
       order: { submittedAt: 'DESC' },
     })
+
+    return this.orderNormalizationService.normalizeOrdersIfNeeded(orders)
   }
 
   private buildWeeklySummary(
@@ -188,6 +253,49 @@ export class OrderService {
       warningReached: percentageUsed >= settings.weeklyWarningPercentage,
       remainingQuantity: Math.max(weeklyLimit - orderedQuantity, 0),
     }
+  }
+
+  private buildStatusCounts(orders: Order[]): AdminOrderStatusCount[] {
+    const counts = new Map<OrderStatus, number>()
+
+    for (const status of Object.values(OrderStatus)) {
+      counts.set(status, 0)
+    }
+
+    for (const order of orders) {
+      counts.set(order.status, (counts.get(order.status) ?? 0) + 1)
+    }
+
+    return [...counts.entries()].map(([status, count]) => ({ status, count }))
+  }
+
+  private buildVaccineQuantities(
+    orders: Order[],
+    includeCancelled: boolean,
+  ): AdminDailyVaccineQuantity[] {
+    const totals = new Map<string, AdminDailyVaccineQuantity>()
+
+    for (const order of orders) {
+      if (!includeCancelled && order.status === OrderStatus.CANCELLED) {
+        continue
+      }
+
+      for (const line of order.orderLines) {
+        const existing = totals.get(line.vaccineId)
+
+        if (existing) {
+          existing.quantity += line.quantity
+        } else {
+          totals.set(line.vaccineId, {
+            vaccineId: line.vaccineId,
+            vaccineName: line.vaccineName,
+            quantity: line.quantity,
+          })
+        }
+      }
+    }
+
+    return [...totals.values()]
   }
 
   async createOrder(user: User, input: CreateOrderInput): Promise<Order> {
@@ -260,6 +368,16 @@ export class OrderService {
       submittedAt,
       deliveryDate,
       cancelledAt: null,
+      stockDecrementedAt: null,
+      statusHistory: [
+        {
+          fromStatus: null,
+          toStatus: OrderStatus.PENDING,
+          changedAt: submittedAt,
+          changedByUserId: user._id.toString(),
+          reason: null,
+        },
+      ],
     })
 
     const saved = await this.orderRepository.save(order)
@@ -295,7 +413,7 @@ export class OrderService {
   }
 
   async findMyOrder(user: User, id: string): Promise<Order> {
-    const order = await this.requireById(id)
+    const order = await this.requireNormalizedById(id)
 
     if (order.apothekerId.toString() !== user._id.toString()) {
       throw new OrderNotOwnedException()
@@ -340,11 +458,18 @@ export class OrderService {
       throw new OrderCannotBeCancelledException()
     }
 
+    const previousStatus = order.status
     order.status = OrderStatus.CANCELLED
     order.cancelledAt = this.clock.now()
+    this.appendStatusHistory(
+      order,
+      previousStatus,
+      OrderStatus.CANCELLED,
+      user._id.toString(),
+    )
 
     const saved = await this.orderRepository.save(order)
-    await this.orderEventsService.publishOrderUpdated(saved)
+    await this.orderEventsService.publishOrderStatusChanged(saved)
     await this.orderNotificationService.createOrderCancelledNotification(
       user,
       saved,
@@ -368,6 +493,10 @@ export class OrderService {
       where.status = filter.status
     }
 
+    if (filter?.deliveryDate !== undefined) {
+      where.deliveryDate = filter.deliveryDate
+    }
+
     if (filter?.apothekerId !== undefined) {
       if (!ObjectId.isValid(filter.apothekerId)) {
         return []
@@ -376,13 +505,215 @@ export class OrderService {
       where.apothekerId = filter.apothekerId
     }
 
-    return this.orderRepository.find({
+    const orders = await this.orderRepository.find({
       where,
       order: { submittedAt: 'DESC' },
     })
+
+    return this.orderNormalizationService.normalizeOrdersIfNeeded(orders)
   }
 
   async findOrderById(id: string): Promise<Order> {
-    return this.requireById(id)
+    return this.requireNormalizedById(id)
+  }
+
+  async updateOrderStatus(
+    admin: User,
+    id: string,
+    targetStatus: OrderStatus,
+    reason?: string | null,
+  ): Promise<Order> {
+    const order = await this.requireNormalizedById(id)
+
+    if (order.status === targetStatus) {
+      if (
+        targetStatus === OrderStatus.DELIVERED &&
+        !this.isDeliveryAlreadyProcessed(order)
+      ) {
+        // Legacy DELIVERED records may lack stockDecrementedAt — allow one delivery attempt.
+      } else {
+        return order
+      }
+    }
+
+    if (
+      order.status !== targetStatus &&
+      !canTransitionOrderStatus(order.status, targetStatus)
+    ) {
+      throw new InvalidOrderStatusTransitionException(
+        order.status,
+        targetStatus,
+      )
+    }
+
+    if (targetStatus === OrderStatus.DELIVERED) {
+      if (this.isDeliveryAlreadyProcessed(order)) {
+        return order
+      }
+
+      const decrementResult = await this.stockService.applyDeliveryDecrement(
+        admin,
+        order.id,
+        order.orderLines,
+      )
+
+      const previousStatus = order.status
+      const wasAlreadyDelivered = previousStatus === OrderStatus.DELIVERED
+      order.status = OrderStatus.DELIVERED
+
+      if (!decrementResult.alreadyProcessed) {
+        order.stockDecrementedAt = this.clock.now()
+      } else if (!order.stockDecrementedAt) {
+        order.stockDecrementedAt = this.clock.now()
+      }
+
+      if (!wasAlreadyDelivered) {
+        this.appendStatusHistory(
+          order,
+          previousStatus,
+          OrderStatus.DELIVERED,
+          admin._id.toString(),
+          reason,
+        )
+      }
+
+      const saved = await this.orderRepository.save(order)
+
+      if (!decrementResult.alreadyProcessed) {
+        await this.orderNotificationService.createOrderDeliveredNotification(
+          saved,
+        )
+        await this.orderEventsService.publishOrderStatusChanged(saved)
+      }
+
+      return saved
+    }
+
+    const previousStatus = order.status
+    order.status = targetStatus
+    this.appendStatusHistory(
+      order,
+      previousStatus,
+      targetStatus,
+      admin._id.toString(),
+      reason,
+    )
+
+    const saved = await this.orderRepository.save(order)
+    await this.orderEventsService.publishOrderStatusChanged(saved)
+
+    return saved
+  }
+
+  async cancelOrder(
+    admin: User,
+    id: string,
+    reason?: string | null,
+  ): Promise<Order> {
+    const order = await this.requireNormalizedById(id)
+
+    if (order.status === OrderStatus.CANCELLED) {
+      return order
+    }
+
+    if (!canAdminCancelOrder(order.status)) {
+      throw new OrderCannotBeCancelledException()
+    }
+
+    const previousStatus = order.status
+    order.status = OrderStatus.CANCELLED
+    order.cancelledAt = this.clock.now()
+    this.appendStatusHistory(
+      order,
+      previousStatus,
+      OrderStatus.CANCELLED,
+      admin._id.toString(),
+      reason,
+    )
+
+    const saved = await this.orderRepository.save(order)
+    await this.orderEventsService.publishOrderStatusChanged(saved)
+    await this.orderNotificationService.createAdminCancelledOrderNotification(
+      saved,
+    )
+
+    return saved
+  }
+
+  async getAdminDailyOrderOverview(
+    deliveryDate: string,
+  ): Promise<AdminDailyOrderOverview> {
+    const orders = await this.findOrders({ deliveryDate })
+    const activeOrders = orders.filter(
+      order => order.status !== OrderStatus.CANCELLED,
+    )
+    const cancelledOrders = orders.filter(
+      order => order.status === OrderStatus.CANCELLED,
+    )
+
+    const pharmacistMap = new Map<string, AdminDailyPharmacistSummary>()
+
+    for (const order of activeOrders) {
+      const apothekerId = order.apothekerId.toString()
+      const existing = pharmacistMap.get(apothekerId)
+
+      if (existing) {
+        existing.orderCount += 1
+        existing.totalDoses += order.totalQuantity
+      } else {
+        pharmacistMap.set(apothekerId, {
+          apothekerId,
+          orderCount: 1,
+          totalDoses: order.totalQuantity,
+        })
+      }
+    }
+
+    return {
+      deliveryDate,
+      totalOrders: activeOrders.length,
+      totalDoses: activeOrders.reduce(
+        (sum, order) => sum + order.totalQuantity,
+        0,
+      ),
+      cancelledOrderCount: cancelledOrders.length,
+      cancelledDoseCount: cancelledOrders.reduce(
+        (sum, order) => sum + order.totalQuantity,
+        0,
+      ),
+      statusCounts: this.buildStatusCounts(orders),
+      pharmacistSummaries: [...pharmacistMap.values()],
+      vaccineQuantities: this.buildVaccineQuantities(activeOrders, true),
+    }
+  }
+
+  async getAdminWeeklyStatistics(
+    isoYear: number,
+    isoWeek: number,
+  ): Promise<AdminWeeklyStatistics> {
+    const orders = await this.findOrders({ isoYear, isoWeek })
+    const activeOrders = orders.filter(
+      order => order.status !== OrderStatus.CANCELLED,
+    )
+    const cancelledOrders = orders.filter(
+      order => order.status === OrderStatus.CANCELLED,
+    )
+
+    return {
+      isoYear,
+      isoWeek,
+      totalOrders: activeOrders.length,
+      totalDoses: activeOrders.reduce(
+        (sum, order) => sum + order.totalQuantity,
+        0,
+      ),
+      cancelledOrderCount: cancelledOrders.length,
+      cancelledDoseCount: cancelledOrders.reduce(
+        (sum, order) => sum + order.totalQuantity,
+        0,
+      ),
+      statusCounts: this.buildStatusCounts(orders),
+      vaccineQuantities: this.buildVaccineQuantities(activeOrders, true),
+    }
   }
 }

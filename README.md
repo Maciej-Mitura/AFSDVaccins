@@ -7,13 +7,13 @@ screens.
 
 ## Current status
 
-**Phase 9 — authoritative stock management and low-stock alerts complete.**
-`StockService` is the sole writer of `Vaccine.stockQuantity`. Every change creates an
-immutable `StockAdjustment` audit row. ADMIN manages stock on `/admin/stock`; low-stock
-warnings persist and publish to ADMIN recipients only when stock crosses below the
-configured threshold.
+**Phase 10 — admin order management and delivery transition complete.**
+Administrators manage order status (`PENDING` → `PLANNED` → `DELIVERED`), delivery
+decrements stock idempotently through `StockService`, daily/weekly operational
+aggregates are available, and the `adminOperationsFeed` subscription delivers live
+operational events to ADMIN only.
 
-**Next phase:** Phase 10 — admin order management and delivery transition (see `docs/implementation-roadmap.md`).
+**Next phase:** Phase 11 — route templates (see `docs/implementation-roadmap.md`).
 
 ## Planned stack
 
@@ -340,7 +340,7 @@ with missing defaults on read (one repair write per document).
 Only **`StockService`** may change it. Vaccine create/update forms manage catalogue
 metadata only (`createVaccine` always starts at `stockQuantity: 0`). Stock changes
 use `adjustVaccineStock` and are recorded in immutable **`StockAdjustment`** rows.
-Delivery-based deduction is **not** implemented until Phase 10.
+Delivery-based deduction runs when an ADMIN marks an order `DELIVERED` (Phase 10).
 
 **Active/inactive:** Prefer deactivation over deletion. Inactive vaccines remain
 visible to ADMIN (`includeInactive: true`) but are hidden from APOTHEKER.
@@ -679,18 +679,18 @@ npm run format:check
 
 ### StockAdjustment fields
 
-| Field                              | Purpose                                                                   |
-| ---------------------------------- | ------------------------------------------------------------------------- |
-| `vaccineId`                        | Which vaccine changed                                                     |
-| `type`                             | `RESTOCK`, `MANUAL_DECREASE`, or `MANUAL_CORRECTION`                      |
+| Field                              | Purpose                                                                     |
+| ---------------------------------- | --------------------------------------------------------------------------- |
+| `vaccineId`                        | Which vaccine changed                                                       |
+| `type`                             | `RESTOCK`, `MANUAL_DECREASE`, `MANUAL_CORRECTION`, or `DELIVERY_DEDUCTION`  |
 | `quantityDelta`                    | Signed change applied (non-zero); not used as input for `MANUAL_CORRECTION` |
 | `targetQuantity`                   | Input for `MANUAL_CORRECTION` — sets stock to this absolute amount          |
-| `quantityBefore` / `quantityAfter` | Server snapshots from successful atomic update                            |
-| `reason`                           | Required free-text admin explanation                                      |
-| `performedByUserId`                | Derived from `@CurrentUser()`                                             |
-| `relatedOrderId`                   | Reserved for Phase 10 delivery decrement (null for manual ops)            |
-| `idempotencyKey`                   | Optional; **omitted** for manual adjustments (sparse unique when present) |
-| `createdAt`                        | Server timestamp                                                          |
+| `quantityBefore` / `quantityAfter` | Server snapshots from successful atomic update                              |
+| `reason`                           | Required free-text admin explanation                                        |
+| `performedByUserId`                | Derived from `@CurrentUser()`                                               |
+| `relatedOrderId`                   | Set for `DELIVERY_DEDUCTION`; null for manual ops                           |
+| `idempotencyKey`                   | `delivery-decrement:{orderId}:{vaccineId}` for delivery; omitted for manual |
+| `createdAt`                        | Server timestamp                                                            |
 
 ### Adjustment rules
 
@@ -758,12 +758,69 @@ balance without its audit row (accepted single-instance MVP limitation).
 10. Restock above threshold, then drop below again — new notification allowed.
 11. Place an order — confirm stock unchanged.
 
+## Admin order management and delivery (Phase 10)
+
+### Order finite-state machine
+
+| From                      | To          | Actor                                 | Stock change          |
+| ------------------------- | ----------- | ------------------------------------- | --------------------- |
+| —                         | `PENDING`   | system (create)                       | none                  |
+| `PENDING`                 | `PLANNED`   | ADMIN                                 | none                  |
+| `PENDING`                 | `DELIVERED` | ADMIN (shortcut)                      | decrement on delivery |
+| `PENDING`                 | `CANCELLED` | ADMIN / APOTHEKER (own, PENDING only) | none                  |
+| `PLANNED`                 | `DELIVERED` | ADMIN                                 | decrement on delivery |
+| `PLANNED`                 | `CANCELLED` | —                                     | **forbidden**         |
+| `DELIVERED` / `CANCELLED` | any         | —                                     | terminal              |
+
+Display mapping: `PENDING` and `PLANNED` → _in behandeling_; `DELIVERED` → _geleverd_.
+
+### Delivery stock decrement
+
+- Runs **only** when an ADMIN transitions an order to `DELIVERED` (not on create or `PLANNED`).
+- All decrements go through `StockService.applyDeliveryDecrement`.
+- Pre-validates every vaccine line; on failure **no** balance change, **no** audit row, **no** notification, **no** realtime event.
+- On partial failure mid-decrement, earlier balance changes are **rolled back** before the error is returned.
+- Audit rows use type `DELIVERY_DEDUCTION` with idempotency key `delivery-decrement:{orderId}:{vaccineId}`.
+
+### Idempotency
+
+- Repeat delivery when `status === DELIVERED` and `stockDecrementedAt` is set → success, no second decrement.
+- Persisted `StockAdjustment.idempotencyKey` and notification deduplication key `order-delivered:{orderId}` prevent duplicates on retry.
+- Idempotent same-status requests append no duplicate status history and publish no events.
+
+### Status history
+
+Embedded `statusHistory` on each order: `fromStatus`, `toStatus`, `changedAt`, `changedByUserId`, optional `reason`. Clients cannot supply history metadata. Legacy orders without history are normalized once on first read (PENDING/CANCELLED/DELIVERED reconstructed from available timestamps; `stockDecrementedAt` is **not** invented for legacy `DELIVERED` records).
+
+### Admin GraphQL
+
+| Operation                                 | Purpose                                                                    |
+| ----------------------------------------- | -------------------------------------------------------------------------- |
+| `adminDailyOrderOverview(deliveryDate)`   | Fulfilment totals by delivery date (cancelled excluded from active totals) |
+| `adminWeeklyStatistics(isoYear, isoWeek)` | Weekly aggregates by delivery-date ISO week                                |
+| `adminOrders(...)`                        | Filtered order list                                                        |
+| `updateOrderStatus(id, status, reason?)`  | ADMIN FSM transitions                                                      |
+| `cancelOrder(id, reason?)`                | ADMIN cancel from `PENDING` only                                           |
+| `adminOperationsFeed`                     | Live `NEW_ORDER`, `ORDER_STATUS_CHANGED`, `LOW_STOCK` for ADMIN            |
+
+### Consistency limitation
+
+Without multi-document MongoDB transactions, a **process crash** between balance rollback/decrement steps and audit insert remains a minimal residual risk. Normal failure paths roll back all balance changes before returning an error. Partial stock loss on insufficient stock is **not** accepted.
+
+### Manual runtime test (Phase 10)
+
+1. Ensure an APOTHEKER has a `PENDING` order with sufficient stock.
+2. Log in as ADMIN → `/admin/orders`.
+3. Move the order to `PLANNED` — confirm no stock change.
+4. Mark `DELIVERED` — confirm one decrement per vaccine, `DELIVERY_DEDUCTION` audit rows, `stockDecrementedAt`, status history.
+5. Repeat mark-delivered — no second decrement, notification, or event.
+6. In another browser profile (APOTHEKER), confirm live status + one `ORDER_DELIVERED` notification.
+7. Attempt delivery with insufficient stock — order unchanged, no audit rows.
+8. Cancel an eligible `PENDING` order — no stock change, one cancellation notification.
+9. Verify daily overview and weekly statistics; confirm `adminOperationsFeed` events.
+10. Confirm APOTHEKER cannot call ADMIN mutations; BEZORGER cannot subscribe to `adminOperationsFeed`.
+
 ## CI
 
 - `.github/workflows/ci-api.yml` — API lint, typecheck, test, build
 - `.github/workflows/ci-pwa.yml` — schema generation, type generation, PWA lint, typecheck, build
-
-## Next phase
-
-**Phase 10 — admin order management and delivery transition** (`docs/implementation-roadmap.md`):
-order FSM transitions, delivery with idempotent stock decrement, and admin operations feed.

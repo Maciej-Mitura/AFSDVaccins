@@ -4,10 +4,12 @@ import { TypeOrmModule } from '@nestjs/typeorm'
 import { NotificationsModule } from '../notifications/notifications.module'
 import { AuthenticationModule } from '../authentication/authentication.module'
 import { SettingsModule } from '../settings/settings.module'
+import { StockModule } from '../stock/stock.module'
 import { UserModule } from '../user/user.module'
 import { VaccineModule } from '../vaccine/vaccine.module'
 import { CLOCK, SystemClock } from './clock.provider'
 import { OrderEventsService } from './order-events.service'
+import { OrderNormalizationService } from './order-normalization.service'
 import { Order } from './order.entity'
 import { OrderResolver } from './order.resolver'
 import { OrderService } from './order.service'
@@ -27,9 +29,23 @@ const orderServiceProvider = isSchemaGeneration
         cancelOwnOrder: () => Promise.resolve(null),
         findOrders: () => Promise.resolve([]),
         findOrderById: () => Promise.resolve(null),
+        updateOrderStatus: () => Promise.resolve(null),
+        cancelOrder: () => Promise.resolve(null),
+        getAdminDailyOrderOverview: () => Promise.resolve(null),
+        getAdminWeeklyStatistics: () => Promise.resolve(null),
       },
     }
   : OrderService
+
+const orderNormalizationProvider = isSchemaGeneration
+  ? {
+      provide: OrderNormalizationService,
+      useValue: {
+        normalizeOrderIfNeeded: (order: Order) => Promise.resolve(order),
+        normalizeOrdersIfNeeded: (orders: Order[]) => Promise.resolve(orders),
+      },
+    }
+  : OrderNormalizationService
 
 const persistenceImports = isSchemaGeneration
   ? []
@@ -42,10 +58,12 @@ const persistenceImports = isSchemaGeneration
     VaccineModule,
     SettingsModule,
     NotificationsModule,
+    StockModule,
     ...persistenceImports,
   ],
   providers: [
     orderServiceProvider,
+    orderNormalizationProvider,
     OrderEventsService,
     OrderResolver,
     {

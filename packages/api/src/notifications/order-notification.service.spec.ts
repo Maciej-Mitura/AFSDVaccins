@@ -101,4 +101,18 @@ describe('OrderNotificationService', () => {
       }),
     )
   })
+
+  it('creates delivered notification once with deterministic deduplication key', async () => {
+    await service.createOrderDeliveredNotification({
+      ...order,
+      status: OrderStatus.DELIVERED,
+    } as Order)
+
+    expect(notificationService.createNotification).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: NotificationType.ORDER_DELIVERED,
+        deduplicationKey: 'order-delivered:order-a',
+      }),
+    )
+  })
 })

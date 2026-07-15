@@ -69,3 +69,14 @@ export class OrderForbiddenException extends ForbiddenException {
     })
   }
 }
+
+export class InvalidOrderStatusTransitionException extends BadRequestException {
+  constructor(fromStatus: string, toStatus: string) {
+    super({
+      message: `Statusovergang van ${fromStatus} naar ${toStatus} is niet toegestaan.`,
+      error: 'INVALID_ORDER_STATUS_TRANSITION',
+      fromStatus,
+      toStatus,
+    })
+  }
+}

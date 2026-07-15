@@ -39,7 +39,10 @@ describe('StockService', () => {
     Pick<MongoRepository<StockAdjustment>, 'find'>
   >
   let stockAdjustmentWriter: jest.Mocked<
-    Pick<StockAdjustmentRepository, 'insertManualAdjustment'>
+    Pick<
+      StockAdjustmentRepository,
+      'insertManualAdjustment' | 'insertIdempotentAdjustment' | 'findByIdempotencyKey'
+    >
   >
   let vaccineStockRepository: jest.Mocked<
     Pick<
@@ -88,6 +91,8 @@ describe('StockService', () => {
 
     stockAdjustmentWriter = {
       insertManualAdjustment: jest.fn(),
+      insertIdempotentAdjustment: jest.fn(),
+      findByIdempotencyKey: jest.fn().mockResolvedValue(null),
     }
 
     vaccineStockRepository = {
@@ -399,6 +404,233 @@ describe('StockService', () => {
   })
 })
 
+describe('StockService.applyDeliveryDecrement', () => {
+  let service: StockService
+  let stockAdjustmentWriter: jest.Mocked<
+    Pick<
+      StockAdjustmentRepository,
+      'insertIdempotentAdjustment' | 'findByIdempotencyKey'
+    >
+  >
+  let vaccineStockRepository: jest.Mocked<
+    Pick<
+      VaccineStockRepository,
+      'findVaccineByObjectId' | 'adjustStockQuantity'
+    >
+  >
+  let stockNotificationService: jest.Mocked<
+    Pick<StockNotificationService, 'notifyAdminsIfEnteredLowStock'>
+  >
+
+  const orderId = '6a569d2cbb2590db980429cd'
+  const vaccineId = '507f1f77bcf86cd799439011'
+  const vaccineObjectId = new ObjectId(vaccineId)
+
+  const adminUser: User = {
+    _id: '507f1f77bcf86cd799439012',
+    id: '507f1f77bcf86cd799439012',
+    firebaseUid: 'firebase-admin',
+    email: 'admin@example.com',
+    firstName: 'Admin',
+    lastName: 'User',
+    role: UserRole.ADMIN,
+    createdAt: new Date('2026-07-14T12:00:00.000Z'),
+    updatedAt: new Date('2026-07-14T12:00:00.000Z'),
+  }
+
+  const vaccine: Vaccine = {
+    _id: vaccineId,
+    id: vaccineId,
+    name: 'Influenza',
+    normalizedName: 'influenza',
+    description: '',
+    manufacturer: 'PharmaCo',
+    stockQuantity: 10,
+    stockWarningThreshold: 5,
+    active: true,
+    createdAt: new Date('2026-07-14T12:00:00.000Z'),
+    updatedAt: new Date('2026-07-14T12:00:00.000Z'),
+  }
+
+  beforeEach(async () => {
+    stockAdjustmentWriter = {
+      insertIdempotentAdjustment: jest.fn(),
+      findByIdempotencyKey: jest.fn().mockResolvedValue(null),
+    }
+
+    vaccineStockRepository = {
+      findVaccineByObjectId: jest.fn().mockResolvedValue(vaccine),
+      adjustStockQuantity: jest.fn(),
+    }
+
+    stockNotificationService = {
+      notifyAdminsIfEnteredLowStock: jest.fn().mockResolvedValue(undefined),
+    }
+
+    const module: TestingModule = await Test.createTestingModule({
+      providers: [
+        StockService,
+        {
+          provide: getRepositoryToken(StockAdjustment),
+          useValue: { find: jest.fn() },
+        },
+        {
+          provide: StockAdjustmentRepository,
+          useValue: stockAdjustmentWriter,
+        },
+        {
+          provide: VaccineStockRepository,
+          useValue: vaccineStockRepository,
+        },
+        {
+          provide: StockNotificationService,
+          useValue: stockNotificationService,
+        },
+      ],
+    }).compile()
+
+    service = module.get(StockService)
+  })
+
+  it('decrements stock and creates DELIVERY_DEDUCTION adjustment', async () => {
+    vaccineStockRepository.adjustStockQuantity.mockResolvedValue({
+      quantityBefore: 10,
+      quantityAfter: 5,
+    })
+    stockAdjustmentWriter.insertIdempotentAdjustment.mockResolvedValue(
+      createStockAdjustmentInstance({
+        _id: 'adjustment-id',
+        type: StockAdjustmentType.DELIVERY_DEDUCTION,
+        quantityDelta: -5,
+        relatedOrderId: orderId,
+        idempotencyKey: `delivery-decrement:${orderId}:${vaccineId}`,
+      }),
+    )
+
+    const result = await service.applyDeliveryDecrement(adminUser, orderId, [
+      { vaccineId, vaccineName: 'Influenza', quantity: 5 },
+    ])
+
+    expect(result.alreadyProcessed).toBe(false)
+    expect(vaccineStockRepository.adjustStockQuantity).toHaveBeenCalledWith(
+      vaccineObjectId,
+      -5,
+    )
+    expect(stockAdjustmentWriter.insertIdempotentAdjustment).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: StockAdjustmentType.DELIVERY_DEDUCTION,
+        relatedOrderId: orderId,
+        idempotencyKey: `delivery-decrement:${orderId}:${vaccineId}`,
+      }),
+    )
+  })
+
+  it('rolls back earlier decrements when a later line fails', async () => {
+    const vaccineBId = '507f1f77bcf86cd799439022'
+    const vaccineBObjectId = new ObjectId(vaccineBId)
+    const vaccineB = {
+      ...vaccine,
+      _id: vaccineBId,
+      id: vaccineBId,
+      stockQuantity: 10,
+    }
+
+    vaccineStockRepository.findVaccineByObjectId.mockImplementation(objectId => {
+      if (objectId.equals(vaccineObjectId)) {
+        return Promise.resolve(vaccine)
+      }
+
+      if (objectId.equals(vaccineBObjectId)) {
+        return Promise.resolve(vaccineB)
+      }
+
+      return Promise.resolve(null)
+    })
+
+    vaccineStockRepository.adjustStockQuantity
+      .mockResolvedValueOnce({ quantityBefore: 10, quantityAfter: 5 })
+      .mockResolvedValueOnce(null)
+
+    await expect(
+      service.applyDeliveryDecrement(adminUser, orderId, [
+        { vaccineId, vaccineName: 'Influenza', quantity: 5 },
+        { vaccineId: vaccineBId, vaccineName: 'Tetanus', quantity: 5 },
+      ]),
+    ).rejects.toBeInstanceOf(InsufficientStockException)
+
+    expect(vaccineStockRepository.adjustStockQuantity).toHaveBeenCalledTimes(3)
+    expect(vaccineStockRepository.adjustStockQuantity).toHaveBeenLastCalledWith(
+      vaccineObjectId,
+      5,
+    )
+    expect(stockAdjustmentWriter.insertIdempotentAdjustment).not.toHaveBeenCalled()
+  })
+
+  it('returns alreadyProcessed without decrementing again', async () => {
+    stockAdjustmentWriter.findByIdempotencyKey.mockResolvedValue(
+      createStockAdjustmentInstance({
+        _id: 'existing',
+        vaccineObjectId,
+        type: StockAdjustmentType.DELIVERY_DEDUCTION,
+        quantityDelta: -5,
+        quantityBefore: 10,
+        quantityAfter: 5,
+        reason: 'existing',
+        performedByUserId: adminUser._id.toString(),
+        relatedOrderId: orderId,
+        idempotencyKey: `delivery-decrement:${orderId}:${vaccineId}`,
+      }),
+    )
+
+    const result = await service.applyDeliveryDecrement(adminUser, orderId, [
+      { vaccineId, vaccineName: 'Influenza', quantity: 5 },
+    ])
+
+    expect(result.alreadyProcessed).toBe(true)
+    expect(vaccineStockRepository.adjustStockQuantity).not.toHaveBeenCalled()
+  })
+
+  it('rejects delivery when pre-validation shows insufficient stock', async () => {
+    vaccineStockRepository.findVaccineByObjectId.mockResolvedValue({
+      ...vaccine,
+      id: vaccineId,
+      stockQuantity: 2,
+    })
+
+    await expect(
+      service.applyDeliveryDecrement(adminUser, orderId, [
+        { vaccineId, vaccineName: 'Influenza', quantity: 5 },
+      ]),
+    ).rejects.toBeInstanceOf(InsufficientStockException)
+
+    expect(vaccineStockRepository.adjustStockQuantity).not.toHaveBeenCalled()
+    expect(stockAdjustmentWriter.insertIdempotentAdjustment).not.toHaveBeenCalled()
+  })
+
+  it('aggregates duplicate order lines defensively', async () => {
+    vaccineStockRepository.adjustStockQuantity.mockResolvedValue({
+      quantityBefore: 10,
+      quantityAfter: 4,
+    })
+    stockAdjustmentWriter.insertIdempotentAdjustment.mockResolvedValue(
+      createStockAdjustmentInstance({
+        _id: 'adjustment-id',
+        type: StockAdjustmentType.DELIVERY_DEDUCTION,
+      }),
+    )
+
+    await service.applyDeliveryDecrement(adminUser, orderId, [
+      { vaccineId, vaccineName: 'Influenza', quantity: 3 },
+      { vaccineId, vaccineName: 'Influenza', quantity: 3 },
+    ])
+
+    expect(vaccineStockRepository.adjustStockQuantity).toHaveBeenCalledWith(
+      vaccineObjectId,
+      -6,
+    )
+  })
+})
+
 describe('StockNotificationService', () => {
   let service: StockNotificationService
   let notificationService: jest.Mocked<
@@ -444,6 +676,7 @@ describe('StockNotificationService', () => {
     service = new StockNotificationService(
       notificationService as unknown as NotificationService,
       userService as unknown as UserService,
+      { publish: jest.fn() } as never,
     )
   })
 

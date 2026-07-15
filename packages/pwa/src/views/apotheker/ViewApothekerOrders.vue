@@ -8,6 +8,7 @@ import CommonErrorState from '@/components/common/CommonErrorState.vue'
 import CommonLoadingSkeleton from '@/components/common/CommonLoadingSkeleton.vue'
 import CommonRealtimeStatus from '@/components/common/CommonRealtimeStatus.vue'
 import { registerReconnectHandler } from '@/composables/useGraphQL'
+import { useNotifications } from '@/composables/useNotifications'
 import { useOrders } from '@/composables/useOrders'
 
 const {
@@ -23,6 +24,11 @@ const {
   mapGraphQLError,
 } = useOrders()
 
+const {
+  subscribeToNotificationEvents,
+  stopNotificationSubscription,
+} = useNotifications()
+
 const cancellingId = ref<string | null>(null)
 const actionError = ref<string | null>(null)
 let reconnectCleanup: (() => void) | null = null
@@ -31,6 +37,7 @@ void loadMyOrders()
 
 onMounted(() => {
   subscribeToMyOrderEvents()
+  subscribeToNotificationEvents()
   reconnectCleanup = registerReconnectHandler(async () => {
     await loadMyOrders()
     await loadWeeklySummary()
@@ -39,8 +46,23 @@ onMounted(() => {
 
 onUnmounted(() => {
   stopMyOrderSubscriptions()
+  stopNotificationSubscription()
   reconnectCleanup?.()
 })
+
+function statusLabel(status: OrderStatus): string {
+  switch (status) {
+    case OrderStatus.Pending:
+    case OrderStatus.Planned:
+      return 'in behandeling'
+    case OrderStatus.Delivered:
+      return 'geleverd'
+    case OrderStatus.Cancelled:
+      return 'geannuleerd'
+    default:
+      return status
+  }
+}
 
 function canCancel(status: OrderStatus): boolean {
   return status === OrderStatus.Pending
@@ -103,7 +125,7 @@ async function onCancel(id: string) {
           <div class="space-y-3 text-sm">
             <div class="flex flex-wrap items-center gap-2">
               <h3 class="font-semibold">Bestelling {{ order.id }}</h3>
-              <UBadge variant="subtle">{{ order.status }}</UBadge>
+              <UBadge variant="subtle">{{ statusLabel(order.status) }}</UBadge>
             </div>
             <p>
               <span class="font-medium">Ingediend:</span>

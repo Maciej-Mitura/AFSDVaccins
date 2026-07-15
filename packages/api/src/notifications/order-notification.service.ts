@@ -110,6 +110,28 @@ export class OrderNotificationService {
     })
   }
 
+  async createOrderDeliveredNotification(order: Order): Promise<void> {
+    await this.notificationService.createNotification({
+      recipientUserId: order.apothekerId.toString(),
+      type: NotificationType.ORDER_DELIVERED,
+      title: 'Bestelling geleverd',
+      body: `Bestelling ${order.id} is geleverd op ${this.formatDeliveryDate(order.deliveryDate)}.`,
+      relatedOrderId: order.id,
+      deduplicationKey: `order-delivered:${order.id}`,
+    })
+  }
+
+  async createAdminCancelledOrderNotification(order: Order): Promise<void> {
+    await this.notificationService.createNotification({
+      recipientUserId: order.apothekerId.toString(),
+      type: NotificationType.ORDER_CANCELLED,
+      title: 'Bestelling geannuleerd',
+      body: `Bestelling ${order.id} is geannuleerd door de beheerder.`,
+      relatedOrderId: order.id,
+      deduplicationKey: `order-cancelled:${order.id}`,
+    })
+  }
+
   async handleOrderCreated(
     user: User,
     order: Order,

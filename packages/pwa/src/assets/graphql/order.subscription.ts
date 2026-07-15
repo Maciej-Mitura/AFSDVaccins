@@ -11,6 +11,14 @@ export const orderCreatedSubscriptionSource = gql`
       submittedAt
       deliveryDate
       cancelledAt
+      stockDecrementedAt
+      statusHistory {
+        fromStatus
+        toStatus
+        changedAt
+        changedByUserId
+        reason
+      }
       orderLines {
         vaccineId
         vaccineName
@@ -32,6 +40,14 @@ export const orderUpdatedSubscriptionSource = gql`
       submittedAt
       deliveryDate
       cancelledAt
+      stockDecrementedAt
+      statusHistory {
+        fromStatus
+        toStatus
+        changedAt
+        changedByUserId
+        reason
+      }
       orderLines {
         vaccineId
         vaccineName
@@ -61,6 +77,14 @@ export const adminOrderCreatedSubscriptionSource = gql`
       isoYear
       submittedAt
       deliveryDate
+      stockDecrementedAt
+      statusHistory {
+        fromStatus
+        toStatus
+        changedAt
+        changedByUserId
+        reason
+      }
       apotheker {
         id
         firstName
@@ -88,6 +112,14 @@ export const adminOrderUpdatedSubscriptionSource = gql`
       submittedAt
       deliveryDate
       cancelledAt
+      stockDecrementedAt
+      statusHistory {
+        fromStatus
+        toStatus
+        changedAt
+        changedByUserId
+        reason
+      }
       apotheker {
         id
         firstName
@@ -111,4 +143,31 @@ export type {
 export {
   AdminOrderCreatedDocument as ADMIN_ORDER_CREATED_SUBSCRIPTION,
   AdminOrderUpdatedDocument as ADMIN_ORDER_UPDATED_SUBSCRIPTION,
+} from '@vaccin-delivery/types'
+
+export const adminOperationsFeedSubscriptionSource = gql`
+  subscription AdminOperationsFeed {
+    adminOperationsFeed {
+      eventType
+      occurredAt
+      message
+      order {
+        id
+        status
+        totalQuantity
+        deliveryDate
+      }
+      vaccine {
+        id
+        name
+        stockQuantity
+        stockWarningThreshold
+      }
+    }
+  }
+`
+
+export type { AdminOperationsFeedSubscription } from '@vaccin-delivery/types'
+export {
+  AdminOperationsFeedDocument as ADMIN_OPERATIONS_FEED_SUBSCRIPTION,
 } from '@vaccin-delivery/types'

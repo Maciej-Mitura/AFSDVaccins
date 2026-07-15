@@ -10,6 +10,12 @@ export const createOrderMutationSource = gql`
       isoYear
       submittedAt
       deliveryDate
+      statusHistory {
+        fromStatus
+        toStatus
+        changedAt
+        reason
+      }
       orderLines {
         vaccineId
         vaccineName
@@ -37,6 +43,13 @@ export const myOrdersQuerySource = gql`
       submittedAt
       deliveryDate
       cancelledAt
+      stockDecrementedAt
+      statusHistory {
+        fromStatus
+        toStatus
+        changedAt
+        reason
+      }
       orderLines {
         vaccineId
         vaccineName
@@ -64,6 +77,13 @@ export const myOrderQuerySource = gql`
       submittedAt
       deliveryDate
       cancelledAt
+      stockDecrementedAt
+      statusHistory {
+        fromStatus
+        toStatus
+        changedAt
+        reason
+      }
       orderLines {
         vaccineId
         vaccineName
@@ -189,3 +209,167 @@ export type {
   OrderQueryVariables,
 } from '@vaccin-delivery/types'
 export { OrderDocument as ORDER_QUERY } from '@vaccin-delivery/types'
+
+export const adminOrdersQuerySource = gql`
+  query AdminOrders(
+    $deliveryDate: String
+    $isoYear: Int
+    $isoWeek: Int
+    $status: OrderStatus
+    $apothekerId: ID
+  ) {
+    adminOrders(
+      deliveryDate: $deliveryDate
+      isoYear: $isoYear
+      isoWeek: $isoWeek
+      status: $status
+      apothekerId: $apothekerId
+    ) {
+      id
+      status
+      totalQuantity
+      isoWeek
+      isoYear
+      submittedAt
+      deliveryDate
+      stockDecrementedAt
+      statusHistory {
+        fromStatus
+        toStatus
+        changedAt
+        changedByUserId
+        reason
+      }
+      apotheker {
+        id
+        firstName
+        lastName
+        email
+      }
+      orderLines {
+        vaccineId
+        vaccineName
+        manufacturer
+        quantity
+      }
+    }
+  }
+`
+
+export type {
+  AdminOrdersQuery,
+  AdminOrdersQueryVariables,
+} from '@vaccin-delivery/types'
+export { AdminOrdersDocument as ADMIN_ORDERS_QUERY } from '@vaccin-delivery/types'
+
+export const adminDailyOrderOverviewQuerySource = gql`
+  query AdminDailyOrderOverview($deliveryDate: String!) {
+    adminDailyOrderOverview(deliveryDate: $deliveryDate) {
+      deliveryDate
+      totalOrders
+      totalDoses
+      cancelledOrderCount
+      cancelledDoseCount
+      statusCounts {
+        status
+        count
+      }
+      pharmacistSummaries {
+        apothekerId
+        orderCount
+        totalDoses
+      }
+      vaccineQuantities {
+        vaccineId
+        vaccineName
+        quantity
+      }
+    }
+  }
+`
+
+export type {
+  AdminDailyOrderOverviewQuery,
+  AdminDailyOrderOverviewQueryVariables,
+} from '@vaccin-delivery/types'
+export {
+  AdminDailyOrderOverviewDocument as ADMIN_DAILY_ORDER_OVERVIEW_QUERY,
+} from '@vaccin-delivery/types'
+
+export const adminWeeklyStatisticsQuerySource = gql`
+  query AdminWeeklyStatistics($isoYear: Int!, $isoWeek: Int!) {
+    adminWeeklyStatistics(isoYear: $isoYear, isoWeek: $isoWeek) {
+      isoYear
+      isoWeek
+      totalOrders
+      totalDoses
+      cancelledOrderCount
+      cancelledDoseCount
+      statusCounts {
+        status
+        count
+      }
+      vaccineQuantities {
+        vaccineId
+        vaccineName
+        quantity
+      }
+    }
+  }
+`
+
+export type {
+  AdminWeeklyStatisticsQuery,
+  AdminWeeklyStatisticsQueryVariables,
+} from '@vaccin-delivery/types'
+export {
+  AdminWeeklyStatisticsDocument as ADMIN_WEEKLY_STATISTICS_QUERY,
+} from '@vaccin-delivery/types'
+
+export const updateOrderStatusMutationSource = gql`
+  mutation UpdateOrderStatus($id: ID!, $status: OrderStatus!, $reason: String) {
+    updateOrderStatus(id: $id, status: $status, reason: $reason) {
+      id
+      status
+      stockDecrementedAt
+      statusHistory {
+        fromStatus
+        toStatus
+        changedAt
+        changedByUserId
+        reason
+      }
+    }
+  }
+`
+
+export type {
+  UpdateOrderStatusMutation,
+  UpdateOrderStatusMutationVariables,
+} from '@vaccin-delivery/types'
+export {
+  UpdateOrderStatusDocument as UPDATE_ORDER_STATUS_MUTATION,
+} from '@vaccin-delivery/types'
+
+export const cancelOrderMutationSource = gql`
+  mutation CancelOrder($id: ID!, $reason: String) {
+    cancelOrder(id: $id, reason: $reason) {
+      id
+      status
+      cancelledAt
+      statusHistory {
+        fromStatus
+        toStatus
+        changedAt
+        changedByUserId
+        reason
+      }
+    }
+  }
+`
+
+export type {
+  CancelOrderMutation,
+  CancelOrderMutationVariables,
+} from '@vaccin-delivery/types'
+export { CancelOrderDocument as CANCEL_ORDER_MUTATION } from '@vaccin-delivery/types'
