@@ -40,6 +40,12 @@ import {
   type UpdateOrderStatusMutation,
   type UpdateOrderStatusMutationVariables,
 } from '@/assets/graphql/order'
+import {
+  applyCancelMutationFailure,
+  applyStatusMutationFailure,
+  clearCancelActionError as clearCancelActionErrorState,
+  clearStatusActionError as clearStatusActionErrorState,
+} from '@/composables/admin-order-mutation-state'
 import { mapGraphQLError } from '@/composables/useCurrentUser'
 import useGraphQL from '@/composables/useGraphQL'
 
@@ -58,6 +64,16 @@ const weeklyStatistics = ref<AdminWeeklyStats | null>(null)
 const weeklySummary = ref<WeeklyOrderSummary | null>(null)
 const loading = ref(false)
 const errorMessage = ref<string | null>(null)
+const adminOrdersLoading = ref(false)
+const adminOrdersError = ref<string | null>(null)
+const adminOverviewLoading = ref(false)
+const adminOverviewError = ref<string | null>(null)
+const adminWeeklyStatsLoading = ref(false)
+const adminWeeklyStatsError = ref<string | null>(null)
+const statusActionLoading = ref(false)
+const statusActionError = ref<string | null>(null)
+const cancelActionLoading = ref(false)
+const cancelActionError = ref<string | null>(null)
 
 let myOrderSubscriptionCleanup: (() => void) | null = null
 let adminOrderSubscriptionCleanup: (() => void) | null = null
@@ -245,8 +261,8 @@ export function useOrders() {
   async function loadAdminOrders(
     variables: AdminOrdersQueryVariables = {},
   ): Promise<void> {
-    loading.value = true
-    errorMessage.value = null
+    adminOrdersLoading.value = true
+    adminOrdersError.value = null
 
     try {
       const result = await apolloClient.query<AdminOrdersQuery>({
@@ -257,18 +273,18 @@ export function useOrders() {
 
       adminOrders.value = result.data.adminOrders
     } catch (error: unknown) {
-      errorMessage.value = mapGraphQLError(error)
+      adminOrdersError.value = mapGraphQLError(error)
       throw error
     } finally {
-      loading.value = false
+      adminOrdersLoading.value = false
     }
   }
 
   async function loadAdminDailyOverview(
     deliveryDate: string,
   ): Promise<AdminDailyOverview> {
-    loading.value = true
-    errorMessage.value = null
+    adminOverviewLoading.value = true
+    adminOverviewError.value = null
 
     try {
       const result = await apolloClient.query<AdminDailyOrderOverviewQuery>({
@@ -280,10 +296,10 @@ export function useOrders() {
       dailyOverview.value = result.data.adminDailyOrderOverview
       return result.data.adminDailyOrderOverview
     } catch (error: unknown) {
-      errorMessage.value = mapGraphQLError(error)
+      adminOverviewError.value = mapGraphQLError(error)
       throw error
     } finally {
-      loading.value = false
+      adminOverviewLoading.value = false
     }
   }
 
@@ -291,8 +307,8 @@ export function useOrders() {
     isoYear: number,
     isoWeek: number,
   ): Promise<AdminWeeklyStats> {
-    loading.value = true
-    errorMessage.value = null
+    adminWeeklyStatsLoading.value = true
+    adminWeeklyStatsError.value = null
 
     try {
       const result = await apolloClient.query<AdminWeeklyStatisticsQuery>({
@@ -304,10 +320,10 @@ export function useOrders() {
       weeklyStatistics.value = result.data.adminWeeklyStatistics
       return result.data.adminWeeklyStatistics
     } catch (error: unknown) {
-      errorMessage.value = mapGraphQLError(error)
+      adminWeeklyStatsError.value = mapGraphQLError(error)
       throw error
     } finally {
-      loading.value = false
+      adminWeeklyStatsLoading.value = false
     }
   }
 
@@ -316,8 +332,8 @@ export function useOrders() {
     status: UpdateOrderStatusMutationVariables['status'],
     reason?: string,
   ): Promise<AdminOrderListItem> {
-    loading.value = true
-    errorMessage.value = null
+    statusActionLoading.value = true
+    statusActionError.value = null
 
     try {
       const result = await apolloClient.mutate<UpdateOrderStatusMutation>({
@@ -333,10 +349,18 @@ export function useOrders() {
       upsertAdminOrder(updated)
       return updated
     } catch (error: unknown) {
-      errorMessage.value = mapGraphQLError(error)
+      const next = applyStatusMutationFailure(
+        {
+          statusActionError: statusActionError.value,
+          cancelActionError: cancelActionError.value,
+          ordersError: adminOrdersError.value,
+        },
+        mapGraphQLError(error),
+      )
+      statusActionError.value = next.statusActionError
       throw error
     } finally {
-      loading.value = false
+      statusActionLoading.value = false
     }
   }
 
@@ -344,8 +368,8 @@ export function useOrders() {
     id: string,
     reason?: string,
   ): Promise<AdminOrderListItem> {
-    loading.value = true
-    errorMessage.value = null
+    cancelActionLoading.value = true
+    cancelActionError.value = null
 
     try {
       const result = await apolloClient.mutate<CancelOrderMutation>({
@@ -361,11 +385,37 @@ export function useOrders() {
       upsertAdminOrder(cancelled)
       return cancelled
     } catch (error: unknown) {
-      errorMessage.value = mapGraphQLError(error)
+      const next = applyCancelMutationFailure(
+        {
+          statusActionError: statusActionError.value,
+          cancelActionError: cancelActionError.value,
+          ordersError: adminOrdersError.value,
+        },
+        mapGraphQLError(error),
+      )
+      cancelActionError.value = next.cancelActionError
       throw error
     } finally {
-      loading.value = false
+      cancelActionLoading.value = false
     }
+  }
+
+  function clearStatusActionError(): void {
+    const next = clearStatusActionErrorState({
+      statusActionError: statusActionError.value,
+      cancelActionError: cancelActionError.value,
+      ordersError: adminOrdersError.value,
+    })
+    statusActionError.value = next.statusActionError
+  }
+
+  function clearCancelActionError(): void {
+    const next = clearCancelActionErrorState({
+      statusActionError: statusActionError.value,
+      cancelActionError: cancelActionError.value,
+      ordersError: adminOrdersError.value,
+    })
+    cancelActionError.value = next.cancelActionError
   }
 
   function isInvalidOrderStatusTransitionError(error: unknown): boolean {
@@ -484,6 +534,18 @@ export function useOrders() {
     weeklySummary,
     loading,
     errorMessage,
+    adminOrdersLoading,
+    adminOrdersError,
+    ordersLoading: adminOrdersLoading,
+    ordersError: adminOrdersError,
+    adminOverviewLoading,
+    adminOverviewError,
+    adminWeeklyStatsLoading,
+    adminWeeklyStatsError,
+    statusActionLoading,
+    statusActionError,
+    cancelActionLoading,
+    cancelActionError,
     hasWeeklyWarning,
     loadMyOrders,
     loadWeeklySummary,
@@ -494,6 +556,8 @@ export function useOrders() {
     loadAdminWeeklyStatistics,
     updateOrderStatus,
     cancelOrderAsAdmin,
+    clearStatusActionError,
+    clearCancelActionError,
     subscribeToMyOrderEvents,
     subscribeToAdminOrderEvents,
     stopMyOrderSubscriptions,

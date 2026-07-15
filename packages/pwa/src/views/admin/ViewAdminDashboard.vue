@@ -20,7 +20,7 @@ const { currentUser, loading: userLoading } = useCurrentUser()
 const {
   dailyOverview,
   weeklyStatistics,
-  loading: ordersLoading,
+  adminOverviewLoading,
   loadAdminDailyOverview,
   loadAdminWeeklyStatistics,
 } = useOrders()
@@ -83,7 +83,7 @@ onUnmounted(() => {
       <template #header>
         <h2 class="text-lg font-semibold">Vandaag — leveroverzicht</h2>
       </template>
-      <CommonLoadingSkeleton v-if="ordersLoading && !dailyOverview" />
+      <CommonLoadingSkeleton v-if="adminOverviewLoading && !dailyOverview" />
       <div v-else class="grid gap-3 text-sm sm:grid-cols-2 lg:grid-cols-4">
         <p>
           <span class="font-medium">Bestellingen:</span>
