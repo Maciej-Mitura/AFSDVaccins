@@ -21,6 +21,18 @@ import { StockNotificationService } from './stock-notification.service'
 import { StockService } from './stock.service'
 import { VaccineStockRepository } from './vaccine-stock.repository'
 
+function createStockAdjustmentInstance(
+  values: Partial<StockAdjustment>,
+): StockAdjustment {
+  const instance = Object.create(
+    StockAdjustment.prototype,
+  ) as StockAdjustment
+
+  Object.assign(instance, values)
+
+  return instance
+}
+
 describe('StockService', () => {
   let service: StockService
   let stockAdjustmentRepository: jest.Mocked<
@@ -124,13 +136,14 @@ describe('StockService', () => {
       quantityAfter,
     })
     stockAdjustmentWriter.insertManualAdjustment.mockImplementation(value =>
-      Promise.resolve({
-        ...value,
-        _id: adjustmentId,
-        id: adjustmentId,
-        relatedOrderId: value.relatedOrderId ?? null,
-        createdAt: new Date('2026-07-14T12:00:00.000Z'),
-      } as StockAdjustment),
+      Promise.resolve(
+        createStockAdjustmentInstance({
+          ...value,
+          _id: adjustmentId,
+          relatedOrderId: value.relatedOrderId ?? null,
+          createdAt: new Date('2026-07-14T12:00:00.000Z'),
+        }),
+      ),
     )
   }
 

@@ -14,11 +14,11 @@ import { StockAdjustmentType } from './stock-adjustment-type.enum'
 @ObjectType('StockAdjustment')
 export class StockAdjustment {
   @ObjectIdColumn()
-  _id!: string
+  _id!: string | ObjectId
 
   @Field(() => ID)
   get id(): string {
-    return this._id
+    return this._id instanceof ObjectId ? this._id.toString() : this._id
   }
 
   @Index()

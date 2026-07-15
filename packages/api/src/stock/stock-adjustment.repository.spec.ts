@@ -3,12 +3,24 @@ import { MongoRepository } from 'typeorm'
 
 import { StockAdjustmentType } from './stock-adjustment-type.enum'
 import { StockAdjustment } from './stock-adjustment.entity'
+
+function createStockAdjustmentInstance(
+  values: Partial<StockAdjustment>,
+): StockAdjustment {
+  const instance = Object.create(
+    StockAdjustment.prototype,
+  ) as StockAdjustment
+
+  Object.assign(instance, values)
+
+  return instance
+}
 import { StockAdjustmentRepository } from './stock-adjustment.repository'
 
 describe('StockAdjustmentRepository', () => {
   let repository: StockAdjustmentRepository
   let mongoRepository: jest.Mocked<
-    Pick<MongoRepository<StockAdjustment>, 'insertOne'>
+    Pick<MongoRepository<StockAdjustment>, 'insertOne' | 'create'>
   >
 
   const vaccineObjectId = new ObjectId('507f1f77bcf86cd799439011')
@@ -26,6 +38,7 @@ describe('StockAdjustmentRepository', () => {
   beforeEach(() => {
     mongoRepository = {
       insertOne: jest.fn(),
+      create: jest.fn(),
     }
 
     repository = new StockAdjustmentRepository(
@@ -34,12 +47,16 @@ describe('StockAdjustmentRepository', () => {
   })
 
   it('persists manual adjustments without the idempotencyKey property', async () => {
+    const insertedId = new ObjectId('6a569d2cbb2590db980429cd')
     mongoRepository.insertOne.mockResolvedValue({
       acknowledged: true,
-      insertedId: new ObjectId('6a569d2cbb2590db980429cd'),
+      insertedId,
     })
+    mongoRepository.create.mockImplementation(value =>
+      createStockAdjustmentInstance(value as Partial<StockAdjustment>),
+    )
 
-    await repository.insertManualAdjustment(basePayload)
+    const saved = await repository.insertManualAdjustment(basePayload)
 
     const insertedDocument = mongoRepository.insertOne.mock.calls[0]?.[0] as
       | Record<string, unknown>
@@ -47,6 +64,8 @@ describe('StockAdjustmentRepository', () => {
 
     expect(insertedDocument).toBeDefined()
     expect(insertedDocument).not.toHaveProperty('idempotencyKey')
+    expect(saved._id).toBe(insertedId.toString())
+    expect(saved.id).toBe(insertedId.toString())
   })
 
   it('allows many manual adjustments with no idempotencyKey', async () => {
@@ -54,6 +73,9 @@ describe('StockAdjustmentRepository', () => {
       acknowledged: true,
       insertedId: new ObjectId(),
     })
+    mongoRepository.create.mockImplementation(value =>
+      createStockAdjustmentInstance(value as Partial<StockAdjustment>),
+    )
 
     for (let index = 0; index < 5; index += 1) {
       await repository.insertManualAdjustment({
@@ -73,6 +95,9 @@ describe('StockAdjustmentRepository', () => {
       acknowledged: true,
       insertedId: new ObjectId('6a569d2cbb2590db980429ce'),
     })
+    mongoRepository.create.mockImplementation(value =>
+      createStockAdjustmentInstance(value as Partial<StockAdjustment>),
+    )
 
     await repository.insertIdempotentAdjustment({
       ...basePayload,
@@ -105,6 +130,9 @@ describe('StockAdjustmentRepository', () => {
       acknowledged: true,
       insertedId: new ObjectId(),
     })
+    mongoRepository.create.mockImplementation(value =>
+      createStockAdjustmentInstance(value as Partial<StockAdjustment>),
+    )
 
     await repository.insertIdempotentAdjustment({
       ...basePayload,

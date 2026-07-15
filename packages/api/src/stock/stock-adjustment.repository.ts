@@ -44,11 +44,10 @@ export class StockAdjustmentRepository {
     }
 
     const insertResult = await this.stockAdjustmentRepository.insertOne(document)
+    const savedAdjustment = this.stockAdjustmentRepository.create(document)
+    savedAdjustment._id = insertResult.insertedId.toString()
 
-    return {
-      _id: insertResult.insertedId.toString(),
-      ...document,
-    } as StockAdjustment
+    return savedAdjustment
   }
 
   async insertIdempotentAdjustment(
@@ -68,10 +67,9 @@ export class StockAdjustmentRepository {
     }
 
     const insertResult = await this.stockAdjustmentRepository.insertOne(document)
+    const savedAdjustment = this.stockAdjustmentRepository.create(document)
+    savedAdjustment._id = insertResult.insertedId.toString()
 
-    return {
-      _id: insertResult.insertedId.toString(),
-      ...document,
-    } as StockAdjustment
+    return savedAdjustment
   }
 }
