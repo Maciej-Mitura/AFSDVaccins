@@ -1,11 +1,13 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { onMounted, onUnmounted, ref } from 'vue'
 
 import { OrderStatus } from '@vaccin-delivery/types'
 
 import CommonEmptyState from '@/components/common/CommonEmptyState.vue'
 import CommonErrorState from '@/components/common/CommonErrorState.vue'
 import CommonLoadingSkeleton from '@/components/common/CommonLoadingSkeleton.vue'
+import CommonRealtimeStatus from '@/components/common/CommonRealtimeStatus.vue'
+import { registerReconnectHandler } from '@/composables/useGraphQL'
 import { useOrders } from '@/composables/useOrders'
 
 const {
@@ -13,15 +15,32 @@ const {
   loading,
   errorMessage,
   loadMyOrders,
+  loadWeeklySummary,
   cancelOwnOrder,
+  subscribeToMyOrderEvents,
+  stopMyOrderSubscriptions,
   isOrderCannotBeCancelledError,
   mapGraphQLError,
 } = useOrders()
 
 const cancellingId = ref<string | null>(null)
 const actionError = ref<string | null>(null)
+let reconnectCleanup: (() => void) | null = null
 
 void loadMyOrders()
+
+onMounted(() => {
+  subscribeToMyOrderEvents()
+  reconnectCleanup = registerReconnectHandler(async () => {
+    await loadMyOrders()
+    await loadWeeklySummary()
+  })
+})
+
+onUnmounted(() => {
+  stopMyOrderSubscriptions()
+  reconnectCleanup?.()
+})
 
 function canCancel(status: OrderStatus): boolean {
   return status === OrderStatus.Pending
@@ -55,6 +74,8 @@ async function onCancel(id: string) {
 
 <template>
   <div class="space-y-6">
+    <CommonRealtimeStatus />
+
     <UCard>
       <template #header>
         <div class="flex flex-wrap items-center justify-between gap-3">

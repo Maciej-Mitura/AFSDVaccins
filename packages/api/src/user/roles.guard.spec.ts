@@ -85,6 +85,24 @@ describe('RolesGuard', () => {
     ).rejects.toBeInstanceOf(ForbiddenException)
   })
 
+  it('throws ForbiddenException for BEZORGER on apotheker/admin subscriptions', async () => {
+    const bezorger: User = {
+      ...applicationUser,
+      id: applicationUser._id,
+      role: UserRole.BEZORGER,
+    }
+
+    reflector.getAllAndOverride.mockReturnValue([
+      UserRole.APOTHEKER,
+      UserRole.ADMIN,
+    ])
+    userService.requireByFirebaseUid.mockResolvedValue(bezorger)
+
+    await expect(
+      guard.canActivate(createContext(bezorger.firebaseUid)),
+    ).rejects.toBeInstanceOf(ForbiddenException)
+  })
+
   it('passes through when no roles are required', async () => {
     reflector.getAllAndOverride.mockReturnValue(undefined)
 

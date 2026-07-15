@@ -22,6 +22,7 @@
             >
               {{ link.label }}
             </UButton>
+            <slot name="header-actions" />
             <UButton
               v-if="isAuthenticated"
               color="neutral"
@@ -49,6 +50,7 @@ import { useRouter } from 'vue-router'
 import { clearApolloCache } from '@/composables/useGraphQL'
 import { useCurrentUser } from '@/composables/useCurrentUser'
 import { useFirebase } from '@/composables/useFirebase'
+import { useNotifications } from '@/composables/useNotifications'
 
 export type AppShellLink = {
   label: string
@@ -63,6 +65,7 @@ const props = defineProps<{
 const router = useRouter()
 const { isAuthenticated, logout } = useFirebase()
 const { clearCurrentUser } = useCurrentUser()
+const { clearNotificationState } = useNotifications()
 const loggingOut = ref(false)
 
 const navigationLinks = computed(() => props.navLinks ?? [])
@@ -73,6 +76,7 @@ async function onLogout() {
   try {
     await logout()
     clearCurrentUser()
+    clearNotificationState()
     await clearApolloCache()
     await router.push({ name: 'auth-login' })
   } finally {

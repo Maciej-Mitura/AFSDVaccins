@@ -5,16 +5,54 @@ import {
   from,
   InMemoryCache,
   Observable,
+  split,
 } from '@apollo/client/core'
+import { GraphQLWsLink } from '@apollo/client/link/subscriptions'
+import { getMainDefinition } from '@apollo/client/utilities'
 import { setContext } from '@apollo/client/link/context'
 import { onError } from '@apollo/client/link/error'
+import type { Client } from 'graphql-ws'
+import { createClient } from 'graphql-ws'
 import type { GraphQLFormattedError } from 'graphql'
 
 import { firebaseAuth } from '@/config/firebase'
+import { setRealtimeConnectionState } from '@/composables/useRealtimeConnection'
 
 type SessionExpiredHandler = (message: string) => Promise<void> | void
 
 let sessionExpiredHandler: SessionExpiredHandler | null = null
+let wsClient: Client | null = null
+let wsClientOwnerUid: string | null = null
+let intentionalWsShutdown = false
+let pendingReconnect = false
+
+const reconnectHandlers = new Set<() => void | Promise<void>>()
+
+export function registerReconnectHandler(
+  handler: () => void | Promise<void>,
+): () => void {
+  reconnectHandlers.add(handler)
+
+  return () => {
+    reconnectHandlers.delete(handler)
+  }
+}
+
+async function notifyReconnectHandlers(): Promise<void> {
+  await Promise.all(
+    [...reconnectHandlers].map(handler => Promise.resolve(handler())),
+  )
+}
+
+function resolveBackendWsUrl(): string {
+  const explicit = import.meta.env.VITE_BACKEND_WS_URL
+
+  if (explicit) {
+    return explicit
+  }
+
+  return import.meta.env.VITE_BACKEND_URL.replace(/^http/i, 'ws')
+}
 
 const httpLink = createHttpLink({
   uri: import.meta.env.VITE_BACKEND_URL,
@@ -126,8 +164,92 @@ const errorLink = onError(({ graphQLErrors, networkError }) => {
   }
 })
 
+function createWebSocketClient(ownerUid: string): Client {
+  intentionalWsShutdown = false
+
+  return createClient({
+    url: resolveBackendWsUrl(),
+    retryAttempts: 5,
+    shouldRetry: () => !intentionalWsShutdown,
+    connectionParams: async () => {
+      const user = firebaseAuth.currentUser
+
+      if (!user || user.uid !== ownerUid) {
+        return {}
+      }
+
+      const token = await user.getIdToken()
+
+      return {
+        Authorization: `Bearer ${token}`,
+      }
+    },
+    on: {
+      connecting: (isRetry?: boolean) => {
+        if (isRetry) {
+          pendingReconnect = true
+        }
+
+        setRealtimeConnectionState(isRetry ? 'reconnecting' : 'connecting')
+      },
+      connected: () => {
+        setRealtimeConnectionState('connected')
+
+        if (pendingReconnect) {
+          pendingReconnect = false
+          void notifyReconnectHandlers()
+        }
+      },
+      closed: () => {
+        if (!intentionalWsShutdown) {
+          setRealtimeConnectionState('unavailable')
+        } else {
+          setRealtimeConnectionState('idle')
+        }
+      },
+    },
+  })
+}
+
+function getOrCreateWebSocketClient(): Client {
+  const user = firebaseAuth.currentUser
+
+  if (!user) {
+    throw new Error('Cannot open WebSocket without authenticated user')
+  }
+
+  if (wsClient && wsClientOwnerUid === user.uid) {
+    return wsClient
+  }
+
+  disposeWebSocketClient()
+
+  wsClientOwnerUid = user.uid
+  wsClient = createWebSocketClient(user.uid)
+
+  return wsClient
+}
+
+const wsLink = new ApolloLink(operation => {
+  const clientLink = new GraphQLWsLink(getOrCreateWebSocketClient())
+  return clientLink.request(operation)
+})
+
+const splitLink = split(
+  ({ query }) => {
+    const definition = getMainDefinition(query)
+
+    return (
+      definition.kind === 'OperationDefinition' &&
+      definition.operation === 'subscription'
+    )
+  },
+  wsLink,
+  from([errorLink, authRetryLink, authLink, httpLink]),
+)
+
 const apolloClient = new ApolloClient({
-  link: from([errorLink, authRetryLink, authLink, httpLink]),
+  link: splitLink,
   cache: new InMemoryCache(),
 })
 
@@ -137,10 +259,26 @@ export function registerSessionExpiredHandler(
   sessionExpiredHandler = handler
 }
 
+export function disposeWebSocketClient(): void {
+  intentionalWsShutdown = true
+
+  if (wsClient) {
+    void wsClient.dispose()
+    wsClient = null
+    wsClientOwnerUid = null
+  }
+
+  setRealtimeConnectionState('idle')
+}
+
 export async function clearApolloCache(): Promise<void> {
+  disposeWebSocketClient()
   await apolloClient.clearStore()
 }
 
 export default function useGraphQL() {
-  return { apolloClient }
+  return {
+    apolloClient,
+    disposeWebSocketClient,
+  }
 }

@@ -1,14 +1,22 @@
 <script setup lang="ts">
-import { reactive } from 'vue'
+import { onMounted, onUnmounted, reactive, ref } from 'vue'
 
 import { OrderStatus } from '@vaccin-delivery/types'
 
 import CommonEmptyState from '@/components/common/CommonEmptyState.vue'
 import CommonErrorState from '@/components/common/CommonErrorState.vue'
 import CommonLoadingSkeleton from '@/components/common/CommonLoadingSkeleton.vue'
+import CommonRealtimeStatus from '@/components/common/CommonRealtimeStatus.vue'
 import { useOrders } from '@/composables/useOrders'
 
-const { adminOrders, loading, errorMessage, loadAdminOrders } = useOrders()
+const {
+  adminOrders,
+  loading,
+  errorMessage,
+  loadAdminOrders,
+  subscribeToAdminOrderEvents,
+  stopAdminOrderSubscriptions,
+} = useOrders()
 
 const filters = reactive<{
   isoYear?: number
@@ -20,14 +28,37 @@ const filters = reactive<{
   status: undefined,
 })
 
+const adminSubscriptionCleanup = ref<(() => void) | null>(null)
+
 void loadAdminOrders()
 
-function applyFilters() {
-  void loadAdminOrders({
+function currentFilterVariables() {
+  return {
     isoYear: filters.isoYear,
     isoWeek: filters.isoWeek,
     status: filters.status,
-  })
+  }
+}
+
+function restartAdminSubscriptions() {
+  adminSubscriptionCleanup.value?.()
+  adminSubscriptionCleanup.value = subscribeToAdminOrderEvents(
+    currentFilterVariables(),
+  )
+}
+
+onMounted(() => {
+  restartAdminSubscriptions()
+})
+
+onUnmounted(() => {
+  adminSubscriptionCleanup.value?.()
+  stopAdminOrderSubscriptions()
+})
+
+function applyFilters() {
+  void loadAdminOrders(currentFilterVariables())
+  restartAdminSubscriptions()
 }
 
 function formatDateTime(value: string): string {
@@ -42,6 +73,8 @@ function formatDeliveryDate(value: string): string {
 
 <template>
   <div class="space-y-6">
+    <CommonRealtimeStatus />
+
     <UCard>
       <template #header>
         <h2 class="text-lg font-semibold">Bestellingenoverzicht</h2>

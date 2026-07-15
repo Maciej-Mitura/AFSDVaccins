@@ -7,13 +7,12 @@ screens.
 
 ## Current status
 
-**Phase 7 — pharmacist ordering and weekly controls complete.** APOTHEKER users
-can place vaccine orders within daily and weekly limits, view order history,
-cancel eligible `PENDING` orders, and see weekly usage warnings. ADMIN has a
-read-only order overview. Stock is **not** deducted when orders are placed.
+**Phase 8 — real-time order updates and persisted notifications complete.**
+Authenticated GraphQL subscriptions over `graphql-ws` push order create/update events
+and persisted apotheker notifications without manual refresh. Ownership is filtered
+server-side; BEZORGER has no order or notification subscription stream in this phase.
 
-**Next phase:** Phase 8 — order notifications and first realtime slice (see
-`docs/implementation-roadmap.md`).
+**Next phase:** Phase 9 — stock management (see `docs/implementation-roadmap.md`).
 
 ## Planned stack
 
@@ -502,6 +501,134 @@ PWA composables:
 11. Log in as ADMIN → both orders visible at `/admin/orders` with delivery dates.
 12. APOTHEKER GraphQL `orders` query → `Forbidden`.
 
+## Real-time order updates and notifications (Phase 8)
+
+### Transport
+
+| Channel   | URL / protocol                                        | Purpose                                  |
+| --------- | ----------------------------------------------------- | ---------------------------------------- |
+| HTTP      | `VITE_BACKEND_URL` (`http://localhost:3000/graphql`)  | Queries and mutations                    |
+| WebSocket | `VITE_BACKEND_WS_URL` (`ws://localhost:3000/graphql`) | GraphQL subscriptions via **graphql-ws** |
+
+The PWA Apollo Client uses a **split link**: HTTP for queries/mutations, WebSocket for
+subscriptions. If `VITE_BACKEND_WS_URL` is omitted, the PWA derives a `ws://` URL from
+`VITE_BACKEND_URL`.
+
+### WebSocket authentication
+
+- Firebase ID tokens are sent in WebSocket `connectionParams`:
+  `Authorization: Bearer <token>`.
+- Tokens are retrieved dynamically from the Firebase client SDK on connect and reconnect.
+- Tokens are **not** stored manually in `localStorage`.
+- The API verifies tokens with `FirebaseService` and loads the application `User` on connect.
+- Invalid, expired, or unregistered identities are rejected safely.
+
+### Subscription operations
+
+| Operation              | Roles            | Purpose                                    |
+| ---------------------- | ---------------- | ------------------------------------------ |
+| `orderCreated`         | APOTHEKER, ADMIN | New order persisted                        |
+| `orderUpdated`         | APOTHEKER, ADMIN | Cancellation or other Phase 7 update       |
+| `notificationReceived` | APOTHEKER        | Persisted notification for the owning user |
+
+Server-side filters ensure:
+
+- **APOTHEKER** receives only orders where `order.apothekerId` matches the authenticated user.
+- **APOTHEKER** receives only notifications where `recipientUserId` matches the authenticated user.
+- **ADMIN** receives all order events but **not** pharmacist-private notifications in this phase.
+- **BEZORGER** cannot subscribe (forbidden by role guard).
+
+### Persisted notifications
+
+Notifications are stored in MongoDB (`notifications` collection) and published over
+WebSocket only **after** persistence.
+
+| Field              | Purpose                                                       |
+| ------------------ | ------------------------------------------------------------- |
+| `recipientUserId`  | Owning application `User` (MongoDB id)                        |
+| `type`             | `ORDER_CONFIRMATION`, `WEEK_LIMIT_WARNING`, `ORDER_CANCELLED` |
+| `title`, `body`    | User-facing message (delivery date in confirmation body)      |
+| `relatedOrderId`   | Optional link to the originating order                        |
+| `deduplicationKey` | Prevents duplicate rows for the same logical event            |
+| `readAt`           | Null = unread; GraphQL `read` is derived from this            |
+| `createdAt`        | Creation timestamp                                            |
+
+**Creation rules:**
+
+- Successful order create → `ORDER_CONFIRMATION` (includes order id, total quantity, delivery date).
+- Real `PENDING` → `CANCELLED` transition → `ORDER_CANCELLED` (idempotent repeats do not duplicate).
+- Weekly usage crossing `ApplicationSettings.weeklyWarningPercentage` → one `WEEK_LIMIT_WARNING`
+  per user / ISO year / ISO week / threshold (deduplication key:
+  `weekly-warning:<userId>:<isoYear>:<isoWeek>:<threshold>`). Further orders in the same
+  warning state in that week do not create another warning.
+
+**GraphQL operations (APOTHEKER only):**
+
+- `myNotifications(unreadOnly)` — list own notifications, newest first.
+- `myUnreadNotificationCount` — unread badge count.
+- `markNotificationRead(id)` — ownership enforced; foreign IDs return `NOTIFICATION_NOT_FOUND`.
+
+### Read/unread and reconnect
+
+- Mark-as-read sets `readAt` and decreases the unread badge live.
+- On WebSocket **reconnect**, the PWA refetches persisted state:
+  `myNotifications`, `myUnreadNotificationCount`, `myOrders`, and `myWeeklyOrderSummary`.
+  This recovers events missed while the in-memory PubSub could not deliver across restarts.
+- On logout, the WebSocket is disposed, Apollo cache cleared, and notification state reset.
+
+### PubSub limitation
+
+The API uses an **in-memory `PubSub`** (`graphql-subscriptions`) suitable for single-instance
+development. This does **not** scale across multiple API instances; production would require
+Redis or another shared broker (deferred to a later phase). Persisted notifications ensure
+clients can recover after reconnect even when live events were missed.
+
+### PWA live pages
+
+- `/apotheker/orders` — subscribes to own order create/update events.
+- `/apotheker/notifications` — notification list, mark-as-read, unread badge in header.
+- `/admin/orders` — subscribes to all order create/update events (respects active filters).
+- `CommonRealtimeStatus` shows connecting / connected / reconnecting / unavailable states.
+- HTTP order and notification operations continue to work when WebSocket is temporarily unavailable.
+
+### Environment
+
+```env
+VITE_BACKEND_URL=http://localhost:3000/graphql
+VITE_BACKEND_WS_URL=ws://localhost:3000/graphql
+```
+
+### Manual two-user runtime test (Phase 8)
+
+**Orders (two sessions):**
+
+1. Open one **ADMIN** browser session on `/admin/orders`.
+2. Open one **APOTHEKER** session (separate profile) on `/apotheker/orders`.
+3. Create an order as APOTHEKER → confirm it appears on both screens without refresh.
+4. Cancel the order → confirm both views update live.
+5. Log in as a **second APOTHEKER** and create an order → first APOTHEKER must not receive it; ADMIN must.
+
+**Notifications (APOTHEKER A vs B):**
+
+6. APOTHEKER A: open `/apotheker/notifications` and create a valid order → persisted
+   notification appears live; unread badge increases; body includes delivery date.
+7. Mark read → unread count decreases; refresh → read state persists.
+8. APOTHEKER B with notifications open → must not see A’s notifications.
+
+**Weekly warning:**
+
+9. Cross `weeklyWarningPercentage` once in an ISO week → one warning notification.
+10. Place another order while still above threshold in the same week → no duplicate warning.
+
+**Cancellation:**
+
+11. Cancel an eligible order → one cancellation notification; idempotent cancel → no duplicate.
+
+**Reconnect and logout:**
+
+12. Restart the API → realtime status reconnects; notifications and orders refetch from MongoDB.
+13. Log out → badge and notification state clear; log in as another user → only that user’s data loads.
+
 ## API commands
 
 ```bash
@@ -544,5 +671,5 @@ npm run format:check
 
 ## Next phase
 
-**Phase 7 — ordering** (`docs/implementation-roadmap.md`): order placement, weekly
-limits, and stock reservation workflows.
+**Phase 9 — stock management** (`docs/implementation-roadmap.md`): authoritative stock
+balance, audit log, and admin stock UI.

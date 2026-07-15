@@ -7,7 +7,14 @@ import { Request, Response } from 'express'
 import { join } from 'node:path'
 import { buildMongoUrl, envValidationSchema } from './config/env.validation'
 import { AuthenticationModule } from './authentication/authentication.module'
+import {
+  buildGraphqlRequestFromWsAuth,
+} from './authentication/graphql-ws-auth.util'
+import { GraphqlWsAuthModule } from './authentication/graphql-ws-auth.module'
+import { GraphqlWsAuthService } from './authentication/graphql-ws-auth.service'
+import { PubSubModule } from './common/pubsub/pubsub.module'
 import { HealthModule } from './health/health.module'
+import { NotificationsModule } from './notifications/notifications.module'
 import { OrderModule } from './order/order.module'
 import { SettingsModule } from './settings/settings.module'
 import { UserModule } from './user/user.module'
@@ -30,9 +37,12 @@ const sharedImports = [
 
   GraphQLModule.forRootAsync<ApolloDriverConfig>({
     driver: ApolloDriver,
-    imports: [ConfigModule],
-    inject: [ConfigService],
-    useFactory: (configService: ConfigService) => {
+    imports: [ConfigModule, GraphqlWsAuthModule],
+    inject: [ConfigService, GraphqlWsAuthService],
+    useFactory: (
+      configService: ConfigService,
+      graphqlWsAuthService: GraphqlWsAuthService,
+    ) => {
       const nodeEnv = configService.get<string>('NODE_ENV', 'development')
       const isProduction = nodeEnv === 'production'
 
@@ -40,10 +50,54 @@ const sharedImports = [
         autoSchemaFile: join(process.cwd(), 'dist/schema.gql'),
         sortSchema: true,
         graphiql: !isProduction,
-        context: ({ req, res }: { req: Request; res: Response }) => ({
+        subscriptions: {
+          'graphql-ws': {
+            onConnect: async (context: {
+              connectionParams?: Record<string, unknown>
+            }) => {
+              try {
+                const auth = await graphqlWsAuthService.authenticateConnection(
+                  context.connectionParams,
+                )
+
+                return buildGraphqlRequestFromWsAuth(auth)
+              } catch {
+                return false
+              }
+            },
+          },
+        },
+        context: ({
           req,
           res,
-        }),
+          extra,
+        }: {
+          req?: Request & {
+            user?: unknown
+            applicationUser?: unknown
+            headers?: { authorization?: string }
+          }
+          res?: Response
+          extra?: ReturnType<typeof buildGraphqlRequestFromWsAuth>
+        }) => {
+          const wsRequest = extra ?? undefined
+
+          if (wsRequest) {
+            return {
+              req: {
+                headers: wsRequest.headers,
+                user: wsRequest.user,
+                applicationUser: wsRequest.applicationUser,
+              },
+              res,
+            }
+          }
+
+          return {
+            req,
+            res,
+          }
+        },
       }
     },
   }),
@@ -83,11 +137,13 @@ const databaseImports = isSchemaGeneration
   imports: [
     ...sharedImports,
     ...databaseImports,
+    PubSubModule,
     HealthModule,
     AuthenticationModule,
     UserModule,
     SettingsModule,
     VaccineModule,
+    NotificationsModule,
     OrderModule,
   ],
 })

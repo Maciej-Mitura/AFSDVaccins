@@ -1,4 +1,4 @@
-import { UseGuards } from '@nestjs/common'
+import { UseGuards, Inject } from '@nestjs/common'
 import {
   Args,
   ID,
@@ -8,9 +8,16 @@ import {
   Query,
   ResolveField,
   Resolver,
+  Subscription,
 } from '@nestjs/graphql'
+import { PubSub } from 'graphql-subscriptions'
 
 import { AuthorizationGuard } from '../authentication/authorization.guard'
+import {
+  ORDER_CREATED_EVENT,
+  ORDER_UPDATED_EVENT,
+  PUB_SUB,
+} from '../common/pubsub/pubsub.constants'
 import { CurrentUser } from '../user/decorators/current-user.decorator'
 import { Roles } from '../user/decorators/roles.decorator'
 import { RolesGuard } from '../user/guards/roles.guard'
@@ -19,6 +26,10 @@ import { UserRole } from '../user/user-role.enum'
 import { UserService } from '../user/user.service'
 import { CreateOrderInput } from './dto/create-order.input'
 import { OrderFilterInput } from './dto/order-filter.input'
+import {
+  filterOrderCreatedEvent,
+  filterOrderUpdatedEvent,
+} from './order-subscription.filter'
 import { Order } from './order.entity'
 import { OrderStatus } from './order-status.enum'
 import { OrderService } from './order.service'
@@ -29,6 +40,7 @@ export class OrderResolver {
   constructor(
     private readonly orderService: OrderService,
     private readonly userService: UserService,
+    @Inject(PUB_SUB) private readonly pubSub: PubSub,
   ) {}
 
   @Mutation(() => Order, {
@@ -123,6 +135,28 @@ export class OrderResolver {
   @Roles(UserRole.ADMIN)
   order(@Args('id', { type: () => ID }) id: string): Promise<Order> {
     return this.orderService.findOrderById(id)
+  }
+
+  @Subscription(() => Order, {
+    description: 'Live order-created events filtered by role and ownership',
+    filter: filterOrderCreatedEvent,
+    resolve: (payload: { orderCreated: Order }) => payload.orderCreated,
+  })
+  @UseGuards(AuthorizationGuard, RolesGuard)
+  @Roles(UserRole.APOTHEKER, UserRole.ADMIN)
+  orderCreated() {
+    return this.pubSub.asyncIterableIterator(ORDER_CREATED_EVENT)
+  }
+
+  @Subscription(() => Order, {
+    description: 'Live order-updated events filtered by role and ownership',
+    filter: filterOrderUpdatedEvent,
+    resolve: (payload: { orderUpdated: Order }) => payload.orderUpdated,
+  })
+  @UseGuards(AuthorizationGuard, RolesGuard)
+  @Roles(UserRole.APOTHEKER, UserRole.ADMIN)
+  orderUpdated() {
+    return this.pubSub.asyncIterableIterator(ORDER_UPDATED_EVENT)
   }
 
   @ResolveField(() => User, {

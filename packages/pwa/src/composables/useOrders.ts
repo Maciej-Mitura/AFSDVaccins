@@ -2,6 +2,16 @@ import { computed, ref } from 'vue'
 import { ApolloError } from '@apollo/client/core'
 
 import {
+  ADMIN_ORDER_CREATED_SUBSCRIPTION,
+  ADMIN_ORDER_UPDATED_SUBSCRIPTION,
+  ORDER_CREATED_SUBSCRIPTION,
+  ORDER_UPDATED_SUBSCRIPTION,
+  type AdminOrderCreatedSubscription,
+  type AdminOrderUpdatedSubscription,
+  type OrderCreatedSubscription,
+  type OrderUpdatedSubscription,
+} from '@/assets/graphql/order.subscription'
+import {
   CANCEL_OWN_ORDER_MUTATION,
   CREATE_ORDER_MUTATION,
   MY_ORDERS_QUERY,
@@ -27,6 +37,61 @@ const adminOrders = ref<AdminOrderListItem[]>([])
 const weeklySummary = ref<WeeklyOrderSummary | null>(null)
 const loading = ref(false)
 const errorMessage = ref<string | null>(null)
+
+let myOrderSubscriptionCleanup: (() => void) | null = null
+let adminOrderSubscriptionCleanup: (() => void) | null = null
+
+function upsertMyOrder(order: OrderListItem): void {
+  const existingIndex = myOrders.value.findIndex(item => item.id === order.id)
+
+  if (existingIndex === -1) {
+    myOrders.value = [order, ...myOrders.value]
+    return
+  }
+
+  myOrders.value = myOrders.value.map(item =>
+    item.id === order.id ? { ...item, ...order } : item,
+  )
+}
+
+function upsertAdminOrder(order: AdminOrderListItem): void {
+  const existingIndex = adminOrders.value.findIndex(item => item.id === order.id)
+
+  if (existingIndex === -1) {
+    adminOrders.value = [order, ...adminOrders.value]
+    return
+  }
+
+  adminOrders.value = adminOrders.value.map(item =>
+    item.id === order.id ? { ...item, ...order } : item,
+  )
+}
+
+function orderMatchesAdminFilters(
+  order: AdminOrderListItem,
+  filters: OrdersQueryVariables,
+): boolean {
+  if (filters.isoYear !== undefined && order.isoYear !== filters.isoYear) {
+    return false
+  }
+
+  if (filters.isoWeek !== undefined && order.isoWeek !== filters.isoWeek) {
+    return false
+  }
+
+  if (filters.status !== undefined && order.status !== filters.status) {
+    return false
+  }
+
+  if (
+    filters.apothekerId !== undefined &&
+    order.apotheker.id !== filters.apothekerId
+  ) {
+    return false
+  }
+
+  return true
+}
 
 function extractGraphQLErrorCode(error: unknown): string | null {
   if (!(error instanceof ApolloError)) {
@@ -182,6 +247,102 @@ export function useOrders() {
     return extractGraphQLErrorCode(error) === 'ORDER_CANNOT_BE_CANCELLED'
   }
 
+  function stopMyOrderSubscriptions(): void {
+    myOrderSubscriptionCleanup?.()
+    myOrderSubscriptionCleanup = null
+  }
+
+  function stopAdminOrderSubscriptions(): void {
+    adminOrderSubscriptionCleanup?.()
+    adminOrderSubscriptionCleanup = null
+  }
+
+  function subscribeToMyOrderEvents(): () => void {
+    stopMyOrderSubscriptions()
+
+    const createdSubscription = apolloClient
+      .subscribe<OrderCreatedSubscription>({
+        query: ORDER_CREATED_SUBSCRIPTION,
+      })
+      .subscribe({
+        next: ({ data }) => {
+          const order = data?.orderCreated
+
+          if (order) {
+            upsertMyOrder(order)
+          }
+        },
+      })
+
+    const updatedSubscription = apolloClient
+      .subscribe<OrderUpdatedSubscription>({
+        query: ORDER_UPDATED_SUBSCRIPTION,
+      })
+      .subscribe({
+        next: ({ data }) => {
+          const order = data?.orderUpdated
+
+          if (order) {
+            upsertMyOrder(order)
+          }
+        },
+      })
+
+    const cleanup = (): void => {
+      createdSubscription.unsubscribe()
+      updatedSubscription.unsubscribe()
+      myOrderSubscriptionCleanup = null
+    }
+
+    myOrderSubscriptionCleanup = cleanup
+
+    return cleanup
+  }
+
+  function subscribeToAdminOrderEvents(
+    filters: OrdersQueryVariables = {},
+  ): () => void {
+    stopAdminOrderSubscriptions()
+
+    const createdSubscription = apolloClient
+      .subscribe<AdminOrderCreatedSubscription>({
+        query: ADMIN_ORDER_CREATED_SUBSCRIPTION,
+      })
+      .subscribe({
+        next: ({ data }) => {
+          const order = data?.orderCreated
+
+          if (order && orderMatchesAdminFilters(order, filters)) {
+            upsertAdminOrder(order)
+          }
+        },
+      })
+
+    const updatedSubscription = apolloClient
+      .subscribe<AdminOrderUpdatedSubscription>({
+        query: ADMIN_ORDER_UPDATED_SUBSCRIPTION,
+      })
+      .subscribe({
+        next: ({ data }) => {
+          const order = data?.orderUpdated
+
+          if (order && orderMatchesAdminFilters(order, filters)) {
+            upsertAdminOrder(order)
+          }
+        },
+      })
+
+    const cleanup = (): void => {
+      createdSubscription.unsubscribe()
+      updatedSubscription.unsubscribe()
+      adminOrderSubscriptionCleanup = null
+    }
+
+    adminOrderSubscriptionCleanup = cleanup
+
+    return cleanup
+  }
+
   return {
     myOrders,
     adminOrders,
@@ -194,6 +355,10 @@ export function useOrders() {
     createOrder,
     cancelOwnOrder,
     loadAdminOrders,
+    subscribeToMyOrderEvents,
+    subscribeToAdminOrderEvents,
+    stopMyOrderSubscriptions,
+    stopAdminOrderSubscriptions,
     isWeeklyLimitExceededError,
     isDailyLimitExceededError,
     isVaccineInactiveError,

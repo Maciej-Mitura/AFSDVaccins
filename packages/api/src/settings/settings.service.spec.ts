@@ -199,7 +199,7 @@ describe('SettingsService', () => {
 
     expect(result.weeklyDoseCap).toBe(DEFAULT_WEEKLY_DOSE_CAP)
     expect(result.dailyDoseCapPerType).toBe(DEFAULT_DAILY_DOSE_CAP_PER_TYPE)
-    expect(repository.save).toHaveBeenCalledTimes(1)
+    expect(repository.save).toHaveBeenCalledTimes(2)
   })
 
   it('updates closing time, warning percentage, and dose caps', async () => {

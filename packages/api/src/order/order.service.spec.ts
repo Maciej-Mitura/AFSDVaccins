@@ -21,6 +21,8 @@ import {
   OrderNotOwnedException,
   WeeklyLimitExceededException,
 } from './exceptions/order.exceptions'
+import { OrderNotificationService } from '../notifications/order-notification.service'
+import { OrderEventsService } from './order-events.service'
 import { Order } from './order.entity'
 import { OrderStatus } from './order-status.enum'
 import { OrderService } from './order.service'
@@ -35,6 +37,15 @@ describe('OrderService', () => {
   >
   let settingsService: jest.Mocked<
     Pick<SettingsService, 'getApplicationSettings'>
+  >
+  let orderNotificationService: jest.Mocked<
+    Pick<
+      OrderNotificationService,
+      'handleOrderCreated' | 'createOrderCancelledNotification'
+    >
+  >
+  let orderEventsService: jest.Mocked<
+    Pick<OrderEventsService, 'publishOrderCreated' | 'publishOrderUpdated'>
   >
 
   const apothekerId = '507f1f77bcf86cd799439011'
@@ -131,6 +142,16 @@ describe('OrderService', () => {
       getApplicationSettings: jest.fn().mockResolvedValue(settings),
     }
 
+    orderEventsService = {
+      publishOrderCreated: jest.fn().mockResolvedValue(undefined),
+      publishOrderUpdated: jest.fn().mockResolvedValue(undefined),
+    }
+
+    orderNotificationService = {
+      handleOrderCreated: jest.fn().mockResolvedValue(undefined),
+      createOrderCancelledNotification: jest.fn().mockResolvedValue(undefined),
+    }
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         OrderService,
@@ -145,6 +166,14 @@ describe('OrderService', () => {
         {
           provide: SettingsService,
           useValue: settingsService,
+        },
+        {
+          provide: OrderEventsService,
+          useValue: orderEventsService,
+        },
+        {
+          provide: OrderNotificationService,
+          useValue: orderNotificationService,
         },
         {
           provide: CLOCK,
@@ -195,6 +224,33 @@ describe('OrderService', () => {
       }),
     )
     expect(result.status).toBe(OrderStatus.PENDING)
+  })
+
+  it('publishes orderCreated only after successful persistence', async () => {
+    repository.create.mockImplementation(value => value as Order)
+    repository.save.mockImplementation(value =>
+      Promise.resolve({
+        ...pendingOrder,
+        ...value,
+      } as Order),
+    )
+
+    await service.createOrder(apotheker, {
+      lines: [{ vaccineId: vaccineAId, quantity: 1 }],
+    })
+
+    expect(orderEventsService.publishOrderCreated).toHaveBeenCalledTimes(1)
+    expect(orderNotificationService.handleOrderCreated).toHaveBeenCalledTimes(1)
+    expect(orderEventsService.publishOrderUpdated).not.toHaveBeenCalled()
+  })
+
+  it('does not create notifications when validation fails', async () => {
+    await expect(
+      service.createOrder(apotheker, { lines: [] }),
+    ).rejects.toBeInstanceOf(InvalidOrderQuantityException)
+
+    expect(orderEventsService.publishOrderCreated).not.toHaveBeenCalled()
+    expect(orderNotificationService.handleOrderCreated).not.toHaveBeenCalled()
   })
 
   it('derives pharmacist ownership from the application user', async () => {
@@ -433,9 +489,13 @@ describe('OrderService', () => {
 
     expect(result.status).toBe(OrderStatus.CANCELLED)
     expect(result.cancelledAt).toEqual(now)
+    expect(orderEventsService.publishOrderUpdated).toHaveBeenCalledTimes(1)
+    expect(
+      orderNotificationService.createOrderCancelledNotification,
+    ).toHaveBeenCalledTimes(1)
   })
 
-  it('returns an already-cancelled order idempotently', async () => {
+  it('does not publish orderUpdated for idempotent repeated cancellation', async () => {
     const cancelled = {
       ...pendingOrder,
       status: OrderStatus.CANCELLED,
@@ -448,6 +508,10 @@ describe('OrderService', () => {
 
     expect(result).toEqual(cancelled)
     expect(repository.save).not.toHaveBeenCalled()
+    expect(orderEventsService.publishOrderUpdated).not.toHaveBeenCalled()
+    expect(
+      orderNotificationService.createOrderCancelledNotification,
+    ).not.toHaveBeenCalled()
   })
 
   it('prevents cancellation of PLANNED orders', async () => {

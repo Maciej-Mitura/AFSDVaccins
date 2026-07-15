@@ -114,6 +114,12 @@ const router = createRouter({
           name: 'apotheker-orders',
           component: () => import('@/views/apotheker/ViewApothekerOrders.vue'),
         },
+        {
+          path: 'notifications',
+          name: 'apotheker-notifications',
+          component: () =>
+            import('@/views/apotheker/ViewApothekerNotifications.vue'),
+        },
       ],
     },
     {

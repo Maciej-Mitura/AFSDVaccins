@@ -1,11 +1,13 @@
 import { Module } from '@nestjs/common'
 import { TypeOrmModule } from '@nestjs/typeorm'
 
+import { NotificationsModule } from '../notifications/notifications.module'
 import { AuthenticationModule } from '../authentication/authentication.module'
 import { SettingsModule } from '../settings/settings.module'
 import { UserModule } from '../user/user.module'
 import { VaccineModule } from '../vaccine/vaccine.module'
 import { CLOCK, SystemClock } from './clock.provider'
+import { OrderEventsService } from './order-events.service'
 import { Order } from './order.entity'
 import { OrderResolver } from './order.resolver'
 import { OrderService } from './order.service'
@@ -39,10 +41,12 @@ const persistenceImports = isSchemaGeneration
     UserModule,
     VaccineModule,
     SettingsModule,
+    NotificationsModule,
     ...persistenceImports,
   ],
   providers: [
     orderServiceProvider,
+    OrderEventsService,
     OrderResolver,
     {
       provide: CLOCK,

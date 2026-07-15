@@ -9,7 +9,10 @@ import request from 'supertest'
 import { Request, Response } from 'express'
 import type { Server } from 'node:http'
 
+import { PubSub } from 'graphql-subscriptions'
+
 import { AuthorizationGuard } from '../authentication/authorization.guard'
+import { PUB_SUB } from '../common/pubsub/pubsub.constants'
 import { FirebaseAuthStrategy } from '../authentication/firebase-auth.strategy'
 import { FirebaseService } from '../authentication/firebase.service'
 import { SettingsService } from '../settings/settings.service'
@@ -152,6 +155,10 @@ describe('OrderResolver (GraphQL)', () => {
         {
           provide: VaccineService,
           useValue: vaccineServiceMock,
+        },
+        {
+          provide: PUB_SUB,
+          useValue: new PubSub(),
         },
       ],
     }).compile()

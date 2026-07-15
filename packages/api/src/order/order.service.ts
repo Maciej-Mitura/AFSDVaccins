@@ -5,6 +5,7 @@ import { MongoRepository } from 'typeorm'
 
 import { ApplicationSettings } from '../settings/settings.entity'
 import { SettingsService } from '../settings/settings.service'
+import { OrderNotificationService } from '../notifications/order-notification.service'
 import { User } from '../user/user.entity'
 import { UserRole } from '../user/user-role.enum'
 import {
@@ -31,6 +32,7 @@ import {
   WeeklyLimitExceededException,
 } from './exceptions/order.exceptions'
 import { OrderLine } from './order-line.entity'
+import { OrderEventsService } from './order-events.service'
 import { Order } from './order.entity'
 import { OrderStatus } from './order-status.enum'
 import { WeeklyOrderSummary } from './weekly-order-summary.type'
@@ -47,6 +49,8 @@ export class OrderService {
     private readonly orderRepository: MongoRepository<Order>,
     private readonly vaccineService: VaccineService,
     private readonly settingsService: SettingsService,
+    private readonly orderEventsService: OrderEventsService,
+    private readonly orderNotificationService: OrderNotificationService,
     @Inject(CLOCK) private readonly clock: Clock,
   ) {}
 
@@ -258,7 +262,16 @@ export class OrderService {
       cancelledAt: null,
     })
 
-    return this.orderRepository.save(order)
+    const saved = await this.orderRepository.save(order)
+    await this.orderEventsService.publishOrderCreated(saved)
+    await this.orderNotificationService.handleOrderCreated(
+      user,
+      saved,
+      currentWeeklyQuantity,
+      settings,
+    )
+
+    return saved
   }
 
   async findMyOrders(
@@ -330,7 +343,14 @@ export class OrderService {
     order.status = OrderStatus.CANCELLED
     order.cancelledAt = this.clock.now()
 
-    return this.orderRepository.save(order)
+    const saved = await this.orderRepository.save(order)
+    await this.orderEventsService.publishOrderUpdated(saved)
+    await this.orderNotificationService.createOrderCancelledNotification(
+      user,
+      saved,
+    )
+
+    return saved
   }
 
   async findOrders(filter?: OrderFilterInput): Promise<Order[]> {

@@ -9,17 +9,20 @@ import useGraphQL, {
 } from './composables/useGraphQL'
 import { useCurrentUser } from './composables/useCurrentUser'
 import { useFirebase } from './composables/useFirebase'
+import { useNotifications } from './composables/useNotifications'
 import router from './router'
 
 import '@/assets/main.css'
 
 const { waitForAuthRestoration, logout } = useFirebase()
 const { clearCurrentUser } = useCurrentUser()
+const { clearNotificationState } = useNotifications()
 const authReady = ref(false)
 
 registerSessionExpiredHandler(async message => {
   await logout()
   clearCurrentUser()
+  clearNotificationState()
   await clearApolloCache()
   await router.push({
     name: 'auth-login',
