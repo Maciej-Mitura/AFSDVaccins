@@ -28,9 +28,7 @@ export const myUnreadNotificationCountQuerySource = gql`
 `
 
 export type { MyUnreadNotificationCountQuery } from '@vaccin-delivery/types'
-export {
-  MyUnreadNotificationCountDocument as MY_UNREAD_NOTIFICATION_COUNT_QUERY,
-} from '@vaccin-delivery/types'
+export { MyUnreadNotificationCountDocument as MY_UNREAD_NOTIFICATION_COUNT_QUERY } from '@vaccin-delivery/types'
 
 export const markNotificationReadMutationSource = gql`
   mutation MarkNotificationRead($id: ID!) {
@@ -46,9 +44,7 @@ export type {
   MarkNotificationReadMutation,
   MarkNotificationReadMutationVariables,
 } from '@vaccin-delivery/types'
-export {
-  MarkNotificationReadDocument as MARK_NOTIFICATION_READ_MUTATION,
-} from '@vaccin-delivery/types'
+export { MarkNotificationReadDocument as MARK_NOTIFICATION_READ_MUTATION } from '@vaccin-delivery/types'
 
 export const notificationReceivedSubscriptionSource = gql`
   subscription NotificationReceived {
@@ -66,6 +62,4 @@ export const notificationReceivedSubscriptionSource = gql`
 `
 
 export type { NotificationReceivedSubscription } from '@vaccin-delivery/types'
-export {
-  NotificationReceivedDocument as NOTIFICATION_RECEIVED_SUBSCRIPTION,
-} from '@vaccin-delivery/types'
+export { NotificationReceivedDocument as NOTIFICATION_RECEIVED_SUBSCRIPTION } from '@vaccin-delivery/types'

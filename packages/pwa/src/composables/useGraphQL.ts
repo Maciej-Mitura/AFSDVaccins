@@ -14,6 +14,7 @@ import { onError } from '@apollo/client/link/error'
 import type { Client } from 'graphql-ws'
 import { createClient } from 'graphql-ws'
 import type { GraphQLFormattedError } from 'graphql'
+import { Kind, OperationTypeNode } from 'graphql'
 
 import { firebaseAuth } from '@/config/firebase'
 import { setRealtimeConnectionState } from '@/composables/useRealtimeConnection'
@@ -240,8 +241,8 @@ const splitLink = split(
     const definition = getMainDefinition(query)
 
     return (
-      definition.kind === 'OperationDefinition' &&
-      definition.operation === 'subscription'
+      definition.kind === Kind.OPERATION_DEFINITION &&
+      definition.operation === OperationTypeNode.SUBSCRIPTION
     )
   },
   wsLink,
