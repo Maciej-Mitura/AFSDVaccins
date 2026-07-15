@@ -11,6 +11,7 @@ import { UserService } from '../user/user.service'
 import { Vaccine } from '../vaccine/vaccine.entity'
 import { StockAdjustmentType } from './stock-adjustment-type.enum'
 import { StockAdjustment } from './stock-adjustment.entity'
+import { StockAdjustmentRepository } from './stock-adjustment.repository'
 import {
   InsufficientStockException,
   InvalidStockAdjustmentException,
@@ -23,7 +24,10 @@ import { VaccineStockRepository } from './vaccine-stock.repository'
 describe('StockService', () => {
   let service: StockService
   let stockAdjustmentRepository: jest.Mocked<
-    Pick<MongoRepository<StockAdjustment>, 'create' | 'save' | 'find'>
+    Pick<MongoRepository<StockAdjustment>, 'find'>
+  >
+  let stockAdjustmentWriter: jest.Mocked<
+    Pick<StockAdjustmentRepository, 'insertManualAdjustment'>
   >
   let vaccineStockRepository: jest.Mocked<
     Pick<
@@ -67,9 +71,11 @@ describe('StockService', () => {
 
   beforeEach(async () => {
     stockAdjustmentRepository = {
-      create: jest.fn(),
-      save: jest.fn(),
       find: jest.fn(),
+    }
+
+    stockAdjustmentWriter = {
+      insertManualAdjustment: jest.fn(),
     }
 
     vaccineStockRepository = {
@@ -88,6 +94,10 @@ describe('StockService', () => {
         {
           provide: getRepositoryToken(StockAdjustment),
           useValue: stockAdjustmentRepository,
+        },
+        {
+          provide: StockAdjustmentRepository,
+          useValue: stockAdjustmentWriter,
         },
         {
           provide: VaccineStockRepository,
@@ -113,14 +123,12 @@ describe('StockService', () => {
       quantityBefore,
       quantityAfter,
     })
-    stockAdjustmentRepository.create.mockImplementation(
-      value => value as StockAdjustment,
-    )
-    stockAdjustmentRepository.save.mockImplementation(value =>
+    stockAdjustmentWriter.insertManualAdjustment.mockImplementation(value =>
       Promise.resolve({
         ...value,
         _id: adjustmentId,
         id: adjustmentId,
+        relatedOrderId: value.relatedOrderId ?? null,
         createdAt: new Date('2026-07-14T12:00:00.000Z'),
       } as StockAdjustment),
     )
@@ -157,13 +165,16 @@ describe('StockService', () => {
     )
     expect(result.quantityBefore).toBe(10)
     expect(result.quantityAfter).toBe(25)
-    expect(stockAdjustmentRepository.save).toHaveBeenCalledTimes(1)
-    expect(stockAdjustmentRepository.create).toHaveBeenCalledWith(
+    expect(stockAdjustmentWriter.insertManualAdjustment).toHaveBeenCalledTimes(1)
+    expect(stockAdjustmentWriter.insertManualAdjustment).toHaveBeenCalledWith(
       expect.objectContaining({
         vaccineObjectId: vaccineObjectId,
         performedByUserId: adminUser._id.toString(),
       }),
     )
+    expect(
+      stockAdjustmentWriter.insertManualAdjustment.mock.calls[0]?.[0],
+    ).not.toHaveProperty('idempotencyKey')
   })
 
   it('manual decrease finds the vaccine', async () => {
@@ -207,7 +218,7 @@ describe('StockService', () => {
     ).rejects.toBeInstanceOf(VaccineNotFoundException)
 
     expect(vaccineStockRepository.adjustStockQuantity).not.toHaveBeenCalled()
-    expect(stockAdjustmentRepository.save).not.toHaveBeenCalled()
+    expect(stockAdjustmentWriter.insertManualAdjustment).not.toHaveBeenCalled()
   })
 
   it('returns VACCINE_NOT_FOUND for valid but nonexistent vaccine IDs', async () => {
@@ -222,7 +233,7 @@ describe('StockService', () => {
       }),
     ).rejects.toBeInstanceOf(VaccineNotFoundException)
 
-    expect(stockAdjustmentRepository.save).not.toHaveBeenCalled()
+    expect(stockAdjustmentWriter.insertManualAdjustment).not.toHaveBeenCalled()
   })
 
   it('does not create an audit record when lookup fails', async () => {
@@ -232,7 +243,7 @@ describe('StockService', () => {
       service.findVaccineStockHistory(nonexistentVaccineId),
     ).rejects.toBeInstanceOf(VaccineNotFoundException)
 
-    expect(stockAdjustmentRepository.save).not.toHaveBeenCalled()
+    expect(stockAdjustmentWriter.insertManualAdjustment).not.toHaveBeenCalled()
   })
 
   it('rejects resulting negative stock without creating audit record', async () => {
@@ -248,7 +259,29 @@ describe('StockService', () => {
       }),
     ).rejects.toBeInstanceOf(InsufficientStockException)
 
-    expect(stockAdjustmentRepository.save).not.toHaveBeenCalled()
+    expect(stockAdjustmentWriter.insertManualAdjustment).not.toHaveBeenCalled()
+  })
+
+  it('allows multiple manual adjustments in succession', async () => {
+    mockSuccessfulAdjustment(10, 15)
+
+    await service.adjustVaccineStock(adminUser, {
+      vaccineId,
+      type: StockAdjustmentType.RESTOCK,
+      quantityDelta: 5,
+      reason: 'First restock',
+    })
+
+    mockSuccessfulAdjustment(15, 18)
+
+    await service.adjustVaccineStock(adminUser, {
+      vaccineId,
+      type: StockAdjustmentType.RESTOCK,
+      quantityDelta: 3,
+      reason: 'Second restock',
+    })
+
+    expect(stockAdjustmentWriter.insertManualAdjustment).toHaveBeenCalledTimes(2)
   })
 
   it('rejects zero delta', async () => {

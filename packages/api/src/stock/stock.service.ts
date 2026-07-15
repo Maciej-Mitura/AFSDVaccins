@@ -12,6 +12,7 @@ import {
 } from './exceptions/stock.exceptions'
 import { StockAdjustmentType } from './stock-adjustment-type.enum'
 import { StockAdjustment } from './stock-adjustment.entity'
+import { StockAdjustmentRepository } from './stock-adjustment.repository'
 import { StockNotificationService } from './stock-notification.service'
 import { VaccineStockRepository } from './vaccine-stock.repository'
 
@@ -20,6 +21,7 @@ export class StockService {
   constructor(
     @InjectRepository(StockAdjustment)
     private readonly stockAdjustmentRepository: MongoRepository<StockAdjustment>,
+    private readonly stockAdjustmentWriter: StockAdjustmentRepository,
     private readonly vaccineStockRepository: VaccineStockRepository,
     private readonly stockNotificationService: StockNotificationService,
   ) {}
@@ -102,19 +104,18 @@ export class StockService {
       throw new InsufficientStockException()
     }
 
-    const adjustmentPayload: Partial<StockAdjustment> = {
-      vaccineObjectId: parsed.objectId,
-      type: input.type,
-      quantityDelta: input.quantityDelta,
-      quantityBefore: updateResult.quantityBefore,
-      quantityAfter: updateResult.quantityAfter,
-      reason: input.reason.trim(),
-      performedByUserId: user._id.toString(),
-      relatedOrderId: null,
-    }
-
-    const adjustment = this.stockAdjustmentRepository.create(adjustmentPayload)
-    const savedAdjustment = await this.stockAdjustmentRepository.save(adjustment)
+    const savedAdjustment = await this.stockAdjustmentWriter.insertManualAdjustment(
+      {
+        vaccineObjectId: parsed.objectId,
+        type: input.type,
+        quantityDelta: input.quantityDelta,
+        quantityBefore: updateResult.quantityBefore,
+        quantityAfter: updateResult.quantityAfter,
+        reason: input.reason.trim(),
+        performedByUserId: user._id.toString(),
+        relatedOrderId: null,
+      },
+    )
 
     await this.stockNotificationService.notifyAdminsIfEnteredLowStock(
       vaccine,

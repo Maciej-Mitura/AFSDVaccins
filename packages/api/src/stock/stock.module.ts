@@ -7,6 +7,8 @@ import { UserModule } from '../user/user.module'
 import { Vaccine } from '../vaccine/vaccine.entity'
 import { VaccineModule } from '../vaccine/vaccine.module'
 import { StockAdjustment } from './stock-adjustment.entity'
+import { StockAdjustmentPersistenceService } from './stock-adjustment.persistence'
+import { StockAdjustmentRepository } from './stock-adjustment.repository'
 import { StockNotificationService } from './stock-notification.service'
 import { StockResolver } from './stock.resolver'
 import { StockService } from './stock.service'
@@ -47,6 +49,28 @@ const vaccineStockRepositoryProvider = isSchemaGeneration
     }
   : VaccineStockRepository
 
+const stockAdjustmentRepositoryProvider = isSchemaGeneration
+  ? {
+      provide: StockAdjustmentRepository,
+      useValue: {
+        insertManualAdjustment: () => Promise.resolve(null),
+        insertIdempotentAdjustment: () => Promise.resolve(null),
+      },
+    }
+  : StockAdjustmentRepository
+
+const stockAdjustmentPersistenceProvider = isSchemaGeneration
+  ? {
+      provide: StockAdjustmentPersistenceService,
+      useValue: {
+        onModuleInit: () => Promise.resolve(undefined),
+        initializeStockAdjustmentPersistence: () => Promise.resolve(undefined),
+        repairLegacyNullIdempotencyKeys: () => Promise.resolve(0),
+        ensurePartialUniqueIdempotencyIndex: () => Promise.resolve(undefined),
+      },
+    }
+  : StockAdjustmentPersistenceService
+
 const persistenceImports = isSchemaGeneration
   ? []
   : [TypeOrmModule.forFeature([StockAdjustment, Vaccine])]
@@ -63,6 +87,8 @@ const persistenceImports = isSchemaGeneration
     stockServiceProvider,
     stockNotificationServiceProvider,
     vaccineStockRepositoryProvider,
+    stockAdjustmentRepositoryProvider,
+    stockAdjustmentPersistenceProvider,
     StockResolver,
   ],
   exports: [StockService],

@@ -54,11 +54,11 @@ export class StockAdjustment {
   relatedOrderId?: string | null
 
   /**
-   * Omitted entirely for manual ADMIN adjustments.
-   * Sparse unique index applies only when this field is present (Phase 10 delivery idempotency).
+   * Present only for idempotent operations such as Phase 10 delivery decrement.
+   * Manual ADMIN adjustments omit this property entirely.
+   * Partial unique index is initialized by StockAdjustmentPersistenceService.
    */
-  @Index({ unique: true, sparse: true })
-  @Column({ nullable: true })
+  @Column()
   idempotencyKey?: string
 
   @CreateDateColumn()
