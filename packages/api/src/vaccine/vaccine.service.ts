@@ -63,7 +63,7 @@ export class VaccineService {
       normalizedName,
       description: input.description?.trim() ?? '',
       manufacturer: input.manufacturer.trim(),
-      stockQuantity: input.stockQuantity ?? 0,
+      stockQuantity: 0,
       stockWarningThreshold: input.stockWarningThreshold ?? 0,
       active: input.active ?? true,
     })
@@ -126,10 +126,6 @@ export class VaccineService {
 
     if (input.manufacturer !== undefined) {
       vaccine.manufacturer = input.manufacturer.trim()
-    }
-
-    if (input.stockQuantity !== undefined) {
-      vaccine.stockQuantity = input.stockQuantity
     }
 
     if (input.stockWarningThreshold !== undefined) {

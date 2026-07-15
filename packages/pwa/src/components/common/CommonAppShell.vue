@@ -51,6 +51,7 @@ import { clearApolloCache } from '@/composables/useGraphQL'
 import { useCurrentUser } from '@/composables/useCurrentUser'
 import { useFirebase } from '@/composables/useFirebase'
 import { useNotifications } from '@/composables/useNotifications'
+import { useAdminNotifications } from '@/composables/useAdminNotifications'
 
 export type AppShellLink = {
   label: string
@@ -66,6 +67,7 @@ const router = useRouter()
 const { isAuthenticated, logout } = useFirebase()
 const { clearCurrentUser } = useCurrentUser()
 const { clearNotificationState } = useNotifications()
+const { clearAdminNotificationState } = useAdminNotifications()
 const loggingOut = ref(false)
 
 const navigationLinks = computed(() => props.navLinks ?? [])
@@ -77,6 +79,7 @@ async function onLogout() {
     await logout()
     clearCurrentUser()
     clearNotificationState()
+    clearAdminNotificationState()
     await clearApolloCache()
     await router.push({ name: 'auth-login' })
   } finally {

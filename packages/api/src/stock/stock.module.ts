@@ -1,0 +1,69 @@
+import { Module } from '@nestjs/common'
+import { TypeOrmModule } from '@nestjs/typeorm'
+
+import { AuthenticationModule } from '../authentication/authentication.module'
+import { NotificationsModule } from '../notifications/notifications.module'
+import { UserModule } from '../user/user.module'
+import { Vaccine } from '../vaccine/vaccine.entity'
+import { VaccineModule } from '../vaccine/vaccine.module'
+import { StockAdjustment } from './stock-adjustment.entity'
+import { StockNotificationService } from './stock-notification.service'
+import { StockResolver } from './stock.resolver'
+import { StockService } from './stock.service'
+import { VaccineStockRepository } from './vaccine-stock.repository'
+
+const isSchemaGeneration =
+  process.argv.includes('--generate-schema-only') ||
+  process.env.GENERATE_SCHEMA_ONLY === 'true'
+
+const stockServiceProvider = isSchemaGeneration
+  ? {
+      provide: StockService,
+      useValue: {
+        adjustVaccineStock: () => Promise.resolve(null),
+        findStockAdjustments: () => Promise.resolve([]),
+        findVaccineStockHistory: () => Promise.resolve([]),
+      },
+    }
+  : StockService
+
+const stockNotificationServiceProvider = isSchemaGeneration
+  ? {
+      provide: StockNotificationService,
+      useValue: {
+        notifyAdminsIfEnteredLowStock: () => Promise.resolve(undefined),
+      },
+    }
+  : StockNotificationService
+
+const vaccineStockRepositoryProvider = isSchemaGeneration
+  ? {
+      provide: VaccineStockRepository,
+      useValue: {
+        vaccineExists: () => Promise.resolve(false),
+        adjustStockQuantity: () => Promise.resolve(null),
+      },
+    }
+  : VaccineStockRepository
+
+const persistenceImports = isSchemaGeneration
+  ? []
+  : [TypeOrmModule.forFeature([StockAdjustment, Vaccine])]
+
+@Module({
+  imports: [
+    AuthenticationModule,
+    UserModule,
+    VaccineModule,
+    NotificationsModule,
+    ...persistenceImports,
+  ],
+  providers: [
+    stockServiceProvider,
+    stockNotificationServiceProvider,
+    vaccineStockRepositoryProvider,
+    StockResolver,
+  ],
+  exports: [StockService],
+})
+export class StockModule {}

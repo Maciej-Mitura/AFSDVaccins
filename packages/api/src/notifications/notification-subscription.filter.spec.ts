@@ -37,7 +37,7 @@ describe('notification-subscription.filter', () => {
     email: 'admin@example.com',
   }
 
-  const notification: Notification = {
+  const orderNotification: Notification = {
     _id: 'notification-a',
     id: 'notification-a',
     recipientUserId: apothekerA._id,
@@ -48,6 +48,19 @@ describe('notification-subscription.filter', () => {
     deduplicationKey: 'order-confirmation:order-a',
     readAt: null,
     createdAt: new Date('2026-07-14T12:00:00.000Z'),
+    read: false,
+  }
+
+  const lowStockNotification: Notification = {
+    ...orderNotification,
+    _id: 'notification-b',
+    id: 'notification-b',
+    recipientUserId: admin._id,
+    type: NotificationType.LOW_STOCK_WARNING,
+    title: 'Lage voorraad',
+    body: 'Influenza heeft nog 5 dosissen.',
+    relatedOrderId: null,
+    deduplicationKey: 'low-stock:vaccine-a:adjustment-a',
     read: false,
   }
 
@@ -82,22 +95,30 @@ describe('notification-subscription.filter', () => {
     }
   }
 
-  it('allows APOTHEKER to receive own notifications', () => {
-    expect(canReceiveNotification(apothekerA, notification)).toBe(true)
+  it('allows APOTHEKER to receive own order notifications', () => {
+    expect(canReceiveNotification(apothekerA, orderNotification)).toBe(true)
   })
 
   it('denies another APOTHEKER notification access', () => {
-    expect(canReceiveNotification(apothekerB, notification)).toBe(false)
+    expect(canReceiveNotification(apothekerB, orderNotification)).toBe(false)
   })
 
   it('denies ADMIN pharmacist-private notifications', () => {
-    expect(canReceiveNotification(admin, notification)).toBe(false)
+    expect(canReceiveNotification(admin, orderNotification)).toBe(false)
+  })
+
+  it('allows ADMIN to receive own low-stock notifications', () => {
+    expect(canReceiveNotification(admin, lowStockNotification)).toBe(true)
+  })
+
+  it('denies APOTHEKER low-stock admin notifications', () => {
+    expect(canReceiveNotification(apothekerA, lowStockNotification)).toBe(false)
   })
 
   it('filters notificationReceived for recipient ownership', () => {
     expect(
       filterNotificationReceivedEvent(
-        { notificationReceived: notification },
+        { notificationReceived: orderNotification },
         {},
         contextFor(apothekerA),
       ),
@@ -105,9 +126,27 @@ describe('notification-subscription.filter', () => {
 
     expect(
       filterNotificationReceivedEvent(
-        { notificationReceived: notification },
+        { notificationReceived: orderNotification },
         {},
         contextFor(apothekerB),
+      ),
+    ).toBe(false)
+  })
+
+  it('filters admin low-stock notifications to admin recipients only', () => {
+    expect(
+      filterNotificationReceivedEvent(
+        { notificationReceived: lowStockNotification },
+        {},
+        contextFor(admin),
+      ),
+    ).toBe(true)
+
+    expect(
+      filterNotificationReceivedEvent(
+        { notificationReceived: lowStockNotification },
+        {},
+        contextFor(apothekerA),
       ),
     ).toBe(false)
   })
@@ -115,7 +154,7 @@ describe('notification-subscription.filter', () => {
   it('filters notificationReceived using graphql-ws extra.wsAuth context', () => {
     expect(
       filterNotificationReceivedEvent(
-        { notificationReceived: notification },
+        { notificationReceived: orderNotification },
         {},
         wsContextFor(apothekerA),
       ),
@@ -123,15 +162,7 @@ describe('notification-subscription.filter', () => {
 
     expect(
       filterNotificationReceivedEvent(
-        { notificationReceived: notification },
-        {},
-        wsContextFor(apothekerB),
-      ),
-    ).toBe(false)
-
-    expect(
-      filterNotificationReceivedEvent(
-        { notificationReceived: notification },
+        { notificationReceived: orderNotification },
         {},
         wsContextFor(admin),
       ),

@@ -46,6 +46,10 @@ void loadVaccines(false)
               <span class="font-medium">Fabrikant:</span>
               {{ vaccine.manufacturer }}
             </p>
+            <p>
+              <span class="font-medium">Beschikbare voorraad:</span>
+              {{ vaccine.stockQuantity }} dosissen
+            </p>
           </div>
         </UCard>
       </div>

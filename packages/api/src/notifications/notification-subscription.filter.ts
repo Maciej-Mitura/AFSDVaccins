@@ -2,6 +2,7 @@ import { getApplicationUser } from '../authentication/graphql-auth.context'
 import { GraphqlRequestContext } from '../authentication/firebase.types'
 import { UserRole } from '../user/user-role.enum'
 import { User } from '../user/user.entity'
+import { NotificationType } from './notification-type.enum'
 import { Notification } from './notification.entity'
 
 export function resolveApplicationUser(
@@ -14,13 +15,21 @@ export function canReceiveNotification(
   user: User,
   notification: Notification,
 ): boolean {
-  if (user.role !== UserRole.APOTHEKER) {
+  if (
+    notification.recipientUserId.toString() !== user._id.toString()
+  ) {
     return false
   }
 
-  return (
-    notification.recipientUserId.toString() === user._id.toString()
-  )
+  if (user.role === UserRole.APOTHEKER) {
+    return notification.type !== NotificationType.LOW_STOCK_WARNING
+  }
+
+  if (user.role === UserRole.ADMIN) {
+    return notification.type === NotificationType.LOW_STOCK_WARNING
+  }
+
+  return false
 }
 
 export function filterNotificationReceivedEvent(

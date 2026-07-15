@@ -7,6 +7,7 @@ import { CLOCK } from '../order/clock.provider'
 import type { Clock } from '../order/clock.provider'
 import { User } from '../user/user.entity'
 import { NotificationNotFoundException } from './exceptions/notification.exceptions'
+import { canReceiveNotification } from './notification-subscription.filter'
 import { NotificationType } from './notification-type.enum'
 import { NotificationEventsService } from './notification-events.service'
 import { Notification } from './notification.entity'
@@ -79,7 +80,11 @@ export class NotificationService {
     return this.notificationRepository.find({
       where,
       order: { createdAt: 'DESC' },
-    })
+    }).then(notifications =>
+      notifications.filter(notification =>
+        canReceiveNotification(user, notification),
+      ),
+    )
   }
 
   async countUnread(user: User): Promise<number> {

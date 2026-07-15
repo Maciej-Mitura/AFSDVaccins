@@ -22,6 +22,7 @@ import { NotificationsModule } from './notifications/notifications.module'
 import { OrderModule } from './order/order.module'
 import { SettingsModule } from './settings/settings.module'
 import { UserModule } from './user/user.module'
+import { StockModule } from './stock/stock.module'
 import { VaccineModule } from './vaccine/vaccine.module'
 
 const isSchemaGeneration =
@@ -131,6 +132,7 @@ const databaseImports = isSchemaGeneration
     UserModule,
     SettingsModule,
     VaccineModule,
+    StockModule,
     NotificationsModule,
     OrderModule,
   ],

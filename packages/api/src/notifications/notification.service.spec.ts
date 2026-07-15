@@ -1,4 +1,3 @@
-import { ObjectId } from 'mongodb'
 import { MongoRepository } from 'typeorm'
 
 import { NotificationNotFoundException } from './exceptions/notification.exceptions'

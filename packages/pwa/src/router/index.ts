@@ -144,6 +144,21 @@ const router = createRouter({
           component: () => import('@/views/admin/ViewAdminVaccines.vue'),
         },
         {
+          path: 'stock',
+          name: 'admin-stock',
+          component: () => import('@/views/admin/ViewAdminStock.vue'),
+        },
+        {
+          path: 'stock/:vaccineId/history',
+          name: 'admin-stock-history',
+          component: () => import('@/views/admin/ViewAdminStockHistory.vue'),
+        },
+        {
+          path: 'notifications',
+          name: 'admin-notifications',
+          component: () => import('@/views/admin/ViewAdminNotifications.vue'),
+        },
+        {
           path: 'orders',
           name: 'admin-orders',
           component: () => import('@/views/admin/ViewAdminOrders.vue'),

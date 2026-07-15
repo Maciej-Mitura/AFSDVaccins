@@ -67,6 +67,13 @@ export class UserService {
     return this.userRepository.save(user)
   }
 
+  async findUsersByRole(role: UserRole): Promise<User[]> {
+    return this.userRepository.find({
+      where: { role },
+      order: { email: 'ASC' },
+    })
+  }
+
   async findUserById(id: string): Promise<User> {
     if (!ObjectId.isValid(id)) {
       throw new UserNotRegisteredException()

@@ -32,10 +32,11 @@ export class NotificationsResolver {
   ) {}
 
   @Query(() => [Notification], {
-    description: 'Returns notifications for the authenticated apotheker',
+    description:
+      'Returns notifications for the authenticated apotheker or admin user',
   })
   @UseGuards(AuthorizationGuard, RolesGuard)
-  @Roles(UserRole.APOTHEKER)
+  @Roles(UserRole.APOTHEKER, UserRole.ADMIN)
   myNotifications(
     @CurrentUser() user: User,
     @Args('unreadOnly', { type: () => Boolean, defaultValue: false })
@@ -45,10 +46,11 @@ export class NotificationsResolver {
   }
 
   @Query(() => Int, {
-    description: 'Returns unread notification count for the authenticated apotheker',
+    description:
+      'Returns unread notification count for the authenticated apotheker or admin user',
   })
   @UseGuards(AuthorizationGuard, RolesGuard)
-  @Roles(UserRole.APOTHEKER)
+  @Roles(UserRole.APOTHEKER, UserRole.ADMIN)
   myUnreadNotificationCount(@CurrentUser() user: User): Promise<number> {
     return this.notificationService.countUnread(user)
   }
@@ -57,7 +59,7 @@ export class NotificationsResolver {
     description: 'Marks one owned notification as read',
   })
   @UseGuards(AuthorizationGuard, RolesGuard)
-  @Roles(UserRole.APOTHEKER)
+  @Roles(UserRole.APOTHEKER, UserRole.ADMIN)
   markNotificationRead(
     @CurrentUser() user: User,
     @Args('id', { type: () => ID }) id: string,
@@ -66,13 +68,14 @@ export class NotificationsResolver {
   }
 
   @Subscription(() => Notification, {
-    description: 'Live notification events for the authenticated apotheker',
+    description:
+      'Live notification events for the authenticated apotheker or admin user',
     filter: filterNotificationReceivedEvent,
     resolve: (payload: { notificationReceived: Notification }) =>
       payload.notificationReceived,
   })
   @UseGuards(AuthorizationGuard, RolesGuard)
-  @Roles(UserRole.APOTHEKER)
+  @Roles(UserRole.APOTHEKER, UserRole.ADMIN)
   notificationReceived() {
     return this.pubSub.asyncIterableIterator(NOTIFICATION_RECEIVED_EVENT)
   }

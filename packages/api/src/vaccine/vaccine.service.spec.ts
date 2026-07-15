@@ -159,7 +159,7 @@ describe('VaccineService', () => {
     })
   })
 
-  it('updates approved fields', async () => {
+  it('updates approved metadata fields without changing stock', async () => {
     mockVaccineLookup(activeVaccine)
     repository.save.mockImplementation(value =>
       Promise.resolve(value as Vaccine),
@@ -167,12 +167,11 @@ describe('VaccineService', () => {
 
     const result = await service.updateVaccine(vaccineId, {
       description: 'Updated description',
-      stockQuantity: 25,
       stockWarningThreshold: 8,
     })
 
     expect(result.description).toBe('Updated description')
-    expect(result.stockQuantity).toBe(25)
+    expect(result.stockQuantity).toBe(10)
     expect(result.stockWarningThreshold).toBe(8)
   })
 

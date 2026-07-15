@@ -36,12 +36,6 @@ export class CreateVaccineInput {
   @IsOptional()
   @IsInt()
   @Min(0)
-  stockQuantity?: number
-
-  @Field(() => Int, { defaultValue: 0 })
-  @IsOptional()
-  @IsInt()
-  @Min(0)
   stockWarningThreshold?: number
 
   @Field({ defaultValue: true })
@@ -71,12 +65,6 @@ export class UpdateVaccineInput {
   @IsNotEmpty()
   @MaxLength(120)
   manufacturer?: string
-
-  @Field(() => Int, { nullable: true })
-  @IsOptional()
-  @IsInt()
-  @Min(0)
-  stockQuantity?: number
 
   @Field(() => Int, { nullable: true })
   @IsOptional()

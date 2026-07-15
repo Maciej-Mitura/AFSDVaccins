@@ -32,7 +32,6 @@ const schema = z.object({
   name: z.string().trim().min(1, 'Naam is verplicht.').max(120),
   description: z.string().trim().max(500).optional(),
   manufacturer: z.string().trim().min(1, 'Fabrikant is verplicht.').max(120),
-  stockQuantity: z.number().int().min(0, 'Voorraad kan niet negatief zijn.'),
   stockWarningThreshold: z
     .number()
     .int()
@@ -45,7 +44,6 @@ const state = reactive<Partial<VaccineForm>>({
   name: undefined,
   description: undefined,
   manufacturer: undefined,
-  stockQuantity: 0,
   stockWarningThreshold: 0,
 })
 
@@ -60,7 +58,6 @@ function resetForm() {
   state.name = undefined
   state.description = undefined
   state.manufacturer = undefined
-  state.stockQuantity = 0
   state.stockWarningThreshold = 0
   formError.value = null
   successMessage.value = null
@@ -76,7 +73,6 @@ function openEditForm(vaccine: VaccineListItem) {
   state.name = vaccine.name
   state.description = vaccine.description
   state.manufacturer = vaccine.manufacturer
-  state.stockQuantity = vaccine.stockQuantity
   state.stockWarningThreshold = vaccine.stockWarningThreshold
   formError.value = null
   successMessage.value = null
@@ -98,7 +94,6 @@ async function onSubmit(event: FormSubmitEvent<VaccineForm>) {
       name: event.data.name,
       description: event.data.description ?? '',
       manufacturer: event.data.manufacturer,
-      stockQuantity: event.data.stockQuantity,
       stockWarningThreshold: event.data.stockWarningThreshold,
     }
 
@@ -185,6 +180,7 @@ async function toggleActive(vaccine: VaccineListItem) {
             <p>
               <span class="font-medium">Voorraad:</span>
               {{ vaccine.stockQuantity }}
+              <span class="text-muted">(beheer via Voorraad)</span>
             </p>
             <p>
               <span class="font-medium">Lage-voorraad drempel:</span>
@@ -228,14 +224,6 @@ async function toggleActive(vaccine: VaccineListItem) {
 
           <UFormField label="Fabrikant" name="manufacturer">
             <UInput v-model="state.manufacturer" autocomplete="off" />
-          </UFormField>
-
-          <UFormField label="Voorraad" name="stockQuantity">
-            <UInput
-              v-model.number="state.stockQuantity"
-              type="number"
-              min="0"
-            />
           </UFormField>
 
           <UFormField

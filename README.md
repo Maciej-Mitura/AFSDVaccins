@@ -7,12 +7,13 @@ screens.
 
 ## Current status
 
-**Phase 8 — real-time order updates and persisted notifications complete.**
-Authenticated GraphQL subscriptions over `graphql-ws` push order create/update events
-and persisted apotheker notifications without manual refresh. Ownership is filtered
-server-side; BEZORGER has no order or notification subscription stream in this phase.
+**Phase 9 — authoritative stock management and low-stock alerts complete.**
+`StockService` is the sole writer of `Vaccine.stockQuantity`. Every change creates an
+immutable `StockAdjustment` audit row. ADMIN manages stock on `/admin/stock`; low-stock
+warnings persist and publish to ADMIN recipients only when stock crosses below the
+configured threshold.
 
-**Next phase:** Phase 9 — stock management (see `docs/implementation-roadmap.md`).
+**Next phase:** Phase 10 — admin order management and delivery transition (see `docs/implementation-roadmap.md`).
 
 ## Planned stack
 
@@ -335,10 +336,11 @@ with missing defaults on read (one repair write per document).
 | `stockWarningThreshold` | Per-vaccine low-stock threshold                    |
 | `active`                | Whether the vaccine is available for future orders |
 
-**Stock boundary:** `stockQuantity` exists on `Vaccine` as the authoritative value.
-ADMIN may set an initial or corrected quantity via vaccine management during this
-phase. Later stock mutations must go through `StockService` / `StockAdjustment`
-(Phase 7+) — no stock history or reservation logic exists yet.
+**Stock boundary:** `stockQuantity` on `Vaccine` is the authoritative balance.
+Only **`StockService`** may change it. Vaccine create/update forms manage catalogue
+metadata only (`createVaccine` always starts at `stockQuantity: 0`). Stock changes
+use `adjustVaccineStock` and are recorded in immutable **`StockAdjustment`** rows.
+Delivery-based deduction is **not** implemented until Phase 10.
 
 **Active/inactive:** Prefer deactivation over deletion. Inactive vaccines remain
 visible to ADMIN (`includeInactive: true`) but are hidden from APOTHEKER.
@@ -664,6 +666,97 @@ npm run format
 npm run format:check
 ```
 
+## Stock management (Phase 9)
+
+### Authoritative balance and audit
+
+| Concept | Role |
+| ------- | ---- |
+| `Vaccine.stockQuantity` | Current authoritative balance |
+| `StockAdjustment` | Immutable audit history — never summed to derive balance |
+| `StockService` | Sole writer of `stockQuantity` |
+| `VaccineStockRepository` | Atomic MongoDB `findOneAndUpdate` with conditional guard for decreases |
+
+### StockAdjustment fields
+
+| Field | Purpose |
+| ----- | ------- |
+| `vaccineId` | Which vaccine changed |
+| `type` | `RESTOCK`, `MANUAL_DECREASE`, or `MANUAL_CORRECTION` |
+| `quantityDelta` | Signed change (non-zero) |
+| `quantityBefore` / `quantityAfter` | Server snapshots from successful atomic update |
+| `reason` | Required free-text admin explanation |
+| `performedByUserId` | Derived from `@CurrentUser()` |
+| `relatedOrderId` | Reserved for Phase 10 delivery decrement (null for manual ops) |
+| `idempotencyKey` | Optional; **omitted** for manual adjustments (sparse unique when present) |
+| `createdAt` | Server timestamp |
+
+### Adjustment rules
+
+- `RESTOCK` requires positive `quantityDelta`
+- `MANUAL_DECREASE` requires negative `quantityDelta`
+- `MANUAL_CORRECTION` allows either sign
+- Zero delta rejected (`INVALID_STOCK_ADJUSTMENT`)
+- Resulting negative stock blocked (`INSUFFICIENT_STOCK`)
+- Negative adjustments use one conditional DB update; concurrent decreases cannot go below zero
+
+### Low-stock notifications
+
+After each successful adjustment, when **`quantityBefore > stockWarningThreshold`**
+and **`quantityAfter <= stockWarningThreshold`**, a `LOW_STOCK_WARNING` notification
+is persisted for each ADMIN user and published via the existing `notificationReceived`
+subscription.
+
+**Episode deduplication:** only the threshold-crossing adjustment creates a warning.
+Further adjustments while already low do not spam. After recovery above the threshold,
+a later crossing creates a new episode with key `low-stock:{vaccineId}:{crossingAdjustmentId}`.
+
+ADMIN notifications are role-filtered — apotheker order notifications never leak to
+ADMIN subscriptions and vice versa.
+
+### GraphQL operations added
+
+| Operation | Auth | Purpose |
+| --------- | ---- | ------- |
+| `adjustVaccineStock` | ADMIN | Adjust stock + append audit |
+| `stockAdjustments` | ADMIN | List adjustments (optional `vaccineId`) |
+| `vaccineStockHistory` | ADMIN | History for one vaccine |
+| `myNotifications` / `notificationReceived` | ADMIN (extended) | Low-stock alerts |
+
+Domain errors: `VACCINE_NOT_FOUND`, `INVALID_STOCK_ADJUSTMENT`, `INSUFFICIENT_STOCK`,
+`FORBIDDEN`, `UNAUTHENTICATED`.
+
+PWA composables and screens:
+
+- `useStock` — overview, adjust, history
+- `useAdminNotifications` — ADMIN low-stock alerts
+- `/admin/stock` — stock management
+- `/admin/stock/:vaccineId/history` — read-only audit history
+- `/admin/notifications` — ADMIN operational alerts
+
+APOTHEKER sees current `stockQuantity` on `/apotheker/vaccines` (read-only). No stock
+mutation or history access for APOTHEKER or BEZORGER.
+
+### Consistency limitation
+
+The vaccine balance update and `StockAdjustment` insert are **not** wrapped in a
+multi-document MongoDB transaction. A process crash between them could leave a changed
+balance without its audit row (accepted single-instance MVP limitation).
+
+### Manual runtime test (Phase 9)
+
+1. Log in as ADMIN → `/admin/stock`.
+2. Restock a vaccine — confirm balance, one audit row, correct before/after.
+3. Decrease stock — confirm negative resulting balance is rejected.
+4. Perform a correction with a reason.
+5. Open history — confirm immutable ordered records.
+6. Log in as APOTHEKER — confirm no stock controls or history.
+7. Attempt `adjustVaccineStock` as APOTHEKER → `FORBIDDEN`.
+8. Adjust to the warning threshold — confirm ADMIN low-stock notification (persisted + live).
+9. Adjust again while still low — no duplicate spam.
+10. Restock above threshold, then drop below again — new notification allowed.
+11. Place an order — confirm stock unchanged.
+
 ## CI
 
 - `.github/workflows/ci-api.yml` — API lint, typecheck, test, build
@@ -671,5 +764,5 @@ npm run format:check
 
 ## Next phase
 
-**Phase 9 — stock management** (`docs/implementation-roadmap.md`): authoritative stock
-balance, audit log, and admin stock UI.
+**Phase 10 — admin order management and delivery transition** (`docs/implementation-roadmap.md`):
+order FSM transitions, delivery with idempotent stock decrement, and admin operations feed.
