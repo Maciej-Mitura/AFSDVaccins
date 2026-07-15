@@ -3,6 +3,7 @@ import { InjectRepository } from '@nestjs/typeorm'
 import { ObjectId } from 'mongodb'
 import { MongoRepository } from 'typeorm'
 
+import { tryParseGraphqlObjectId } from '../common/mongodb/graphql-object-id.util'
 import { Vaccine } from '../vaccine/vaccine.entity'
 
 export type AtomicStockUpdateResult = {
@@ -21,16 +22,20 @@ export class VaccineStockRepository {
     private readonly vaccineRepository: MongoRepository<Vaccine>,
   ) {}
 
-  async vaccineExists(vaccineId: string): Promise<boolean> {
-    if (!ObjectId.isValid(vaccineId)) {
-      return false
+  async findVaccineByGraphqlId(vaccineId: string): Promise<Vaccine | null> {
+    const parsed = tryParseGraphqlObjectId(vaccineId)
+
+    if (!parsed) {
+      return null
     }
 
-    const count = await this.vaccineRepository.count({
-      where: { _id: new ObjectId(vaccineId) },
-    })
+    return this.findVaccineByObjectId(parsed.objectId)
+  }
 
-    return count > 0
+  async findVaccineByObjectId(objectId: ObjectId): Promise<Vaccine | null> {
+    return this.vaccineRepository.findOne({
+      where: { _id: objectId },
+    })
   }
 
   /**
@@ -38,15 +43,9 @@ export class VaccineStockRepository {
    * Negative deltas use a conditional filter so concurrent decreases cannot go below zero.
    */
   async adjustStockQuantity(
-    vaccineId: string,
+    objectId: ObjectId,
     quantityDelta: number,
   ): Promise<AtomicStockUpdateResult | null> {
-    if (!ObjectId.isValid(vaccineId)) {
-      return null
-    }
-
-    const objectId = new ObjectId(vaccineId)
-
     if (quantityDelta > 0) {
       const updatedDocument = await this.vaccineRepository.findOneAndUpdate(
         { _id: objectId },

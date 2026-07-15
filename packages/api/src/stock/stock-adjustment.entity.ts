@@ -1,4 +1,5 @@
 import { Field, ID, Int, ObjectType } from '@nestjs/graphql'
+import { ObjectId } from 'mongodb'
 import {
   Column,
   CreateDateColumn,
@@ -22,8 +23,7 @@ export class StockAdjustment {
 
   @Index()
   @Column()
-  @Field(() => ID)
-  vaccineId!: string
+  vaccineObjectId!: ObjectId
 
   @Column()
   @Field(() => StockAdjustmentType)

@@ -1,8 +1,8 @@
 import { Injectable } from '@nestjs/common'
 import { InjectRepository } from '@nestjs/typeorm'
-import { ObjectId } from 'mongodb'
 import { MongoRepository } from 'typeorm'
 
+import { tryParseGraphqlObjectId } from '../common/mongodb/graphql-object-id.util'
 import { UserRole } from '../user/user-role.enum'
 import { CreateVaccineInput, UpdateVaccineInput } from './dto/vaccine.inputs'
 import {
@@ -28,12 +28,14 @@ export class VaccineService {
   }
 
   private async requireById(id: string): Promise<Vaccine> {
-    if (!ObjectId.isValid(id)) {
+    const parsed = tryParseGraphqlObjectId(id)
+
+    if (!parsed) {
       throw new VaccineNotFoundException()
     }
 
     const vaccine = await this.vaccineRepository.findOne({
-      where: { _id: new ObjectId(id) },
+      where: { _id: parsed.objectId },
     })
 
     if (!vaccine) {

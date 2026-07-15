@@ -1,10 +1,9 @@
 import { Injectable } from '@nestjs/common'
 import { InjectRepository } from '@nestjs/typeorm'
-import { ObjectId } from 'mongodb'
 import { MongoRepository } from 'typeorm'
 
+import { tryParseGraphqlObjectId } from '../common/mongodb/graphql-object-id.util'
 import { User } from '../user/user.entity'
-import { VaccineService } from '../vaccine/vaccine.service'
 import { AdjustStockInput } from './dto/adjust-stock.input'
 import {
   InsufficientStockException,
@@ -22,7 +21,6 @@ export class StockService {
     @InjectRepository(StockAdjustment)
     private readonly stockAdjustmentRepository: MongoRepository<StockAdjustment>,
     private readonly vaccineStockRepository: VaccineStockRepository,
-    private readonly vaccineService: VaccineService,
     private readonly stockNotificationService: StockNotificationService,
   ) {}
 
@@ -56,28 +54,45 @@ export class StockService {
     }
   }
 
+  private async requireVaccineByGraphqlId(vaccineId: string) {
+    const parsed = tryParseGraphqlObjectId(vaccineId)
+
+    if (!parsed) {
+      throw new VaccineNotFoundException()
+    }
+
+    const vaccine = await this.vaccineStockRepository.findVaccineByObjectId(
+      parsed.objectId,
+    )
+
+    if (!vaccine) {
+      throw new VaccineNotFoundException()
+    }
+
+    return {
+      parsed,
+      vaccine,
+    }
+  }
+
   async adjustVaccineStock(
     user: User,
     input: AdjustStockInput,
   ): Promise<StockAdjustment> {
     this.validateTypeAndDelta(input.type, input.quantityDelta)
 
-    const vaccineExists = await this.vaccineStockRepository.vaccineExists(
+    const { parsed, vaccine } = await this.requireVaccineByGraphqlId(
       input.vaccineId,
     )
 
-    if (!vaccineExists) {
-      throw new VaccineNotFoundException()
-    }
-
     const updateResult = await this.vaccineStockRepository.adjustStockQuantity(
-      input.vaccineId,
+      parsed.objectId,
       input.quantityDelta,
     )
 
     if (!updateResult) {
-      const stillExists = await this.vaccineStockRepository.vaccineExists(
-        input.vaccineId,
+      const stillExists = await this.vaccineStockRepository.findVaccineByObjectId(
+        parsed.objectId,
       )
 
       if (!stillExists) {
@@ -88,7 +103,7 @@ export class StockService {
     }
 
     const adjustmentPayload: Partial<StockAdjustment> = {
-      vaccineId: input.vaccineId,
+      vaccineObjectId: parsed.objectId,
       type: input.type,
       quantityDelta: input.quantityDelta,
       quantityBefore: updateResult.quantityBefore,
@@ -100,10 +115,6 @@ export class StockService {
 
     const adjustment = this.stockAdjustmentRepository.create(adjustmentPayload)
     const savedAdjustment = await this.stockAdjustmentRepository.save(adjustment)
-
-    const vaccine = await this.vaccineService.findVaccineEntityById(
-      input.vaccineId,
-    )
 
     await this.stockNotificationService.notifyAdminsIfEnteredLowStock(
       vaccine,
@@ -117,12 +128,14 @@ export class StockService {
 
   async findStockAdjustments(vaccineId?: string): Promise<StockAdjustment[]> {
     if (vaccineId !== undefined) {
-      if (!ObjectId.isValid(vaccineId)) {
+      const parsed = tryParseGraphqlObjectId(vaccineId)
+
+      if (!parsed) {
         return []
       }
 
       return this.stockAdjustmentRepository.find({
-        where: { vaccineId },
+        where: { vaccineObjectId: parsed.objectId },
         order: { createdAt: 'DESC' },
       })
     }
@@ -133,20 +146,10 @@ export class StockService {
   }
 
   async findVaccineStockHistory(vaccineId: string): Promise<StockAdjustment[]> {
-    if (!ObjectId.isValid(vaccineId)) {
-      throw new VaccineNotFoundException()
-    }
-
-    const vaccineExists = await this.vaccineStockRepository.vaccineExists(
-      vaccineId,
-    )
-
-    if (!vaccineExists) {
-      throw new VaccineNotFoundException()
-    }
+    const { parsed } = await this.requireVaccineByGraphqlId(vaccineId)
 
     return this.stockAdjustmentRepository.find({
-      where: { vaccineId },
+      where: { vaccineObjectId: parsed.objectId },
       order: { createdAt: 'DESC' },
     })
   }

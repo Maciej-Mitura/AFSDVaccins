@@ -154,9 +154,13 @@ describe('VaccineService', () => {
       description: 'Updated description',
     })
 
-    expect(repository.findOne).toHaveBeenCalledWith({
-      where: { _id: new ObjectId(vaccineId) },
-    })
+    const lookupCall = repository.findOne.mock.calls[0]?.[0]
+    const lookupId = (
+      lookupCall?.where as { _id: ObjectId } | undefined
+    )?._id
+
+    expect(lookupId).toBeInstanceOf(ObjectId)
+    expect(lookupId?.toString()).toBe(vaccineId)
   })
 
   it('updates approved metadata fields without changing stock', async () => {

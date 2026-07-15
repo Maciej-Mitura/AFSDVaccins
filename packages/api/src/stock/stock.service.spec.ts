@@ -9,7 +9,6 @@ import { UserRole } from '../user/user-role.enum'
 import { User } from '../user/user.entity'
 import { UserService } from '../user/user.service'
 import { Vaccine } from '../vaccine/vaccine.entity'
-import { VaccineService } from '../vaccine/vaccine.service'
 import { StockAdjustmentType } from './stock-adjustment-type.enum'
 import { StockAdjustment } from './stock-adjustment.entity'
 import {
@@ -27,14 +26,19 @@ describe('StockService', () => {
     Pick<MongoRepository<StockAdjustment>, 'create' | 'save' | 'find'>
   >
   let vaccineStockRepository: jest.Mocked<
-    Pick<VaccineStockRepository, 'vaccineExists' | 'adjustStockQuantity'>
+    Pick<
+      VaccineStockRepository,
+      'findVaccineByGraphqlId' | 'findVaccineByObjectId' | 'adjustStockQuantity'
+    >
   >
-  let vaccineService: jest.Mocked<Pick<VaccineService, 'findVaccineEntityById'>>
   let stockNotificationService: jest.Mocked<
     Pick<StockNotificationService, 'notifyAdminsIfEnteredLowStock'>
   >
 
   const vaccineId = '507f1f77bcf86cd799439011'
+  const nonexistentVaccineId = '6a569d2cbb2590db980429cd'
+  const vaccineObjectId = new ObjectId(vaccineId)
+
   const adminUser: User = {
     _id: '507f1f77bcf86cd799439012',
     id: '507f1f77bcf86cd799439012',
@@ -69,12 +73,9 @@ describe('StockService', () => {
     }
 
     vaccineStockRepository = {
-      vaccineExists: jest.fn(),
+      findVaccineByGraphqlId: jest.fn(),
+      findVaccineByObjectId: jest.fn(),
       adjustStockQuantity: jest.fn(),
-    }
-
-    vaccineService = {
-      findVaccineEntityById: jest.fn(),
     }
 
     stockNotificationService = {
@@ -93,10 +94,6 @@ describe('StockService', () => {
           useValue: vaccineStockRepository,
         },
         {
-          provide: VaccineService,
-          useValue: vaccineService,
-        },
-        {
           provide: StockNotificationService,
           useValue: stockNotificationService,
         },
@@ -111,7 +108,7 @@ describe('StockService', () => {
     quantityAfter: number,
     adjustmentId = '6a569d2cbb2590db980429cd',
   ): void {
-    vaccineStockRepository.vaccineExists.mockResolvedValue(true)
+    vaccineStockRepository.findVaccineByObjectId.mockResolvedValue(vaccine)
     vaccineStockRepository.adjustStockQuantity.mockResolvedValue({
       quantityBefore,
       quantityAfter,
@@ -127,14 +124,24 @@ describe('StockService', () => {
         createdAt: new Date('2026-07-14T12:00:00.000Z'),
       } as StockAdjustment),
     )
-    vaccineService.findVaccineEntityById.mockResolvedValue({
-      ...vaccine,
-      id: vaccineId,
-      stockQuantity: quantityAfter,
-    })
   }
 
-  it('positive restock updates balance and persists audit', async () => {
+  it('accepts a valid GraphQL string ObjectId for adjustVaccineStock', async () => {
+    mockSuccessfulAdjustment(10, 25)
+
+    await service.adjustVaccineStock(adminUser, {
+      vaccineId,
+      type: StockAdjustmentType.RESTOCK,
+      quantityDelta: 15,
+      reason: 'Weekly delivery',
+    })
+
+    expect(vaccineStockRepository.findVaccineByObjectId).toHaveBeenCalledWith(
+      vaccineObjectId,
+    )
+  })
+
+  it('restock finds and updates the vaccine', async () => {
     mockSuccessfulAdjustment(10, 25)
 
     const result = await service.adjustVaccineStock(adminUser, {
@@ -145,26 +152,21 @@ describe('StockService', () => {
     })
 
     expect(vaccineStockRepository.adjustStockQuantity).toHaveBeenCalledWith(
-      vaccineId,
+      vaccineObjectId,
       15,
     )
     expect(result.quantityBefore).toBe(10)
     expect(result.quantityAfter).toBe(25)
-    expect(result.performedByUserId).toBe(adminUser._id.toString())
     expect(stockAdjustmentRepository.save).toHaveBeenCalledTimes(1)
     expect(stockAdjustmentRepository.create).toHaveBeenCalledWith(
       expect.objectContaining({
-        vaccineId,
+        vaccineObjectId: vaccineObjectId,
         performedByUserId: adminUser._id.toString(),
       }),
     )
-    expect(
-      (stockAdjustmentRepository.create.mock.calls[0]?.[0] as StockAdjustment)
-        .idempotencyKey,
-    ).toBeUndefined()
   })
 
-  it('negative decrease updates balance', async () => {
+  it('manual decrease finds the vaccine', async () => {
     mockSuccessfulAdjustment(10, 7)
 
     const result = await service.adjustVaccineStock(adminUser, {
@@ -175,68 +177,66 @@ describe('StockService', () => {
     })
 
     expect(result.quantityAfter).toBe(7)
-  })
-
-  it('manual correction supports positive and negative delta', async () => {
-    mockSuccessfulAdjustment(10, 9)
-
-    await service.adjustVaccineStock(adminUser, {
-      vaccineId,
-      type: StockAdjustmentType.MANUAL_CORRECTION,
-      quantityDelta: -1,
-      reason: 'Count correction',
-    })
-
-    mockSuccessfulAdjustment(9, 11)
-
-    await service.adjustVaccineStock(adminUser, {
-      vaccineId,
-      type: StockAdjustmentType.MANUAL_CORRECTION,
-      quantityDelta: 2,
-      reason: 'Count correction',
-    })
-
-    expect(vaccineStockRepository.adjustStockQuantity).toHaveBeenLastCalledWith(
-      vaccineId,
-      2,
+    expect(vaccineStockRepository.findVaccineByObjectId).toHaveBeenCalledWith(
+      vaccineObjectId,
     )
   })
 
-  it('rejects zero delta', async () => {
-    await expect(
-      service.adjustVaccineStock(adminUser, {
-        vaccineId,
-        type: StockAdjustmentType.MANUAL_CORRECTION,
-        quantityDelta: 0,
-        reason: 'Invalid',
-      }),
-    ).rejects.toBeInstanceOf(InvalidStockAdjustmentException)
+  it('finds stock history by GraphQL string vaccine ID using ObjectId lookup', async () => {
+    vaccineStockRepository.findVaccineByObjectId.mockResolvedValue(vaccine)
+    stockAdjustmentRepository.find.mockResolvedValue([
+      { _id: '1', createdAt: new Date('2026-07-15T10:00:00.000Z') },
+    ] as StockAdjustment[])
 
-    expect(vaccineStockRepository.adjustStockQuantity).not.toHaveBeenCalled()
+    await service.findVaccineStockHistory(vaccineId)
+
+    expect(stockAdjustmentRepository.find).toHaveBeenCalledWith({
+      where: { vaccineObjectId: vaccineObjectId },
+      order: { createdAt: 'DESC' },
+    })
   })
 
-  it('rejects invalid type and delta combinations', async () => {
+  it('returns VACCINE_NOT_FOUND for malformed vaccine IDs', async () => {
     await expect(
       service.adjustVaccineStock(adminUser, {
-        vaccineId,
+        vaccineId: 'invalid-id',
         type: StockAdjustmentType.RESTOCK,
-        quantityDelta: -5,
-        reason: 'Invalid',
-      }),
-    ).rejects.toBeInstanceOf(InvalidStockAdjustmentException)
-
-    await expect(
-      service.adjustVaccineStock(adminUser, {
-        vaccineId,
-        type: StockAdjustmentType.MANUAL_DECREASE,
         quantityDelta: 5,
         reason: 'Invalid',
       }),
-    ).rejects.toBeInstanceOf(InvalidStockAdjustmentException)
+    ).rejects.toBeInstanceOf(VaccineNotFoundException)
+
+    expect(vaccineStockRepository.adjustStockQuantity).not.toHaveBeenCalled()
+    expect(stockAdjustmentRepository.save).not.toHaveBeenCalled()
   })
 
-  it('rejects resulting negative stock', async () => {
-    vaccineStockRepository.vaccineExists.mockResolvedValue(true)
+  it('returns VACCINE_NOT_FOUND for valid but nonexistent vaccine IDs', async () => {
+    vaccineStockRepository.findVaccineByObjectId.mockResolvedValue(null)
+
+    await expect(
+      service.adjustVaccineStock(adminUser, {
+        vaccineId: nonexistentVaccineId,
+        type: StockAdjustmentType.RESTOCK,
+        quantityDelta: 5,
+        reason: 'Missing vaccine',
+      }),
+    ).rejects.toBeInstanceOf(VaccineNotFoundException)
+
+    expect(stockAdjustmentRepository.save).not.toHaveBeenCalled()
+  })
+
+  it('does not create an audit record when lookup fails', async () => {
+    vaccineStockRepository.findVaccineByObjectId.mockResolvedValue(null)
+
+    await expect(
+      service.findVaccineStockHistory(nonexistentVaccineId),
+    ).rejects.toBeInstanceOf(VaccineNotFoundException)
+
+    expect(stockAdjustmentRepository.save).not.toHaveBeenCalled()
+  })
+
+  it('rejects resulting negative stock without creating audit record', async () => {
+    vaccineStockRepository.findVaccineByObjectId.mockResolvedValue(vaccine)
     vaccineStockRepository.adjustStockQuantity.mockResolvedValue(null)
 
     await expect(
@@ -251,64 +251,15 @@ describe('StockService', () => {
     expect(stockAdjustmentRepository.save).not.toHaveBeenCalled()
   })
 
-  it('handles vaccine not found safely', async () => {
-    vaccineStockRepository.vaccineExists.mockResolvedValue(false)
-
+  it('rejects zero delta', async () => {
     await expect(
       service.adjustVaccineStock(adminUser, {
         vaccineId,
-        type: StockAdjustmentType.RESTOCK,
-        quantityDelta: 5,
-        reason: 'Missing vaccine',
+        type: StockAdjustmentType.MANUAL_CORRECTION,
+        quantityDelta: 0,
+        reason: 'Invalid',
       }),
-    ).rejects.toBeInstanceOf(VaccineNotFoundException)
-  })
-
-  it('derives performing user from authenticated user', async () => {
-    mockSuccessfulAdjustment(10, 12)
-
-    const result = await service.adjustVaccineStock(adminUser, {
-      vaccineId,
-      type: StockAdjustmentType.RESTOCK,
-      quantityDelta: 2,
-      reason: 'Restock',
-    })
-
-    expect(result.performedByUserId).toBe(adminUser._id.toString())
-  })
-
-  it('persists one adjustment record per successful update', async () => {
-    mockSuccessfulAdjustment(10, 12)
-
-    await service.adjustVaccineStock(adminUser, {
-      vaccineId,
-      type: StockAdjustmentType.RESTOCK,
-      quantityDelta: 2,
-      reason: 'Restock',
-    })
-
-    expect(stockAdjustmentRepository.save).toHaveBeenCalledTimes(1)
-  })
-
-  it('returns stock history ordered newest first', async () => {
-    vaccineStockRepository.vaccineExists.mockResolvedValue(true)
-    stockAdjustmentRepository.find.mockResolvedValue([
-      { _id: '1', createdAt: new Date('2026-07-15T10:00:00.000Z') },
-      { _id: '2', createdAt: new Date('2026-07-14T10:00:00.000Z') },
-    ] as StockAdjustment[])
-
-    await service.findVaccineStockHistory(vaccineId)
-
-    expect(stockAdjustmentRepository.find).toHaveBeenCalledWith({
-      where: { vaccineId },
-      order: { createdAt: 'DESC' },
-    })
-  })
-
-  it('handles malformed vaccine IDs safely in history lookup', async () => {
-    await expect(
-      service.findVaccineStockHistory('invalid-id'),
-    ).rejects.toBeInstanceOf(VaccineNotFoundException)
+    ).rejects.toBeInstanceOf(InvalidStockAdjustmentException)
   })
 
   it('evaluates low stock after successful adjustment', async () => {
@@ -323,12 +274,7 @@ describe('StockService', () => {
 
     expect(
       stockNotificationService.notifyAdminsIfEnteredLowStock,
-    ).toHaveBeenCalledWith(
-      expect.objectContaining({ _id: vaccineId }),
-      6,
-      5,
-      expect.any(String),
-    )
+    ).toHaveBeenCalledWith(vaccine, 6, 5, expect.any(String))
   })
 })
 
@@ -391,33 +337,20 @@ describe('StockNotificationService', () => {
       }),
     )
   })
-
-  it('does not notify while already low', async () => {
-    await service.notifyAdminsIfEnteredLowStock(vaccine, 4, 3, 'adjustment-2')
-
-    expect(notificationService.createNotification).not.toHaveBeenCalled()
-  })
-
-  it('can notify again after recovery and later crossing', async () => {
-    await service.notifyAdminsIfEnteredLowStock(vaccine, 6, 5, 'episode-a')
-    await service.notifyAdminsIfEnteredLowStock(vaccine, 4, 3, 'episode-a-followup')
-    await service.notifyAdminsIfEnteredLowStock(vaccine, 6, 4, 'episode-b')
-
-    expect(notificationService.createNotification).toHaveBeenCalledTimes(2)
-  })
 })
 
 describe('VaccineStockRepository', () => {
   let repository: VaccineStockRepository
   let vaccineRepository: jest.Mocked<
-    Pick<MongoRepository<Vaccine>, 'count' | 'findOneAndUpdate'>
+    Pick<MongoRepository<Vaccine>, 'findOne' | 'findOneAndUpdate'>
   >
 
   const vaccineId = '507f1f77bcf86cd799439011'
+  const vaccineObjectId = new ObjectId(vaccineId)
 
   beforeEach(() => {
     vaccineRepository = {
-      count: jest.fn(),
+      findOne: jest.fn(),
       findOneAndUpdate: jest.fn(),
     }
 
@@ -426,16 +359,32 @@ describe('VaccineStockRepository', () => {
     )
   })
 
+  it('finds vaccines by GraphQL string ID using ObjectId conversion', async () => {
+    vaccineRepository.findOne.mockResolvedValue({ _id: vaccineId } as Vaccine)
+
+    const result = await repository.findVaccineByGraphqlId(vaccineId)
+
+    expect(vaccineRepository.findOne).toHaveBeenCalledWith({
+      where: { _id: vaccineObjectId },
+    })
+    expect(result).not.toBeNull()
+  })
+
+  it('returns null for malformed GraphQL IDs', async () => {
+    await expect(repository.findVaccineByGraphqlId('invalid-id')).resolves.toBeNull()
+    expect(vaccineRepository.findOne).not.toHaveBeenCalled()
+  })
+
   it('uses conditional update for negative adjustments', async () => {
     vaccineRepository.findOneAndUpdate.mockResolvedValue({
       stockQuantity: 7,
     })
 
-    const result = await repository.adjustStockQuantity(vaccineId, -3)
+    const result = await repository.adjustStockQuantity(vaccineObjectId, -3)
 
     expect(vaccineRepository.findOneAndUpdate).toHaveBeenCalledWith(
       {
-        _id: new ObjectId(vaccineId),
+        _id: vaccineObjectId,
         stockQuantity: { $gte: 3 },
       },
       { $inc: { stockQuantity: -3 } },

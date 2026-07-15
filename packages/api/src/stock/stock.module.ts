@@ -40,7 +40,8 @@ const vaccineStockRepositoryProvider = isSchemaGeneration
   ? {
       provide: VaccineStockRepository,
       useValue: {
-        vaccineExists: () => Promise.resolve(false),
+        findVaccineByGraphqlId: () => Promise.resolve(null),
+        findVaccineByObjectId: () => Promise.resolve(null),
         adjustStockQuantity: () => Promise.resolve(null),
       },
     }

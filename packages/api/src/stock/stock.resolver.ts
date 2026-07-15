@@ -61,6 +61,13 @@ export class StockResolver {
     return this.stockService.findVaccineStockHistory(vaccineId)
   }
 
+  @ResolveField(() => ID, {
+    description: 'Vaccine affected by this stock adjustment',
+  })
+  vaccineId(@Parent() adjustment: StockAdjustment): string {
+    return adjustment.vaccineObjectId.toString()
+  }
+
   @ResolveField(() => User, {
     description: 'User who performed the stock adjustment',
   })
