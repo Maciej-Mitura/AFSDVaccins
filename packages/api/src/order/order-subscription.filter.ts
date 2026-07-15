@@ -1,3 +1,4 @@
+import { getApplicationUser } from '../authentication/graphql-auth.context'
 import { GraphqlRequestContext } from '../authentication/firebase.types'
 import { UserRole } from '../user/user-role.enum'
 import { User } from '../user/user.entity'
@@ -6,7 +7,7 @@ import { Order } from './order.entity'
 export function resolveApplicationUser(
   context: GraphqlRequestContext,
 ): User | null {
-  return context.req.applicationUser ?? null
+  return getApplicationUser(context)
 }
 
 export function canReceiveOrderEvent(user: User, order: Order): boolean {

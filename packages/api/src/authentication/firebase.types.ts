@@ -1,3 +1,5 @@
+import { User } from '../user/user.entity'
+
 export type VerifiedFirebaseIdentity = {
   uid: string
   email?: string
@@ -5,12 +7,22 @@ export type VerifiedFirebaseIdentity = {
   emailVerified: boolean
 }
 
-export type GraphqlRequestContext = {
-  req: {
-    user?: VerifiedFirebaseIdentity
-    applicationUser?: import('../user/user.entity').User
-    headers?: {
-      authorization?: string
-    }
+export type NormalizedGraphqlRequest = {
+  user?: VerifiedFirebaseIdentity
+  applicationUser?: User
+  headers?: {
+    authorization?: string
   }
+}
+
+export type GraphqlWsContextExtra = {
+  wsAuth?: NormalizedGraphqlRequest
+  socket?: unknown
+  request?: unknown
+}
+
+export type GraphqlRequestContext = {
+  req: NormalizedGraphqlRequest
+  res?: unknown
+  extra?: GraphqlWsContextExtra
 }

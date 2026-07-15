@@ -92,7 +92,7 @@ describe('OrderNotificationService', () => {
     await service.createOrderCancelledNotification(apotheker, {
       ...order,
       status: OrderStatus.CANCELLED,
-    })
+    } as Order)
 
     expect(notificationService.createNotification).toHaveBeenCalledWith(
       expect.objectContaining({

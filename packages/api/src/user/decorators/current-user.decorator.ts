@@ -1,20 +1,24 @@
 import { createParamDecorator, ExecutionContext } from '@nestjs/common'
-import { GqlExecutionContext } from '@nestjs/graphql'
 
-import { GraphqlRequestContext } from '../../authentication/firebase.types'
+import {
+  getGraphqlRequestContext,
+  resolveNormalizedGraphqlRequest,
+  syncAuthToRequest,
+} from '../../authentication/graphql-auth.context'
 import { User } from '../user.entity'
 
 export const CurrentUser = createParamDecorator(
   (_data: unknown, context: ExecutionContext): User => {
-    const gqlContext = GqlExecutionContext.create(context)
-    const request = gqlContext.getContext<GraphqlRequestContext>().req
+    const gqlContext = getGraphqlRequestContext(context)
+    const normalized = resolveNormalizedGraphqlRequest(gqlContext)
+    syncAuthToRequest(gqlContext, normalized)
 
-    if (!request.applicationUser) {
+    if (!gqlContext.req.applicationUser) {
       throw new Error(
         'Application user is not available on the request context',
       )
     }
 
-    return request.applicationUser
+    return gqlContext.req.applicationUser
   },
 )

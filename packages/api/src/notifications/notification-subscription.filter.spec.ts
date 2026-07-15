@@ -1,3 +1,4 @@
+import { buildNormalizedGraphqlRequest } from '../authentication/graphql-auth.context'
 import { NotificationType } from './notification-type.enum'
 import {
   canReceiveNotification,
@@ -58,6 +59,29 @@ describe('notification-subscription.filter', () => {
     }
   }
 
+  function wsContextFor(user: User) {
+    const wsAuth = buildNormalizedGraphqlRequest({
+      user: {
+        uid: user.firebaseUid,
+        email: user.email,
+        emailVerified: true,
+      },
+      applicationUser: user,
+      headers: {
+        authorization: 'Bearer ws-token',
+      },
+    })
+
+    return {
+      req: {},
+      extra: {
+        socket: {},
+        request: {},
+        wsAuth,
+      },
+    }
+  }
+
   it('allows APOTHEKER to receive own notifications', () => {
     expect(canReceiveNotification(apothekerA, notification)).toBe(true)
   })
@@ -84,6 +108,32 @@ describe('notification-subscription.filter', () => {
         { notificationReceived: notification },
         {},
         contextFor(apothekerB),
+      ),
+    ).toBe(false)
+  })
+
+  it('filters notificationReceived using graphql-ws extra.wsAuth context', () => {
+    expect(
+      filterNotificationReceivedEvent(
+        { notificationReceived: notification },
+        {},
+        wsContextFor(apothekerA),
+      ),
+    ).toBe(true)
+
+    expect(
+      filterNotificationReceivedEvent(
+        { notificationReceived: notification },
+        {},
+        wsContextFor(apothekerB),
+      ),
+    ).toBe(false)
+
+    expect(
+      filterNotificationReceivedEvent(
+        { notificationReceived: notification },
+        {},
+        wsContextFor(admin),
       ),
     ).toBe(false)
   })

@@ -1,3 +1,4 @@
+import { buildNormalizedGraphqlRequest } from '../authentication/graphql-auth.context'
 import { UserRole } from '../user/user-role.enum'
 import { User } from '../user/user.entity'
 import { OrderStatus } from './order-status.enum'
@@ -69,6 +70,33 @@ describe('order-subscription.filter', () => {
     }
   }
 
+  function wsContextFor(user: User) {
+    const wsAuth = buildNormalizedGraphqlRequest({
+      user: {
+        uid: user.firebaseUid,
+        email: user.email,
+        emailVerified: true,
+      },
+      applicationUser: user,
+      headers: {
+        authorization: 'Bearer ws-token',
+      },
+    })
+
+    return {
+      req: {
+        headers: wsAuth.headers,
+        user: wsAuth.user,
+        applicationUser: wsAuth.applicationUser,
+      },
+      extra: {
+        socket: {},
+        request: {},
+        wsAuth,
+      },
+    }
+  }
+
   it('allows ADMIN to receive all order events', () => {
     expect(canReceiveOrderEvent(admin, orderForA)).toBe(true)
   })
@@ -116,6 +144,24 @@ describe('order-subscription.filter', () => {
         contextFor(apothekerA),
       ),
     ).toBe(true)
+  })
+
+  it('filters orderUpdated using graphql-ws extra.wsAuth context', () => {
+    expect(
+      filterOrderUpdatedEvent(
+        { orderUpdated: orderForA },
+        {},
+        wsContextFor(apothekerA),
+      ),
+    ).toBe(true)
+
+    expect(
+      filterOrderUpdatedEvent(
+        { orderUpdated: orderForA },
+        {},
+        wsContextFor(apothekerB),
+      ),
+    ).toBe(false)
   })
 
   it('rejects events without authenticated application user', () => {

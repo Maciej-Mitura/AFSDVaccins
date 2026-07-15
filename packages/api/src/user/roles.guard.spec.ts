@@ -3,6 +3,7 @@ import { Reflector } from '@nestjs/core'
 import { ExecutionContext } from '@nestjs/common'
 import { GqlExecutionContext } from '@nestjs/graphql'
 
+import { buildNormalizedGraphqlRequest } from '../authentication/graphql-auth.context'
 import { RolesGuard } from './guards/roles.guard'
 import { UserRole } from './user-role.enum'
 import { User } from './user.entity'
@@ -59,6 +60,38 @@ describe('RolesGuard', () => {
     } as unknown as ExecutionContext
   }
 
+  function createWsSubscriptionContext(): ExecutionContext {
+    const wsAuth = buildNormalizedGraphqlRequest({
+      user: {
+        uid: applicationUser.firebaseUid,
+        email: applicationUser.email,
+        emailVerified: true,
+      },
+      applicationUser,
+      headers: {
+        authorization: 'Bearer ws-token',
+      },
+    })
+
+    jest.spyOn(GqlExecutionContext, 'create').mockReturnValue({
+      getContext: () => ({
+        req: {},
+        extra: {
+          socket: {},
+          request: {},
+          wsAuth,
+        },
+      }),
+    } as unknown as GqlExecutionContext)
+
+    return {
+      getHandler: () => jest.fn(),
+      getClass: () => class TestClass {},
+      getType: () => 'graphql',
+      switchToHttp: () => ({ getRequest: () => ({}) }),
+    } as unknown as ExecutionContext
+  }
+
   it('throws UnauthorizedException when Firebase identity is missing', async () => {
     reflector.getAllAndOverride.mockReturnValue([UserRole.APOTHEKER])
 
@@ -83,6 +116,18 @@ describe('RolesGuard', () => {
     await expect(
       guard.canActivate(createContext(applicationUser.firebaseUid)),
     ).rejects.toBeInstanceOf(ForbiddenException)
+  })
+
+  it('allows matching roles for graphql-ws subscription context', async () => {
+    reflector.getAllAndOverride.mockReturnValue([
+      UserRole.APOTHEKER,
+      UserRole.ADMIN,
+    ])
+
+    await expect(
+      guard.canActivate(createWsSubscriptionContext()),
+    ).resolves.toBe(true)
+    expect(userService.requireByFirebaseUid).not.toHaveBeenCalled()
   })
 
   it('throws ForbiddenException for BEZORGER on apotheker/admin subscriptions', async () => {

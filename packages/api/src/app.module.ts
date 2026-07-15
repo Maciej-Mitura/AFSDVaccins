@@ -3,15 +3,19 @@ import { ConfigModule, ConfigService } from '@nestjs/config'
 import { GraphQLModule } from '@nestjs/graphql'
 import { ApolloDriver, ApolloDriverConfig } from '@nestjs/apollo'
 import { TypeOrmModule } from '@nestjs/typeorm'
-import { Request, Response } from 'express'
 import { join } from 'node:path'
 import { buildMongoUrl, envValidationSchema } from './config/env.validation'
 import { AuthenticationModule } from './authentication/authentication.module'
+import { GraphqlWsContextExtra } from './authentication/firebase.types'
 import {
-  buildGraphqlRequestFromWsAuth,
-} from './authentication/graphql-ws-auth.util'
+  applyGraphqlWsAuthToContext,
+  buildGraphqlContextFromHttp,
+  buildGraphqlContextFromWs,
+  isGraphqlWsServerContext,
+} from './authentication/graphql-auth.context'
 import { GraphqlWsAuthModule } from './authentication/graphql-ws-auth.module'
 import { GraphqlWsAuthService } from './authentication/graphql-ws-auth.service'
+import { buildGraphqlRequestFromWsAuth } from './authentication/graphql-ws-auth.util'
 import { PubSubModule } from './common/pubsub/pubsub.module'
 import { HealthModule } from './health/health.module'
 import { NotificationsModule } from './notifications/notifications.module'
@@ -54,49 +58,33 @@ const sharedImports = [
           'graphql-ws': {
             onConnect: async (context: {
               connectionParams?: Record<string, unknown>
+              extra: unknown
             }) => {
               try {
                 const auth = await graphqlWsAuthService.authenticateConnection(
                   context.connectionParams,
                 )
 
-                return buildGraphqlRequestFromWsAuth(auth)
+                applyGraphqlWsAuthToContext(
+                  {
+                    extra: context.extra as GraphqlWsContextExtra,
+                  },
+                  buildGraphqlRequestFromWsAuth(auth),
+                )
+
+                return true
               } catch {
                 return false
               }
             },
           },
         },
-        context: ({
-          req,
-          res,
-          extra,
-        }: {
-          req?: Request & {
-            user?: unknown
-            applicationUser?: unknown
-            headers?: { authorization?: string }
-          }
-          res?: Response
-          extra?: ReturnType<typeof buildGraphqlRequestFromWsAuth>
-        }) => {
-          const wsRequest = extra ?? undefined
-
-          if (wsRequest) {
-            return {
-              req: {
-                headers: wsRequest.headers,
-                user: wsRequest.user,
-                applicationUser: wsRequest.applicationUser,
-              },
-              res,
-            }
+        context: (ctxOrReq: unknown) => {
+          if (isGraphqlWsServerContext(ctxOrReq)) {
+            return buildGraphqlContextFromWs(ctxOrReq)
           }
 
-          return {
-            req,
-            res,
-          }
+          return buildGraphqlContextFromHttp(ctxOrReq)
         },
       }
     },

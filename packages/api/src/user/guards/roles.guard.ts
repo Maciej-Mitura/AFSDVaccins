@@ -6,9 +6,12 @@ import {
   UnauthorizedException,
 } from '@nestjs/common'
 import { Reflector } from '@nestjs/core'
-import { GqlExecutionContext } from '@nestjs/graphql'
 
-import { GraphqlRequestContext } from '../../authentication/firebase.types'
+import {
+  getGraphqlRequestContext,
+  resolveNormalizedGraphqlRequest,
+  syncAuthToRequest,
+} from '../../authentication/graphql-auth.context'
 import { UserRole } from '../user-role.enum'
 import { UserService } from '../user.service'
 import { ROLES_KEY } from '../decorators/roles.decorator'
@@ -30,8 +33,11 @@ export class RolesGuard implements CanActivate {
       return true
     }
 
-    const gqlContext = GqlExecutionContext.create(context)
-    const request = gqlContext.getContext<GraphqlRequestContext>().req
+    const gqlContext = getGraphqlRequestContext(context)
+    const normalized = resolveNormalizedGraphqlRequest(gqlContext)
+    syncAuthToRequest(gqlContext, normalized)
+
+    const request = gqlContext.req
 
     if (!request.user?.uid) {
       throw new UnauthorizedException()

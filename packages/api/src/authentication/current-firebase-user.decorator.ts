@@ -1,16 +1,18 @@
 import { createParamDecorator, ExecutionContext } from '@nestjs/common'
-import { GqlExecutionContext } from '@nestjs/graphql'
 
 import {
-  GraphqlRequestContext,
-  VerifiedFirebaseIdentity,
-} from './firebase.types'
+  getGraphqlRequestContext,
+  resolveNormalizedGraphqlRequest,
+  syncAuthToRequest,
+} from './graphql-auth.context'
+import { VerifiedFirebaseIdentity } from './firebase.types'
 
 export const CurrentFirebaseUser = createParamDecorator(
   (_data: unknown, context: ExecutionContext): VerifiedFirebaseIdentity => {
-    const gqlContext = GqlExecutionContext.create(context)
-    const request = gqlContext.getContext<GraphqlRequestContext>().req
+    const gqlContext = getGraphqlRequestContext(context)
+    const normalized = resolveNormalizedGraphqlRequest(gqlContext)
+    syncAuthToRequest(gqlContext, normalized)
 
-    return request.user as VerifiedFirebaseIdentity
+    return gqlContext.req.user as VerifiedFirebaseIdentity
   },
 )
