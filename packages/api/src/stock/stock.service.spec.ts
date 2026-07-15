@@ -297,15 +297,90 @@ describe('StockService', () => {
     expect(stockAdjustmentWriter.insertManualAdjustment).toHaveBeenCalledTimes(2)
   })
 
-  it('rejects zero delta', async () => {
+  it('manual correction sets stock to target quantity', async () => {
+    mockSuccessfulAdjustment(10, 25)
+
+    const result = await service.adjustVaccineStock(adminUser, {
+      vaccineId,
+      type: StockAdjustmentType.MANUAL_CORRECTION,
+      targetQuantity: 25,
+      reason: 'Inventory count',
+    })
+
+    expect(vaccineStockRepository.adjustStockQuantity).toHaveBeenCalledWith(
+      vaccineObjectId,
+      15,
+    )
+    expect(result.quantityBefore).toBe(10)
+    expect(result.quantityAfter).toBe(25)
+    expect(stockAdjustmentWriter.insertManualAdjustment).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: StockAdjustmentType.MANUAL_CORRECTION,
+        quantityDelta: 15,
+      }),
+    )
+  })
+
+  it('manual correction can decrease stock to target quantity', async () => {
+    mockSuccessfulAdjustment(10, 3)
+
+    await service.adjustVaccineStock(adminUser, {
+      vaccineId,
+      type: StockAdjustmentType.MANUAL_CORRECTION,
+      targetQuantity: 3,
+      reason: 'Inventory count',
+    })
+
+    expect(vaccineStockRepository.adjustStockQuantity).toHaveBeenCalledWith(
+      vaccineObjectId,
+      -7,
+    )
+  })
+
+  it('rejects correction when target matches current stock', async () => {
+    vaccineStockRepository.findVaccineByObjectId.mockResolvedValue(vaccine)
+
     await expect(
       service.adjustVaccineStock(adminUser, {
         vaccineId,
         type: StockAdjustmentType.MANUAL_CORRECTION,
+        targetQuantity: 10,
+        reason: 'No change',
+      }),
+    ).rejects.toBeInstanceOf(InvalidStockAdjustmentException)
+
+    expect(vaccineStockRepository.adjustStockQuantity).not.toHaveBeenCalled()
+    expect(stockAdjustmentWriter.insertManualAdjustment).not.toHaveBeenCalled()
+  })
+
+  it('rejects correction with quantityDelta instead of targetQuantity', async () => {
+    vaccineStockRepository.findVaccineByObjectId.mockResolvedValue(vaccine)
+
+    await expect(
+      service.adjustVaccineStock(adminUser, {
+        vaccineId,
+        type: StockAdjustmentType.MANUAL_CORRECTION,
+        quantityDelta: 5,
+        reason: 'Invalid',
+      }),
+    ).rejects.toBeInstanceOf(InvalidStockAdjustmentException)
+
+    expect(vaccineStockRepository.adjustStockQuantity).not.toHaveBeenCalled()
+  })
+
+  it('rejects zero delta', async () => {
+    vaccineStockRepository.findVaccineByObjectId.mockResolvedValue(vaccine)
+
+    await expect(
+      service.adjustVaccineStock(adminUser, {
+        vaccineId,
+        type: StockAdjustmentType.RESTOCK,
         quantityDelta: 0,
         reason: 'Invalid',
       }),
     ).rejects.toBeInstanceOf(InvalidStockAdjustmentException)
+
+    expect(vaccineStockRepository.adjustStockQuantity).not.toHaveBeenCalled()
   })
 
   it('evaluates low stock after successful adjustment', async () => {

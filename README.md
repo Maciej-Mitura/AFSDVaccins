@@ -670,32 +670,33 @@ npm run format:check
 
 ### Authoritative balance and audit
 
-| Concept | Role |
-| ------- | ---- |
-| `Vaccine.stockQuantity` | Current authoritative balance |
-| `StockAdjustment` | Immutable audit history — never summed to derive balance |
-| `StockService` | Sole writer of `stockQuantity` |
+| Concept                  | Role                                                                   |
+| ------------------------ | ---------------------------------------------------------------------- |
+| `Vaccine.stockQuantity`  | Current authoritative balance                                          |
+| `StockAdjustment`        | Immutable audit history — never summed to derive balance               |
+| `StockService`           | Sole writer of `stockQuantity`                                         |
 | `VaccineStockRepository` | Atomic MongoDB `findOneAndUpdate` with conditional guard for decreases |
 
 ### StockAdjustment fields
 
-| Field | Purpose |
-| ----- | ------- |
-| `vaccineId` | Which vaccine changed |
-| `type` | `RESTOCK`, `MANUAL_DECREASE`, or `MANUAL_CORRECTION` |
-| `quantityDelta` | Signed change (non-zero) |
-| `quantityBefore` / `quantityAfter` | Server snapshots from successful atomic update |
-| `reason` | Required free-text admin explanation |
-| `performedByUserId` | Derived from `@CurrentUser()` |
-| `relatedOrderId` | Reserved for Phase 10 delivery decrement (null for manual ops) |
-| `idempotencyKey` | Optional; **omitted** for manual adjustments (sparse unique when present) |
-| `createdAt` | Server timestamp |
+| Field                              | Purpose                                                                   |
+| ---------------------------------- | ------------------------------------------------------------------------- |
+| `vaccineId`                        | Which vaccine changed                                                     |
+| `type`                             | `RESTOCK`, `MANUAL_DECREASE`, or `MANUAL_CORRECTION`                      |
+| `quantityDelta`                    | Signed change applied (non-zero); not used as input for `MANUAL_CORRECTION` |
+| `targetQuantity`                   | Input for `MANUAL_CORRECTION` — sets stock to this absolute amount          |
+| `quantityBefore` / `quantityAfter` | Server snapshots from successful atomic update                            |
+| `reason`                           | Required free-text admin explanation                                      |
+| `performedByUserId`                | Derived from `@CurrentUser()`                                             |
+| `relatedOrderId`                   | Reserved for Phase 10 delivery decrement (null for manual ops)            |
+| `idempotencyKey`                   | Optional; **omitted** for manual adjustments (sparse unique when present) |
+| `createdAt`                        | Server timestamp                                                          |
 
 ### Adjustment rules
 
 - `RESTOCK` requires positive `quantityDelta`
 - `MANUAL_DECREASE` requires negative `quantityDelta`
-- `MANUAL_CORRECTION` allows either sign
+- `MANUAL_CORRECTION` requires non-negative `targetQuantity` and sets stock to that absolute amount (delta = target − current)
 - Zero delta rejected (`INVALID_STOCK_ADJUSTMENT`)
 - Resulting negative stock blocked (`INSUFFICIENT_STOCK`)
 - Negative adjustments use one conditional DB update; concurrent decreases cannot go below zero
@@ -716,12 +717,12 @@ ADMIN subscriptions and vice versa.
 
 ### GraphQL operations added
 
-| Operation | Auth | Purpose |
-| --------- | ---- | ------- |
-| `adjustVaccineStock` | ADMIN | Adjust stock + append audit |
-| `stockAdjustments` | ADMIN | List adjustments (optional `vaccineId`) |
-| `vaccineStockHistory` | ADMIN | History for one vaccine |
-| `myNotifications` / `notificationReceived` | ADMIN (extended) | Low-stock alerts |
+| Operation                                  | Auth             | Purpose                                 |
+| ------------------------------------------ | ---------------- | --------------------------------------- |
+| `adjustVaccineStock`                       | ADMIN            | Adjust stock + append audit             |
+| `stockAdjustments`                         | ADMIN            | List adjustments (optional `vaccineId`) |
+| `vaccineStockHistory`                      | ADMIN            | History for one vaccine                 |
+| `myNotifications` / `notificationReceived` | ADMIN (extended) | Low-stock alerts                        |
 
 Domain errors: `VACCINE_NOT_FOUND`, `INVALID_STOCK_ADJUSTMENT`, `INSUFFICIENT_STOCK`,
 `FORBIDDEN`, `UNAUTHENTICATED`.

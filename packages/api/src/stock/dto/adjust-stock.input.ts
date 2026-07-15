@@ -3,8 +3,9 @@ import {
   IsEnum,
   IsInt,
   IsNotEmpty,
-  IsNotIn,
+  IsOptional,
   MaxLength,
+  Min,
 } from 'class-validator'
 import { Transform } from 'class-transformer'
 
@@ -19,10 +20,16 @@ export class AdjustStockInput {
   @IsNotEmpty()
   vaccineId!: string
 
-  @Field(() => Int)
+  @Field(() => Int, { nullable: true })
+  @IsOptional()
   @IsInt()
-  @IsNotIn([0])
-  quantityDelta!: number
+  quantityDelta?: number
+
+  @Field(() => Int, { nullable: true })
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  targetQuantity?: number
 
   @Field(() => StockAdjustmentType)
   @IsEnum(StockAdjustmentType)

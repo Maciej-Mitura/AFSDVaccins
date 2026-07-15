@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, reactive, ref } from 'vue'
+import { computed, reactive, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 
 import type { FormSubmitEvent } from '@nuxt/ui'
@@ -39,21 +39,64 @@ const adjustmentTypeOptions = [
   { label: 'Correctie', value: StockAdjustmentType.ManualCorrection },
 ]
 
-const schema = z.object({
-  type: z.nativeEnum(StockAdjustmentType),
-  quantityDelta: z.number().int().refine(value => value !== 0, {
-    message: 'Aantal mag niet nul zijn.',
-  }),
-  reason: z.string().trim().min(1, 'Reden is verplicht.').max(500),
-})
+type AdjustForm = {
+  type: StockAdjustmentType
+  quantityDelta: number
+  reason: string
+}
 
-type AdjustForm = z.output<typeof schema>
+const schema = computed(() =>
+  z
+    .object({
+      type: z.nativeEnum(StockAdjustmentType),
+      quantityDelta: z.number().int(),
+      reason: z.string().trim().min(1, 'Reden is verplicht.').max(500),
+    })
+    .superRefine((data, ctx) => {
+      if (data.type === StockAdjustmentType.ManualCorrection) {
+        if (data.quantityDelta < 0) {
+          ctx.addIssue({
+            code: 'custom',
+            message: 'Voorraad mag niet negatief zijn.',
+            path: ['quantityDelta'],
+          })
+        }
+
+        if (
+          selectedVaccine.value &&
+          data.quantityDelta === selectedVaccine.value.stockQuantity
+        ) {
+          ctx.addIssue({
+            code: 'custom',
+            message: 'Voorraad is al gelijk aan deze waarde.',
+            path: ['quantityDelta'],
+          })
+        }
+
+        return
+      }
+
+      if (data.quantityDelta === 0) {
+        ctx.addIssue({
+          code: 'custom',
+          message: 'Aantal mag niet nul zijn.',
+          path: ['quantityDelta'],
+        })
+      }
+    }),
+)
 
 const state = reactive<Partial<AdjustForm>>({
   type: StockAdjustmentType.Restock,
   quantityDelta: undefined,
   reason: undefined,
 })
+
+const quantityFieldLabel = computed(() =>
+  state.type === StockAdjustmentType.ManualCorrection
+    ? 'Nieuwe voorraad (dosissen)'
+    : 'Aantal (dosissen)',
+)
 
 const formTitle = computed(() =>
   selectedVaccine.value
@@ -76,6 +119,18 @@ function openAdjustForm(vaccine: StockOverviewItem) {
   showForm.value = true
 }
 
+watch(
+  () => state.type,
+  type => {
+    if (
+      type === StockAdjustmentType.ManualCorrection &&
+      selectedVaccine.value
+    ) {
+      state.quantityDelta = selectedVaccine.value.stockQuantity
+    }
+  },
+)
+
 function closeForm() {
   showForm.value = false
   selectedVaccine.value = null
@@ -87,11 +142,30 @@ function normalizeDelta(type: StockAdjustmentType, rawDelta: number): number {
     return Math.abs(rawDelta)
   }
 
-  if (type === StockAdjustmentType.ManualDecrease) {
-    return -Math.abs(rawDelta)
+  return -Math.abs(rawDelta)
+}
+
+function buildAdjustInput(
+  vaccineId: string,
+  type: StockAdjustmentType,
+  quantityDelta: number,
+  reason: string,
+) {
+  if (type === StockAdjustmentType.ManualCorrection) {
+    return {
+      vaccineId,
+      type,
+      targetQuantity: quantityDelta,
+      reason,
+    }
   }
 
-  return rawDelta
+  return {
+    vaccineId,
+    type,
+    quantityDelta: normalizeDelta(type, quantityDelta),
+    reason,
+  }
 }
 
 async function onSubmit(event: FormSubmitEvent<AdjustForm>) {
@@ -102,12 +176,14 @@ async function onSubmit(event: FormSubmitEvent<AdjustForm>) {
   formError.value = null
 
   try {
-    await adjustStock({
-      vaccineId: selectedVaccine.value.id,
-      type: event.data.type,
-      quantityDelta: normalizeDelta(event.data.type, event.data.quantityDelta),
-      reason: event.data.reason,
-    })
+    await adjustStock(
+      buildAdjustInput(
+        selectedVaccine.value.id,
+        event.data.type,
+        event.data.quantityDelta,
+        event.data.reason,
+      ),
+    )
 
     closeForm()
   } catch (error: unknown) {
@@ -225,7 +301,7 @@ function openHistory(vaccineId: string): void {
             />
           </UFormField>
 
-          <UFormField label="Aantal (dosissen)" name="quantityDelta">
+          <UFormField :label="quantityFieldLabel" name="quantityDelta">
             <UInput
               v-model.number="state.quantityDelta"
               type="number"

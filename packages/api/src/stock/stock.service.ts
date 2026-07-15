@@ -26,31 +26,75 @@ export class StockService {
     private readonly stockNotificationService: StockNotificationService,
   ) {}
 
-  private validateTypeAndDelta(
+  private resolveAdjustmentDelta(
     type: StockAdjustmentType,
-    quantityDelta: number,
-  ): void {
-    if (quantityDelta === 0) {
-      throw new InvalidStockAdjustmentException('Quantity delta cannot be zero')
-    }
-
+    quantityDelta: number | undefined,
+    targetQuantity: number | undefined,
+    currentStock: number,
+  ): number {
     switch (type) {
       case StockAdjustmentType.RESTOCK:
-        if (quantityDelta <= 0) {
+        if (targetQuantity !== undefined) {
+          throw new InvalidStockAdjustmentException(
+            'RESTOCK must not include targetQuantity',
+          )
+        }
+
+        if (
+          quantityDelta === undefined ||
+          !Number.isInteger(quantityDelta) ||
+          quantityDelta <= 0
+        ) {
           throw new InvalidStockAdjustmentException(
             'RESTOCK requires a positive quantity delta',
           )
         }
-        break
+
+        return quantityDelta
       case StockAdjustmentType.MANUAL_DECREASE:
-        if (quantityDelta >= 0) {
+        if (targetQuantity !== undefined) {
+          throw new InvalidStockAdjustmentException(
+            'MANUAL_DECREASE must not include targetQuantity',
+          )
+        }
+
+        if (
+          quantityDelta === undefined ||
+          !Number.isInteger(quantityDelta) ||
+          quantityDelta >= 0
+        ) {
           throw new InvalidStockAdjustmentException(
             'MANUAL_DECREASE requires a negative quantity delta',
           )
         }
-        break
+
+        return quantityDelta
       case StockAdjustmentType.MANUAL_CORRECTION:
-        break
+        if (quantityDelta !== undefined) {
+          throw new InvalidStockAdjustmentException(
+            'MANUAL_CORRECTION must use targetQuantity, not quantityDelta',
+          )
+        }
+
+        if (
+          targetQuantity === undefined ||
+          !Number.isInteger(targetQuantity) ||
+          targetQuantity < 0
+        ) {
+          throw new InvalidStockAdjustmentException(
+            'MANUAL_CORRECTION requires a non-negative targetQuantity',
+          )
+        }
+
+        const delta = targetQuantity - currentStock
+
+        if (delta === 0) {
+          throw new InvalidStockAdjustmentException(
+            'Target quantity matches current stock',
+          )
+        }
+
+        return delta
       default:
         throw new InvalidStockAdjustmentException('Unsupported adjustment type')
     }
@@ -81,15 +125,20 @@ export class StockService {
     user: User,
     input: AdjustStockInput,
   ): Promise<StockAdjustment> {
-    this.validateTypeAndDelta(input.type, input.quantityDelta)
-
     const { parsed, vaccine } = await this.requireVaccineByGraphqlId(
       input.vaccineId,
     )
 
+    const quantityDelta = this.resolveAdjustmentDelta(
+      input.type,
+      input.quantityDelta,
+      input.targetQuantity,
+      vaccine.stockQuantity,
+    )
+
     const updateResult = await this.vaccineStockRepository.adjustStockQuantity(
       parsed.objectId,
-      input.quantityDelta,
+      quantityDelta,
     )
 
     if (!updateResult) {
@@ -108,7 +157,7 @@ export class StockService {
       {
         vaccineObjectId: parsed.objectId,
         type: input.type,
-        quantityDelta: input.quantityDelta,
+        quantityDelta,
         quantityBefore: updateResult.quantityBefore,
         quantityAfter: updateResult.quantityAfter,
         reason: input.reason.trim(),
