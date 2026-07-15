@@ -18,17 +18,13 @@ const {
   ordersLoading,
   ordersError,
   statusActionLoading,
-  statusActionError,
   cancelActionLoading,
-  cancelActionError,
   loadAdminOrders,
   loadAdminDailyOverview,
   subscribeToAdminOrderEvents,
   stopAdminOrderSubscriptions,
   updateOrderStatus,
   cancelOrderAsAdmin,
-  clearStatusActionError,
-  clearCancelActionError,
   isInvalidOrderStatusTransitionError,
   isInsufficientStockError,
   isOrderCannotBeCancelledError,
@@ -51,6 +47,8 @@ const filters = reactive<{
   status: undefined,
 })
 
+const actionError = ref<string | null>(null)
+const cancelActionError = ref<string | null>(null)
 const actingOrderId = ref<string | null>(null)
 const confirmDeliverId = ref<string | null>(null)
 const confirmCancelId = ref<string | null>(null)
@@ -112,8 +110,8 @@ onUnmounted(() => {
 })
 
 async function applyFilters() {
-  clearStatusActionError()
-  clearCancelActionError()
+  actionError.value = null
+  cancelActionError.value = null
   await refreshData()
   restartAdminSubscriptions()
 }
@@ -162,17 +160,17 @@ function orderStockReady(order: (typeof adminOrders.value)[number]): boolean {
 
 function handleStatusActionError(error: unknown) {
   if (isInsufficientStockError(error)) {
-    statusActionError.value =
+    actionError.value =
       'Onvoldoende voorraad om deze bestelling te leveren. Er is geen wijziging doorgevoerd.'
     return
   }
 
   if (isInvalidOrderStatusTransitionError(error)) {
-    statusActionError.value = 'Deze statusovergang is niet toegestaan.'
+    actionError.value = 'Deze statusovergang is niet toegestaan.'
     return
   }
 
-  statusActionError.value = mapGraphQLError(error)
+  actionError.value = mapGraphQLError(error)
 }
 
 function handleCancelActionError(error: unknown) {
@@ -185,7 +183,7 @@ function handleCancelActionError(error: unknown) {
 }
 
 async function onMarkPlanned(id: string) {
-  clearStatusActionError()
+  actionError.value = null
   actingOrderId.value = id
 
   try {
@@ -199,12 +197,12 @@ async function onMarkPlanned(id: string) {
 }
 
 async function onMarkDelivered(id: string) {
-  confirmDeliverId.value = null
-  clearStatusActionError()
+  actionError.value = null
   actingOrderId.value = id
 
   try {
     await updateOrderStatus(id, OrderStatus.Delivered)
+    confirmDeliverId.value = null
     await refreshData()
     await loadStockOverview()
   } catch (error: unknown) {
@@ -215,12 +213,12 @@ async function onMarkDelivered(id: string) {
 }
 
 async function onCancel(id: string) {
-  confirmCancelId.value = null
-  clearCancelActionError()
+  cancelActionError.value = null
   actingOrderId.value = id
 
   try {
     await cancelOrderAsAdmin(id)
+    confirmCancelId.value = null
     await refreshData()
   } catch (error: unknown) {
     handleCancelActionError(error)
@@ -230,6 +228,7 @@ async function onCancel(id: string) {
 }
 async function closeDeliverModal() {
   confirmDeliverId.value = null
+  actionError.value = null
 }
 
 async function closeCancelModal() {
@@ -316,6 +315,22 @@ async function closeCancelModal() {
         />
         <UButton @click="applyFilters">Filteren</UButton>
       </div>
+
+      <UAlert
+        v-if="actionError"
+        class="mb-4"
+        color="error"
+        variant="subtle"
+        :title="actionError"
+      />
+
+      <UAlert
+        v-if="cancelActionError"
+        class="mb-4"
+        color="error"
+        variant="subtle"
+        :title="cancelActionError"
+      />
 
       <CommonLoadingSkeleton v-if="ordersLoading && adminOrders.length === 0" />
 
@@ -436,26 +451,6 @@ async function closeCancelModal() {
           </div>
         </UCard>
       </div>
-
-      <UAlert
-        v-if="statusActionError"
-        class="mt-4"
-        color="error"
-        variant="subtle"
-        :title="statusActionError"
-        :close-button="{ icon: 'i-lucide-x', color: 'neutral', variant: 'link' }"
-        @close="clearStatusActionError"
-      />
-
-      <UAlert
-        v-if="cancelActionError"
-        class="mt-4"
-        color="error"
-        variant="subtle"
-        :title="cancelActionError"
-        :close-button="{ icon: 'i-lucide-x', color: 'neutral', variant: 'link' }"
-        @close="clearCancelActionError"
-      />
     </UCard>
 
     <UModal
@@ -468,6 +463,13 @@ async function closeCancelModal() {
           Bevestig dat deze bestelling geleverd is. De voorraad wordt nu
           afgetrokken.
         </p>
+        <UAlert
+          v-if="actionError"
+          class="mt-3"
+          color="error"
+          variant="subtle"
+          :title="actionError"
+        />
       </template>
       <template #footer>
         <UButton variant="ghost" @click="() => { void closeDeliverModal() }">
@@ -475,6 +477,7 @@ async function closeCancelModal() {
         </UButton>
         <UButton
           color="primary"
+          :loading="statusActionLoading"
           @click="() => { if (confirmDeliverId) void onMarkDelivered(confirmDeliverId) }"
         >
           Bevestig levering
