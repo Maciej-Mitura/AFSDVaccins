@@ -106,5 +106,15 @@ describe('resolveProfileCompletionMode', () => {
         missingApplicationUser: true,
       }),
     ).toBe('unregistered')
+
+    expect(
+      resolveProfileCompletionMode({
+        authReady: true,
+        userLoading: false,
+        userInitialized: true,
+        currentUser: null,
+        missingApplicationUser: true,
+      }),
+    ).not.toBe('apotheker')
   })
 })

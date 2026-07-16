@@ -256,25 +256,27 @@ application.
 
 ### Self-registration
 
-Public registration always creates role **`APOTHEKER`**. Clients cannot supply
-`role`, `firebaseUid`, or `email` in `createOwnUser`.
+Public registration lets the user choose **`APOTHEKER`** or **`BEZORGER`** via
+`SelfRegistrationRole` on `createOwnUser`. Clients cannot supply `ADMIN`,
+`firebaseUid`, or `email`. Repeated `createOwnUser` is idempotent and never
+changes an existing role.
+
+If Firebase identity exists without a MongoDB `User`, `/auth/complete-profile`
+asks for account type again (recovery), then creates the application user.
 
 ### Profile completion
 
-If a Firebase account exists without a MongoDB `User` (for example a Phase 4
-test account), login redirects to `/auth/complete-profile` to call
-`createOwnUser`.
-
-**APOTHEKER** users without an `ApothekerProfile` are also redirected to
+**APOTHEKER** users without an `ApothekerProfile` are redirected to
 `/auth/complete-profile` to collect pharmacy name and delivery address
-(`completeApothekerProfile`). The form may call `createOwnUser` first when the
-application user is missing, then `completeApothekerProfile` — they remain
-separate GraphQL mutations.
+(`completeApothekerProfile`).
 
 **BEZORGER** users without a `BezorgerProfile` complete courier fields
 (`displayName`, optional `vehicleLabel`) via `completeBezorgerProfile`.
 
-**ADMIN** does not require a role-specific profile.
+Lifecycle: Firebase identity → `createOwnUser(selected role)` →
+`completeApothekerProfile` or `completeBezorgerProfile`.
+
+**ADMIN** does not require a role-specific profile and cannot self-register.
 
 ### Pharmacy and courier profiles (Phase 5 corrective)
 

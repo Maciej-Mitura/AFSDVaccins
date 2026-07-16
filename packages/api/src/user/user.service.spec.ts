@@ -6,7 +6,9 @@ import { VerifiedFirebaseIdentity } from '../authentication/firebase.types'
 import { CreateOwnUserInput } from './dto/create-own-user.input'
 import { UpdateOwnUserInput } from './dto/update-own-user.input'
 import { FirebaseEmailMissingException } from './exceptions/firebase-email-missing.exception'
+import { InvalidSelfRegistrationRoleException } from './exceptions/invalid-self-registration-role.exception'
 import { UserNotRegisteredException } from './exceptions/user-not-registered.exception'
+import { SelfRegistrationRole } from './self-registration-role.enum'
 import { UserRole } from './user-role.enum'
 import { User } from './user.entity'
 import { UserService } from './user.service'
@@ -74,6 +76,7 @@ describe('UserService', () => {
     const input: CreateOwnUserInput = {
       firstName: 'Jan',
       lastName: 'Apotheker',
+      role: SelfRegistrationRole.APOTHEKER,
     }
 
     const result = await service.createOwnUser(identity, input)
@@ -90,15 +93,67 @@ describe('UserService', () => {
     expect(result.role).toBe(UserRole.APOTHEKER)
   })
 
+  it('creates a BEZORGER when that self-registration role is selected', async () => {
+    repository.findOne.mockResolvedValue(null)
+    repository.create.mockImplementation(value => value as User)
+    repository.save.mockImplementation(value =>
+      Promise.resolve({
+        ...existingUser,
+        ...value,
+        role: UserRole.BEZORGER,
+      } as User),
+    )
+
+    const result = await service.createOwnUser(identity, {
+      firstName: 'Tom',
+      lastName: 'Koerier',
+      role: SelfRegistrationRole.BEZORGER,
+    })
+
+    expect(repository.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        role: UserRole.BEZORGER,
+      }),
+    )
+    expect(result.role).toBe(UserRole.BEZORGER)
+  })
+
+  it('rejects unsupported self-registration roles', () => {
+    expect(() =>
+      service.mapSelfRegistrationRole('ADMIN' as SelfRegistrationRole),
+    ).toThrow(InvalidSelfRegistrationRoleException)
+  })
+
   it('returns the existing user for duplicate firebaseUid submissions', async () => {
     repository.findOne.mockResolvedValue(existingUser)
 
     const result = await service.createOwnUser(identity, {
       firstName: 'Other',
       lastName: 'Name',
+      role: SelfRegistrationRole.BEZORGER,
     })
 
     expect(result).toEqual(existingUser)
+    expect(result.role).toBe(UserRole.APOTHEKER)
+    expect(repository.save).not.toHaveBeenCalled()
+  })
+
+  it('does not change an existing role on repeated createOwnUser', async () => {
+    repository.findOne.mockResolvedValue(existingUser)
+
+    const first = await service.createOwnUser(identity, {
+      firstName: 'Jan',
+      lastName: 'Apotheker',
+      role: SelfRegistrationRole.BEZORGER,
+    })
+    const second = await service.createOwnUser(identity, {
+      firstName: 'Changed',
+      lastName: 'Name',
+      role: SelfRegistrationRole.BEZORGER,
+    })
+
+    expect(first.role).toBe(UserRole.APOTHEKER)
+    expect(second.role).toBe(UserRole.APOTHEKER)
     expect(repository.save).not.toHaveBeenCalled()
   })
 
@@ -111,6 +166,7 @@ describe('UserService', () => {
         {
           firstName: 'Jan',
           lastName: 'Apotheker',
+          role: SelfRegistrationRole.APOTHEKER,
         },
       ),
     ).rejects.toBeInstanceOf(FirebaseEmailMissingException)

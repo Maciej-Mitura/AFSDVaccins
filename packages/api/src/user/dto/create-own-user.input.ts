@@ -1,5 +1,7 @@
 import { Field, InputType } from '@nestjs/graphql'
-import { IsNotEmpty, IsString, MaxLength } from 'class-validator'
+import { IsEnum, IsNotEmpty, IsString, MaxLength } from 'class-validator'
+
+import { SelfRegistrationRole } from '../self-registration-role.enum'
 
 @InputType()
 export class CreateOwnUserInput {
@@ -14,4 +16,8 @@ export class CreateOwnUserInput {
   @IsNotEmpty()
   @MaxLength(100)
   lastName!: string
+
+  @Field(() => SelfRegistrationRole)
+  @IsEnum(SelfRegistrationRole)
+  role!: SelfRegistrationRole
 }

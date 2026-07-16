@@ -7,9 +7,19 @@ import { VerifiedFirebaseIdentity } from '../authentication/firebase.types'
 import { CreateOwnUserInput } from './dto/create-own-user.input'
 import { UpdateOwnUserInput } from './dto/update-own-user.input'
 import { FirebaseEmailMissingException } from './exceptions/firebase-email-missing.exception'
+import { InvalidSelfRegistrationRoleException } from './exceptions/invalid-self-registration-role.exception'
 import { UserNotRegisteredException } from './exceptions/user-not-registered.exception'
+import { SelfRegistrationRole } from './self-registration-role.enum'
 import { UserRole } from './user-role.enum'
 import { User } from './user.entity'
+
+const SELF_REGISTRATION_ROLE_MAP: ReadonlyMap<
+  SelfRegistrationRole,
+  UserRole
+> = new Map([
+  [SelfRegistrationRole.APOTHEKER, UserRole.APOTHEKER],
+  [SelfRegistrationRole.BEZORGER, UserRole.BEZORGER],
+])
 
 @Injectable()
 export class UserService {
@@ -24,6 +34,16 @@ export class UserService {
 
   normalizeName(value: string): string {
     return value.trim()
+  }
+
+  mapSelfRegistrationRole(role: SelfRegistrationRole): UserRole {
+    const mapped = SELF_REGISTRATION_ROLE_MAP.get(role)
+
+    if (!mapped) {
+      throw new InvalidSelfRegistrationRoleException()
+    }
+
+    return mapped
   }
 
   async findByFirebaseUid(firebaseUid: string): Promise<User | null> {
@@ -56,12 +76,14 @@ export class UserService {
       throw new FirebaseEmailMissingException()
     }
 
+    const role = this.mapSelfRegistrationRole(input.role)
+
     const user = this.userRepository.create({
       firebaseUid: identity.uid,
       email: this.normalizeEmail(identity.email),
       firstName: this.normalizeName(input.firstName),
       lastName: this.normalizeName(input.lastName),
-      role: UserRole.APOTHEKER,
+      role,
     })
 
     return this.userRepository.save(user)

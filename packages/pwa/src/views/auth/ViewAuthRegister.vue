@@ -3,9 +3,13 @@ import { reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
 
 import type { FormSubmitEvent } from '@nuxt/ui'
+import { SelfRegistrationRole } from '@vaccin-delivery/types'
 import * as z from 'zod'
 
-import { useCurrentUser } from '@/composables/useCurrentUser'
+import {
+  getDefaultRouteForRole,
+  useCurrentUser,
+} from '@/composables/useCurrentUser'
 import { useFirebase } from '@/composables/useFirebase'
 
 const router = useRouter()
@@ -14,6 +18,7 @@ const {
   createOwnUser,
   loadCurrentUser,
   mapGraphQLError,
+  needsProfileCompletion,
 } = useCurrentUser()
 
 const loading = ref(false)
@@ -25,6 +30,10 @@ const schema = z.object({
   lastName: z.string().min(2, 'Achternaam moet minstens 2 tekens bevatten.'),
   email: z.string().email('Voer een geldig e-mailadres in.'),
   password: z.string().min(8, 'Wachtwoord moet minstens 8 tekens bevatten.'),
+  role: z.enum(
+    [SelfRegistrationRole.Apotheker, SelfRegistrationRole.Bezorger],
+    { message: 'Kies een accounttype.' },
+  ),
 })
 
 type RegisterForm = z.output<typeof schema>
@@ -34,6 +43,7 @@ const state = reactive<Partial<RegisterForm>>({
   lastName: undefined,
   email: undefined,
   password: undefined,
+  role: undefined,
 })
 
 async function onSubmit(event: FormSubmitEvent<RegisterForm>) {
@@ -49,12 +59,21 @@ async function onSubmit(event: FormSubmitEvent<RegisterForm>) {
     )
 
     try {
-      await createOwnUser(event.data.firstName, event.data.lastName)
+      const user = await createOwnUser(
+        event.data.firstName,
+        event.data.lastName,
+        event.data.role,
+      )
       await loadCurrentUser(true)
-      await router.push('/auth/complete-profile')
+
+      if (needsProfileCompletion.value) {
+        await router.push('/auth/complete-profile')
+      } else {
+        await router.push(getDefaultRouteForRole(user.role))
+      }
     } catch (profileError: unknown) {
       profileWarning.value =
-        'Je Firebase-account is aangemaakt, maar het applicatieprofiel kon niet worden opgeslagen. Log in en voltooi je profiel via “Profiel aanvullen”.'
+        'Je Firebase-account is aangemaakt, maar het applicatieprofiel kon niet worden opgeslagen. Log in en kies opnieuw je accounttype via “Profiel aanvullen”.'
       formError.value = mapGraphQLError(profileError)
     }
   } catch (error: unknown) {
@@ -73,8 +92,8 @@ async function onSubmit(event: FormSubmitEvent<RegisterForm>) {
     </template>
 
     <p class="mb-4 text-sm text-muted">
-      Maakt een Firebase-account en een applicatieprofiel aan. Nieuwe accounts
-      krijgen standaard de rol APOTHEKER.
+      Maakt een Firebase-account en een applicatieprofiel aan. Kies expliciet of
+      je als apotheker of bezorger registreert.
     </p>
 
     <UAlert
@@ -94,6 +113,42 @@ async function onSubmit(event: FormSubmitEvent<RegisterForm>) {
     />
 
     <UForm :schema="schema" :state="state" class="space-y-4" @submit="onSubmit">
+      <UFormField label="Accounttype" name="role" required>
+        <div class="grid gap-3 sm:grid-cols-2">
+          <button
+            type="button"
+            class="rounded-lg border px-3 py-3 text-left transition"
+            :class="
+              state.role === SelfRegistrationRole.Apotheker
+                ? 'border-primary bg-primary/5'
+                : 'border-default hover:border-primary/40'
+            "
+            @click="state.role = SelfRegistrationRole.Apotheker"
+          >
+            <p class="font-medium">Apotheker</p>
+            <p class="mt-1 text-sm text-muted">
+              Ik plaats vaccinbestellingen voor een apotheek.
+            </p>
+          </button>
+
+          <button
+            type="button"
+            class="rounded-lg border px-3 py-3 text-left transition"
+            :class="
+              state.role === SelfRegistrationRole.Bezorger
+                ? 'border-primary bg-primary/5'
+                : 'border-default hover:border-primary/40'
+            "
+            @click="state.role = SelfRegistrationRole.Bezorger"
+          >
+            <p class="font-medium">Bezorger</p>
+            <p class="mt-1 text-sm text-muted">
+              Ik lever geplande vaccinbestellingen.
+            </p>
+          </button>
+        </div>
+      </UFormField>
+
       <UFormField label="Voornaam" name="firstName" required>
         <UInput
           v-model="state.firstName"

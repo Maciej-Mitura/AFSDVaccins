@@ -172,6 +172,7 @@ describe('UserResolver (GraphQL)', () => {
           input: {
             firstName: 'Jan',
             lastName: 'Apotheker',
+            role: 'APOTHEKER',
           },
         },
       })
@@ -188,8 +189,72 @@ describe('UserResolver (GraphQL)', () => {
       expect.objectContaining({
         firstName: 'Jan',
         lastName: 'Apotheker',
+        role: 'APOTHEKER',
       }),
     )
     expect(body.data?.createOwnUser.role).toBe(UserRole.APOTHEKER)
+  })
+
+  it('rejects ADMIN as a self-registration role at the GraphQL layer', async () => {
+    firebaseServiceMock.verifyIdToken.mockResolvedValue({
+      uid: mockUser.firebaseUid,
+      email: mockUser.email,
+      email_verified: true,
+    })
+
+    const response = await request(server)
+      .post('/graphql')
+      .set('Authorization', 'Bearer valid-token')
+      .send({
+        query: CREATE_OWN_USER_MUTATION,
+        variables: {
+          input: {
+            firstName: 'Jan',
+            lastName: 'Admin',
+            role: 'ADMIN',
+          },
+        },
+      })
+
+    const body = response.body as {
+      data?: { createOwnUser?: User }
+      errors?: Array<{ message: string }>
+    }
+
+    expect(response.status).toBe(200)
+    expect(body.data?.createOwnUser).toBeFalsy()
+    expect(body.errors?.[0]?.message).toMatch(/SelfRegistrationRole|ADMIN/i)
+    expect(userServiceMock.createOwnUser).not.toHaveBeenCalled()
+  })
+
+  it('rejects missing role on createOwnUser', async () => {
+    firebaseServiceMock.verifyIdToken.mockResolvedValue({
+      uid: mockUser.firebaseUid,
+      email: mockUser.email,
+      email_verified: true,
+    })
+
+    const response = await request(server)
+      .post('/graphql')
+      .set('Authorization', 'Bearer valid-token')
+      .send({
+        query: CREATE_OWN_USER_MUTATION,
+        variables: {
+          input: {
+            firstName: 'Jan',
+            lastName: 'Apotheker',
+          },
+        },
+      })
+
+    const body = response.body as {
+      data?: { createOwnUser?: User }
+      errors?: Array<{ message: string }>
+    }
+
+    expect(response.status).toBe(200)
+    expect(body.data?.createOwnUser).toBeFalsy()
+    expect(body.errors?.[0]?.message).toMatch(/role/i)
+    expect(userServiceMock.createOwnUser).not.toHaveBeenCalled()
   })
 })

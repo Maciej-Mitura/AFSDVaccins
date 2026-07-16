@@ -30,8 +30,7 @@ const {
   formatAddress,
 } = useDeliveryRoutes()
 
-const { bezorgerProfiles, loadProfileOptions, findBezorgerProfile } =
-  useRouteTemplates()
+const { loadProfileOptions, findBezorgerProfile } = useRouteTemplates()
 
 const deliveryDate = ref(todayLocalDate())
 const selectedTemplateId = ref<string | undefined>(undefined)

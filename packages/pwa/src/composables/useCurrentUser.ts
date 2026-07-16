@@ -1,6 +1,6 @@
 import { computed, ref } from 'vue'
 import { ApolloError } from '@apollo/client/core'
-import { UserRole } from '@vaccin-delivery/types'
+import { SelfRegistrationRole, UserRole } from '@vaccin-delivery/types'
 
 import {
   CREATE_OWN_USER_MUTATION,
@@ -175,6 +175,7 @@ export function useCurrentUser() {
   async function createOwnUser(
     firstName: string,
     lastName: string,
+    role: SelfRegistrationRole,
   ): Promise<ApplicationUser> {
     const result = await apolloClient.mutate<CreateOwnUserMutation>({
       mutation: CREATE_OWN_USER_MUTATION,
@@ -182,6 +183,7 @@ export function useCurrentUser() {
         input: {
           firstName,
           lastName,
+          role,
         },
       },
     })
