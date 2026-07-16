@@ -1,0 +1,477 @@
+<script setup lang="ts">
+import { computed, reactive, ref } from 'vue'
+
+import type { FormSubmitEvent } from '@nuxt/ui'
+import * as z from 'zod'
+
+import CommonEmptyState from '@/components/common/CommonEmptyState.vue'
+import CommonErrorState from '@/components/common/CommonErrorState.vue'
+import CommonLoadingSkeleton from '@/components/common/CommonLoadingSkeleton.vue'
+import {
+  useRouteTemplates,
+  type RouteTemplateListItem,
+} from '@/composables/useRouteTemplates'
+
+const {
+  templates,
+  apothekerProfiles,
+  bezorgerProfiles,
+  loading,
+  profilesLoading,
+  errorMessage,
+  loadRouteTemplates,
+  loadProfileOptions,
+  createRouteTemplate,
+  updateRouteTemplate,
+  setRouteTemplateActive,
+  findApothekerProfile,
+  findBezorgerProfile,
+  formatPharmacyLabel,
+  isRouteTemplateAlreadyExistsError,
+  isRouteTemplateDuplicateStopError,
+  isRouteTemplateEmptyStopsError,
+  mapGraphQLError,
+} = useRouteTemplates()
+
+const includeInactive = ref(true)
+const showForm = ref(false)
+const editingTemplate = ref<RouteTemplateListItem | null>(null)
+const saving = ref(false)
+const formError = ref<string | null>(null)
+const successMessage = ref<string | null>(null)
+const togglingId = ref<string | null>(null)
+const selectedPharmacyId = ref<string | undefined>(undefined)
+
+const schema = z.object({
+  name: z.string().trim().min(1, 'Naam is verplicht.').max(120),
+  description: z.string().trim().max(500).optional(),
+  bezorgerProfileId: z.string().min(1, 'Kies een bezorger.'),
+})
+
+type TemplateForm = z.output<typeof schema>
+
+const state = reactive<{
+  name?: string
+  description?: string
+  bezorgerProfileId?: string
+}>({
+  name: undefined,
+  description: undefined,
+  bezorgerProfileId: undefined,
+})
+
+const stopIds = ref<string[]>([])
+
+const formTitle = computed(() =>
+  editingTemplate.value ? 'Routetemplate bewerken' : 'Nieuwe routetemplate',
+)
+
+const pharmacyOptions = computed(() =>
+  apothekerProfiles.value.map(profile => ({
+    label: formatPharmacyLabel(profile),
+    value: profile.id,
+  })),
+)
+
+const courierOptions = computed(() =>
+  bezorgerProfiles.value.map(profile => ({
+    label: profile.vehicleLabel
+      ? `${profile.displayName} (${profile.vehicleLabel})`
+      : profile.displayName,
+    value: profile.id,
+  })),
+)
+
+const availablePharmacyOptions = computed(() =>
+  pharmacyOptions.value.filter(option => !stopIds.value.includes(option.value)),
+)
+
+const orderedStops = computed(() =>
+  stopIds.value.map((id, index) => {
+    const profile = findApothekerProfile(id)
+    return {
+      id,
+      sequence: index + 1,
+      label: profile ? formatPharmacyLabel(profile) : id,
+    }
+  }),
+)
+
+void Promise.all([
+  loadRouteTemplates(includeInactive.value),
+  loadProfileOptions(),
+])
+
+async function reloadTemplates() {
+  await loadRouteTemplates(includeInactive.value)
+}
+
+async function toggleIncludeInactive() {
+  includeInactive.value = !includeInactive.value
+  await reloadTemplates()
+}
+
+function resetForm() {
+  editingTemplate.value = null
+  state.name = undefined
+  state.description = undefined
+  state.bezorgerProfileId = undefined
+  stopIds.value = []
+  selectedPharmacyId.value = undefined
+  formError.value = null
+}
+
+function openCreateForm() {
+  resetForm()
+  successMessage.value = null
+  showForm.value = true
+}
+
+function openEditForm(template: RouteTemplateListItem) {
+  editingTemplate.value = template
+  state.name = template.name
+  state.description = template.description ?? undefined
+  state.bezorgerProfileId = template.bezorgerProfileId
+  stopIds.value = [...template.stops]
+    .sort((a, b) => a.sequence - b.sequence)
+    .map(stop => stop.apothekerProfileId)
+  selectedPharmacyId.value = undefined
+  formError.value = null
+  successMessage.value = null
+  showForm.value = true
+}
+
+function closeForm() {
+  showForm.value = false
+  resetForm()
+}
+
+function addStop() {
+  if (!selectedPharmacyId.value) {
+    return
+  }
+
+  if (stopIds.value.includes(selectedPharmacyId.value)) {
+    formError.value = 'Deze apotheek staat al in de route.'
+    return
+  }
+
+  stopIds.value = [...stopIds.value, selectedPharmacyId.value]
+  selectedPharmacyId.value = undefined
+  formError.value = null
+}
+
+function removeStop(index: number) {
+  stopIds.value = stopIds.value.filter((_, stopIndex) => stopIndex !== index)
+}
+
+function moveStop(index: number, direction: -1 | 1) {
+  const target = index + direction
+
+  if (target < 0 || target >= stopIds.value.length) {
+    return
+  }
+
+  const next = [...stopIds.value]
+  const current = next[index]
+  const swapWith = next[target]
+
+  if (current === undefined || swapWith === undefined) {
+    return
+  }
+
+  next[index] = swapWith
+  next[target] = current
+  stopIds.value = next
+}
+
+function mapFormError(error: unknown): string {
+  if (isRouteTemplateAlreadyExistsError(error)) {
+    return 'Er bestaat al een routetemplate met deze naam.'
+  }
+
+  if (isRouteTemplateDuplicateStopError(error)) {
+    return 'Dubbele apotheken in één template zijn niet toegestaan.'
+  }
+
+  if (isRouteTemplateEmptyStopsError(error)) {
+    return 'Voeg minstens één apotheekstop toe.'
+  }
+
+  return mapGraphQLError(error)
+}
+
+async function onSubmit(event: FormSubmitEvent<TemplateForm>) {
+  if (stopIds.value.length === 0) {
+    formError.value = 'Voeg minstens één apotheekstop toe.'
+    return
+  }
+
+  saving.value = true
+  formError.value = null
+  successMessage.value = null
+
+  try {
+    const payload = {
+      name: event.data.name,
+      description: event.data.description ?? null,
+      bezorgerProfileId: event.data.bezorgerProfileId,
+      stops: stopIds.value.map(apothekerProfileId => ({ apothekerProfileId })),
+    }
+
+    if (editingTemplate.value) {
+      await updateRouteTemplate(editingTemplate.value.id, payload)
+      successMessage.value = 'Routetemplate bijgewerkt.'
+    } else {
+      await createRouteTemplate(payload)
+      successMessage.value = 'Routetemplate aangemaakt.'
+    }
+
+    closeForm()
+    await reloadTemplates()
+  } catch (error: unknown) {
+    formError.value = mapFormError(error)
+  } finally {
+    saving.value = false
+  }
+}
+
+async function toggleActive(template: RouteTemplateListItem) {
+  togglingId.value = template.id
+  formError.value = null
+
+  try {
+    await setRouteTemplateActive(template.id, !template.active)
+    successMessage.value = template.active
+      ? 'Routetemplate gedeactiveerd.'
+      : 'Routetemplate geactiveerd.'
+    await reloadTemplates()
+  } catch (error: unknown) {
+    formError.value = mapGraphQLError(error)
+  } finally {
+    togglingId.value = null
+  }
+}
+
+function courierLabel(bezorgerProfileId: string): string {
+  const profile = findBezorgerProfile(bezorgerProfileId)
+  return profile?.displayName ?? bezorgerProfileId
+}
+
+function stopSummary(template: RouteTemplateListItem): string {
+  return [...template.stops]
+    .sort((a, b) => a.sequence - b.sequence)
+    .map(stop => {
+      const profile = findApothekerProfile(stop.apothekerProfileId)
+      return profile
+        ? `${stop.sequence}. ${profile.pharmacyName}`
+        : `${stop.sequence}. ${stop.apothekerProfileId}`
+    })
+    .join(' → ')
+}
+</script>
+
+<template>
+  <div class="space-y-6">
+    <div class="flex flex-wrap items-center justify-between gap-3">
+      <h2 class="text-lg font-semibold">Routetemplates</h2>
+      <div class="flex flex-wrap items-center gap-3">
+        <UButton
+          size="sm"
+          :variant="includeInactive ? 'soft' : 'ghost'"
+          color="neutral"
+          @click="toggleIncludeInactive"
+        >
+          {{ includeInactive ? 'Incl. inactief' : 'Alleen actief' }}
+        </UButton>
+        <UButton size="sm" @click="openCreateForm">Nieuwe template</UButton>
+      </div>
+    </div>
+
+    <UAlert
+      v-if="successMessage"
+      color="success"
+      variant="subtle"
+      :title="successMessage"
+    />
+
+    <UAlert
+      v-if="formError && !showForm"
+      color="error"
+      variant="subtle"
+      :title="formError"
+    />
+
+    <CommonLoadingSkeleton
+      v-if="(loading || profilesLoading) && templates.length === 0"
+    />
+
+    <CommonErrorState
+      v-else-if="errorMessage && templates.length === 0"
+      title="Routetemplates laden mislukt"
+      :description="errorMessage"
+    />
+
+    <CommonEmptyState
+      v-else-if="templates.length === 0"
+      title="Geen routetemplates"
+      description="Maak een template met een bezorger en geordende apotheekstops."
+    />
+
+    <div v-else class="space-y-4">
+      <UCard v-for="template in templates" :key="template.id">
+        <div
+          class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between"
+        >
+          <div class="space-y-2 text-sm">
+            <div class="flex flex-wrap items-center gap-2">
+              <h3 class="font-semibold">{{ template.name }}</h3>
+              <UBadge
+                :color="template.active ? 'success' : 'neutral'"
+                variant="subtle"
+              >
+                {{ template.active ? 'Actief' : 'Inactief' }}
+              </UBadge>
+            </div>
+            <p>{{ template.description || 'Geen beschrijving' }}</p>
+            <p>
+              <span class="font-medium">Bezorger:</span>
+              {{ courierLabel(template.bezorgerProfileId) }}
+            </p>
+            <p>
+              <span class="font-medium">Stops:</span>
+              {{ stopSummary(template) }}
+            </p>
+          </div>
+
+          <div class="flex flex-wrap gap-2">
+            <UButton
+              size="sm"
+              variant="outline"
+              @click="openEditForm(template)"
+            >
+              Bewerken
+            </UButton>
+            <UButton
+              size="sm"
+              :color="template.active ? 'warning' : 'success'"
+              variant="soft"
+              :loading="togglingId === template.id"
+              @click="toggleActive(template)"
+            >
+              {{ template.active ? 'Deactiveren' : 'Activeren' }}
+            </UButton>
+          </div>
+        </div>
+      </UCard>
+    </div>
+
+    <UModal v-model:open="showForm" :title="formTitle">
+      <template #body>
+        <UForm
+          :schema="schema"
+          :state="state"
+          class="space-y-4"
+          @submit="onSubmit"
+        >
+          <UFormField label="Naam" name="name">
+            <UInput v-model="state.name" autocomplete="off" />
+          </UFormField>
+
+          <UFormField label="Beschrijving" name="description">
+            <UTextarea v-model="state.description" :rows="2" />
+          </UFormField>
+
+          <UFormField label="Bezorger" name="bezorgerProfileId">
+            <USelect
+              v-model="state.bezorgerProfileId"
+              :items="courierOptions"
+              placeholder="Kies een bezorger"
+              class="w-full"
+            />
+          </UFormField>
+
+          <div class="space-y-3">
+            <p class="text-sm font-medium">Apotheekstops</p>
+
+            <div class="flex flex-col gap-2 sm:flex-row">
+              <USelect
+                v-model="selectedPharmacyId"
+                :items="availablePharmacyOptions"
+                placeholder="Kies een apotheek"
+                class="w-full"
+              />
+              <UButton
+                type="button"
+                variant="soft"
+                :disabled="!selectedPharmacyId"
+                @click="addStop"
+              >
+                Toevoegen
+              </UButton>
+            </div>
+
+            <CommonEmptyState
+              v-if="orderedStops.length === 0"
+              title="Nog geen stops"
+              description="Voeg minstens één apotheek toe en orden met omhoog/omlaag."
+            />
+
+            <ul v-else class="space-y-2">
+              <li
+                v-for="(stop, index) in orderedStops"
+                :key="stop.id"
+                class="flex flex-col gap-2 rounded-md border border-default p-3 text-sm sm:flex-row sm:items-center sm:justify-between"
+              >
+                <div>
+                  <span class="font-medium">{{ stop.sequence }}.</span>
+                  {{ stop.label }}
+                </div>
+                <div class="flex flex-wrap gap-2">
+                  <UButton
+                    size="xs"
+                    variant="ghost"
+                    :disabled="index === 0"
+                    @click="moveStop(index, -1)"
+                  >
+                    Omhoog
+                  </UButton>
+                  <UButton
+                    size="xs"
+                    variant="ghost"
+                    :disabled="index === orderedStops.length - 1"
+                    @click="moveStop(index, 1)"
+                  >
+                    Omlaag
+                  </UButton>
+                  <UButton
+                    size="xs"
+                    color="error"
+                    variant="soft"
+                    @click="removeStop(index)"
+                  >
+                    Verwijderen
+                  </UButton>
+                </div>
+              </li>
+            </ul>
+          </div>
+
+          <UAlert
+            v-if="formError"
+            color="error"
+            variant="subtle"
+            :title="formError"
+          />
+
+          <div class="flex gap-2">
+            <UButton type="submit" :loading="saving">Opslaan</UButton>
+            <UButton color="neutral" variant="ghost" @click="closeForm">
+              Annuleren
+            </UButton>
+          </div>
+        </UForm>
+      </template>
+    </UModal>
+  </div>
+</template>

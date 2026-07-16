@@ -28,6 +28,7 @@ import { useAdminNotifications } from '@/composables/useAdminNotifications'
 const adminNavLinks: AppShellLink[] = [
   { label: 'Dashboard', to: '/admin' },
   { label: 'Bestellingen', to: '/admin/orders' },
+  { label: 'Routetemplates', to: '/admin/route-templates' },
   { label: 'Vaccins', to: '/admin/vaccines' },
   { label: 'Voorraad', to: '/admin/stock' },
   { label: 'Instellingen', to: '/admin/settings' },

@@ -7,19 +7,14 @@ screens.
 
 ## Current status
 
-**Phase 5 profile prerequisite complete (corrective).** Application users now have
-role-specific profiles required for routing:
+**Phase 11 complete — reusable delivery route templates.** ADMIN can create,
+edit, activate, and deactivate `RouteTemplate` documents with ordered pharmacy
+stops. Templates reference `BezorgerProfile.id` and `ApothekerProfile.id` only
+(no duplicated pharmacy name/address). Orders remain linked by
+`Order.apothekerId` → `User.id`.
 
-- `Address` embedded value (`street`, `houseNumber`, `postalCode`, `city`, `country`)
-- `ApothekerProfile` (pharmacy name + address, linked by `userId` → `User.id`)
-- `BezorgerProfile` (`displayName`, optional `vehicleLabel`, linked by `userId`)
-
-**Orders remain linked by `Order.apothekerId` → `User.id`.** Route templates
-(Phase 11) will reference `ApothekerProfile.id` and resolve orders through:
-
-`RouteTemplateStop.apothekerProfileId` → `ApothekerProfile.userId` → `Order.apothekerId`.
-
-**Next phase:** Phase 11 — route templates (see `docs/implementation-roadmap.md`).
+**Next phase:** Phase 12 — daily route generation from templates (see
+`docs/implementation-roadmap.md`).
 
 ## Planned stack
 
@@ -871,6 +866,69 @@ Without multi-document MongoDB transactions, a **process crash** between balance
 8. Cancel an eligible `PENDING` order — no stock change, one cancellation notification.
 9. Verify daily overview and weekly statistics; confirm `adminOperationsFeed` events.
 10. Confirm APOTHEKER cannot call ADMIN mutations; BEZORGER cannot subscribe to `adminOperationsFeed`.
+
+## Route templates (Phase 11)
+
+Reusable delivery plans stored as `RouteTemplate` with embedded
+`RouteTemplateStop` entries. Templates are configuration only — no daily
+`DeliveryRoute`, preview, order assignment, or stock side effects.
+
+### Domain model
+
+| Field / entity       | Notes                                                               |
+| -------------------- | ------------------------------------------------------------------- |
+| `RouteTemplate.name` | Display name (trimmed)                                              |
+| `normalizedName`     | Unique key: trim + collapse whitespace + case-fold (not client-set) |
+| `description`        | Optional                                                            |
+| `active`             | Soft lifecycle; no hard delete                                      |
+| `bezorgerProfileId`  | → `BezorgerProfile.id`                                              |
+| `stops[]`            | Embedded; `apothekerProfileId` + server `sequence` `1..n`           |
+| Audit                | `createdAt` / `updatedAt` / `createdByUserId` / `updatedByUserId`   |
+
+Ownership bridge for later generation:
+
+`RouteTemplateStop.apothekerProfileId` → `ApothekerProfile.userId` → `Order.apothekerId`.
+
+### Validation
+
+- ADMIN-only GraphQL CRUD
+- Unique normalized names (duplicate-key mapped to `ROUTE_TEMPLATE_ALREADY_EXISTS`)
+- Courier and pharmacist profile IDs must exist
+- No duplicate pharmacies in one template (`ROUTE_TEMPLATE_DUPLICATE_STOP`)
+- At least one stop required (`ROUTE_TEMPLATE_EMPTY_STOPS`)
+- Sequence rewritten from array order; responses ordered by `sequence`
+- Clients cannot supply audit identity, timestamps, `normalizedName`, or sequence
+
+### GraphQL operations
+
+| Operation                                          | Auth  | Purpose                             |
+| -------------------------------------------------- | ----- | ----------------------------------- |
+| `routeTemplates(includeInactive: Boolean = false)` | ADMIN | List templates                      |
+| `routeTemplate(id)`                                | ADMIN | Single template                     |
+| `createRouteTemplate(input)`                       | ADMIN | Create with courier + stops         |
+| `updateRouteTemplate(id, input)`                   | ADMIN | Edit name/description/courier/stops |
+| `setRouteTemplateActive(id, active)`               | ADMIN | Activate / deactivate               |
+
+### PWA
+
+- `/admin/route-templates` — list, create/edit, reorder stops (move up/down),
+  activate/deactivate, optional inactive inclusion
+- Display pharmacy name/address and courier display name from profile queries
+- Persist only profile IDs
+
+### Manual runtime test (Phase 11)
+
+1. Create at least two `ApothekerProfile`s and one `BezorgerProfile`.
+2. Log in as ADMIN → `/admin/route-templates`.
+3. Create a template with one courier and at least three pharmacies.
+4. Refresh — confirm persistence and stop order.
+5. Reorder stops and refresh.
+6. Edit name, description, courier, and stops.
+7. Confirm duplicate name with different casing is rejected.
+8. Confirm duplicate pharmacy stop is rejected.
+9. Deactivate and reactivate the template.
+10. Confirm APOTHEKER and BEZORGER cannot access template operations.
+11. Confirm orders, stock, notifications, and delivery transitions are unchanged.
 
 ## CI
 

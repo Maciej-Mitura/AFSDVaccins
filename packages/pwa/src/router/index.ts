@@ -163,6 +163,12 @@ const router = createRouter({
           name: 'admin-orders',
           component: () => import('@/views/admin/ViewAdminOrders.vue'),
         },
+        {
+          path: 'route-templates',
+          name: 'admin-route-templates',
+          component: () =>
+            import('@/views/admin/ViewAdminRouteTemplates.vue'),
+        },
       ],
     },
     {
