@@ -33,6 +33,9 @@ const orderServiceProvider = isSchemaGeneration
         cancelOrder: () => Promise.resolve(null),
         getAdminDailyOrderOverview: () => Promise.resolve(null),
         getAdminWeeklyStatistics: () => Promise.resolve(null),
+        findQualifyingOrdersForPharmacist: () => Promise.resolve([]),
+        planOrdersForGeneratedRoute: () => Promise.resolve([]),
+        publishPlannedOrderUpdates: () => Promise.resolve(),
       },
     }
   : OrderService

@@ -605,6 +605,78 @@ export class OrderService {
     return saved
   }
 
+  /**
+   * Qualifying orders for route generation: matching deliveryDate, pharmacist,
+   * and status PENDING or PLANNED (excludes CANCELLED and DELIVERED).
+   */
+  async findQualifyingOrdersForPharmacist(
+    apothekerUserId: string,
+    deliveryDate: string,
+  ): Promise<Order[]> {
+    const orders = await this.orderRepository.find({
+      where: {
+        apothekerId: apothekerUserId,
+        deliveryDate,
+      },
+    })
+
+    const qualifying = orders.filter(
+      order =>
+        order.status === OrderStatus.PENDING ||
+        order.status === OrderStatus.PLANNED,
+    )
+
+    return this.orderNormalizationService.normalizeOrdersIfNeeded(qualifying)
+  }
+
+  /**
+   * Persists PENDING → PLANNED for route generation without publishing realtime
+   * events. Callers must publish orderUpdated only after DeliveryRoute upsert.
+   */
+  async planOrdersForGeneratedRoute(
+    admin: User,
+    orderIds: string[],
+  ): Promise<Order[]> {
+    const changedOrders: Order[] = []
+    const uniqueIds = [...new Set(orderIds)]
+
+    for (const orderId of uniqueIds) {
+      const order = await this.requireNormalizedById(orderId)
+
+      if (order.status === OrderStatus.PLANNED) {
+        continue
+      }
+
+      if (!canTransitionOrderStatus(order.status, OrderStatus.PLANNED)) {
+        throw new InvalidOrderStatusTransitionException(
+          order.status,
+          OrderStatus.PLANNED,
+        )
+      }
+
+      const previousStatus = order.status
+      order.status = OrderStatus.PLANNED
+      this.appendStatusHistory(
+        order,
+        previousStatus,
+        OrderStatus.PLANNED,
+        admin._id.toString(),
+        'Included in generated delivery route',
+      )
+
+      const saved = await this.orderRepository.save(order)
+      changedOrders.push(saved)
+    }
+
+    return changedOrders
+  }
+
+  async publishPlannedOrderUpdates(orders: Order[]): Promise<void> {
+    for (const order of orders) {
+      await this.orderEventsService.publishOrderStatusChanged(order)
+    }
+  }
+
   async cancelOrder(
     admin: User,
     id: string,

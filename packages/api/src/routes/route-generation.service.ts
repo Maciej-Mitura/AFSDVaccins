@@ -1,0 +1,313 @@
+import { Injectable } from '@nestjs/common'
+import { InjectRepository } from '@nestjs/typeorm'
+import { MongoRepository } from 'typeorm'
+
+import { tryParseGraphqlObjectId } from '../common/mongodb/graphql-object-id.util'
+import {
+  formatLocalDate,
+  getZonedDateParts,
+} from '../order/delivery-date.util'
+import { Order } from '../order/order.entity'
+import { OrderLine } from '../order/order-line.entity'
+import { OrderService } from '../order/order.service'
+import { ApothekerProfile } from '../profile/apotheker/apotheker-profile.entity'
+import { ApothekerProfileService } from '../profile/apotheker/apotheker-profile.service'
+import { BezorgerProfileService } from '../profile/bezorger/bezorger-profile.service'
+import { ApothekerProfileNotFoundException } from '../profile/exceptions/profile.exceptions'
+import { RouteTemplateNotFoundException } from '../route-templates/exceptions/route-template.exceptions'
+import { RouteTemplatesService } from '../route-templates/route-templates.service'
+import { SettingsService } from '../settings/settings.service'
+import { User } from '../user/user.entity'
+import { isValidDeliveryDateString } from './delivery-date-validation.util'
+import { DeliveryRoute } from './delivery-route.entity'
+import { DeliveryRouteEventsService } from './delivery-route-events.service'
+import { DeliveryStop } from './delivery-stop.embed'
+import {
+  DeliveryRouteNotRegenerableException,
+  InvalidDeliveryDateException,
+  RouteTemplateInactiveException,
+} from './exceptions/delivery-route.exceptions'
+import { OrderLineSnapshot } from './order-line-snapshot.embed'
+import { RouteStatus } from './route-status.enum'
+import { RouteStatusHistoryEntry } from './route-status-history.type'
+
+function isDuplicateKeyError(error: unknown): boolean {
+  return (
+    typeof error === 'object' &&
+    error !== null &&
+    'code' in error &&
+    (error as { code?: number }).code === 11000
+  )
+}
+
+function copyAddress(
+  address: ApothekerProfile['address'],
+): DeliveryStop['address'] {
+  return {
+    street: address.street,
+    houseNumber: address.houseNumber,
+    postalCode: address.postalCode,
+    city: address.city,
+    country: address.country,
+  }
+}
+
+function aggregateOrderLines(orders: Order[]): OrderLineSnapshot[] {
+  const byVaccine = new Map<string, OrderLineSnapshot>()
+
+  for (const order of orders) {
+    for (const line of order.orderLines ?? []) {
+      const existing = byVaccine.get(line.vaccineId)
+
+      if (existing) {
+        existing.quantity += line.quantity
+      } else {
+        byVaccine.set(line.vaccineId, {
+          vaccineId: line.vaccineId,
+          vaccineName: line.vaccineName,
+          manufacturer: line.manufacturer,
+          quantity: line.quantity,
+        })
+      }
+    }
+  }
+
+  return [...byVaccine.values()]
+}
+
+function sumOrderQuantities(orders: Order[]): number {
+  return orders.reduce((total, order) => {
+    if (typeof order.totalQuantity === 'number') {
+      return total + order.totalQuantity
+    }
+
+    return (
+      total +
+      (order.orderLines ?? []).reduce(
+        (lineTotal: number, line: OrderLine) => lineTotal + line.quantity,
+        0,
+      )
+    )
+  }, 0)
+}
+
+@Injectable()
+export class RouteGenerationService {
+  constructor(
+    @InjectRepository(DeliveryRoute)
+    private readonly deliveryRouteRepository: MongoRepository<DeliveryRoute>,
+    private readonly routeTemplatesService: RouteTemplatesService,
+    private readonly apothekerProfileService: ApothekerProfileService,
+    private readonly bezorgerProfileService: BezorgerProfileService,
+    private readonly orderService: OrderService,
+    private readonly settingsService: SettingsService,
+    private readonly deliveryRouteEventsService: DeliveryRouteEventsService,
+  ) {}
+
+  async generateDeliveryRoute(
+    admin: User,
+    routeTemplateId: string,
+    deliveryDate: string,
+  ): Promise<DeliveryRoute> {
+    if (!isValidDeliveryDateString(deliveryDate)) {
+      throw new InvalidDeliveryDateException()
+    }
+
+    const templateIdParsed = tryParseGraphqlObjectId(routeTemplateId)
+
+    if (!templateIdParsed) {
+      throw new RouteTemplateNotFoundException()
+    }
+
+    const template = await this.routeTemplatesService.findRouteTemplateById(
+      templateIdParsed.stringValue,
+    )
+
+    if (!template.active) {
+      throw new RouteTemplateInactiveException()
+    }
+
+    await this.bezorgerProfileService.findBezorgerProfileById(
+      template.bezorgerProfileId,
+    )
+
+    const orderedTemplateStops = [...(template.stops ?? [])].sort(
+      (a, b) => a.sequence - b.sequence,
+    )
+
+    const stops: DeliveryStop[] = []
+    const skippedApothekerProfileIds: string[] = []
+    const allOrderIds: string[] = []
+
+    for (const templateStop of orderedTemplateStops) {
+      const profileParsed = tryParseGraphqlObjectId(
+        templateStop.apothekerProfileId,
+      )
+
+      if (!profileParsed) {
+        throw new ApothekerProfileNotFoundException()
+      }
+
+      const profile =
+        await this.apothekerProfileService.findApothekerProfileById(
+          profileParsed.stringValue,
+        )
+
+      const qualifyingOrders =
+        await this.orderService.findQualifyingOrdersForPharmacist(
+          profile.userId.toString(),
+          deliveryDate,
+        )
+
+      if (qualifyingOrders.length === 0) {
+        skippedApothekerProfileIds.push(profile.id)
+        continue
+      }
+
+      const orderIds = qualifyingOrders.map(order => order.id)
+      allOrderIds.push(...orderIds)
+
+      stops.push({
+        sequence: stops.length + 1,
+        apothekerProfileId: profile.id,
+        apothekerUserId: profile.userId.toString(),
+        pharmacyName: profile.pharmacyName,
+        address: copyAddress(profile.address),
+        orderIds,
+        orderCount: orderIds.length,
+        totalQuantity: sumOrderQuantities(qualifyingOrders),
+        lines: aggregateOrderLines(qualifyingOrders),
+      })
+    }
+
+    const existing = await this.findByBezorgerAndDate(
+      template.bezorgerProfileId,
+      deliveryDate,
+    )
+
+    if (existing) {
+      this.assertRegenerable(existing)
+    }
+
+    const changedOrders = await this.orderService.planOrdersForGeneratedRoute(
+      admin,
+      allOrderIds,
+    )
+
+    const now = new Date()
+    const adminId = admin._id.toString()
+
+    let saved: DeliveryRoute
+
+    if (existing) {
+      const previousStatus = existing.status
+      existing.routeTemplateId = template.id
+      existing.stops = stops
+      existing.skippedApothekerProfileIds = skippedApothekerProfileIds
+      existing.status = RouteStatus.ASSIGNED
+      existing.generatedAt = now
+      existing.generatedByUserId = adminId
+
+      if (previousStatus !== RouteStatus.ASSIGNED) {
+        if (!Array.isArray(existing.statusHistory)) {
+          existing.statusHistory = []
+        }
+
+        existing.statusHistory.push({
+          fromStatus: previousStatus,
+          toStatus: RouteStatus.ASSIGNED,
+          changedAt: now,
+          changedByUserId: adminId,
+          reason: 'Route regenerated',
+        })
+      }
+
+      saved = await this.deliveryRouteRepository.save(existing)
+    } else {
+      const route = this.deliveryRouteRepository.create({
+        routeTemplateId: template.id,
+        bezorgerProfileId: template.bezorgerProfileId,
+        deliveryDate,
+        status: RouteStatus.ASSIGNED,
+        stops,
+        skippedApothekerProfileIds,
+        statusHistory: [this.buildInitialHistoryEntry(adminId, now)],
+        generatedAt: now,
+        generatedByUserId: adminId,
+      })
+
+      try {
+        saved = await this.deliveryRouteRepository.save(route)
+      } catch (error) {
+        if (!isDuplicateKeyError(error)) {
+          throw error
+        }
+
+        const raced = await this.findByBezorgerAndDate(
+          template.bezorgerProfileId,
+          deliveryDate,
+        )
+
+        if (!raced) {
+          throw error
+        }
+
+        this.assertRegenerable(raced)
+        raced.routeTemplateId = template.id
+        raced.stops = stops
+        raced.skippedApothekerProfileIds = skippedApothekerProfileIds
+        raced.status = RouteStatus.ASSIGNED
+        raced.generatedAt = now
+        raced.generatedByUserId = adminId
+        saved = await this.deliveryRouteRepository.save(raced)
+      }
+    }
+
+    await this.orderService.publishPlannedOrderUpdates(changedOrders)
+    await this.deliveryRouteEventsService.publishBezorgerRouteUpdated(saved)
+
+    return saved
+  }
+
+  async getLocalTodayDeliveryDate(): Promise<string> {
+    const settings = await this.settingsService.getApplicationSettings()
+    const local = getZonedDateParts(new Date(), settings.timezone)
+    return formatLocalDate(local)
+  }
+
+  async findByBezorgerAndDate(
+    bezorgerProfileId: string,
+    deliveryDate: string,
+  ): Promise<DeliveryRoute | null> {
+    return this.deliveryRouteRepository.findOne({
+      where: {
+        bezorgerProfileId,
+        deliveryDate,
+      },
+    })
+  }
+
+  private assertRegenerable(route: DeliveryRoute): void {
+    if (
+      route.status === RouteStatus.ASSIGNED ||
+      route.status === RouteStatus.CANCELLED
+    ) {
+      return
+    }
+
+    throw new DeliveryRouteNotRegenerableException(route.status)
+  }
+
+  private buildInitialHistoryEntry(
+    changedByUserId: string,
+    changedAt: Date,
+  ): RouteStatusHistoryEntry {
+    return {
+      fromStatus: null,
+      toStatus: RouteStatus.ASSIGNED,
+      changedAt,
+      changedByUserId,
+      reason: 'Route generated',
+    }
+  }
+}

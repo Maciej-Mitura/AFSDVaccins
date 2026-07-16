@@ -7,14 +7,13 @@ screens.
 
 ## Current status
 
-**Phase 11 complete — reusable delivery route templates.** ADMIN can create,
-edit, activate, and deactivate `RouteTemplate` documents with ordered pharmacy
-stops. Templates reference `BezorgerProfile.id` and `ApothekerProfile.id` only
-(no duplicated pharmacy name/address). Orders remain linked by
-`Order.apothekerId` → `User.id`.
+**Phase 12 complete — delivery-route generation.** ADMIN generates daily
+`DeliveryRoute` documents from active `RouteTemplate`s. Pharmacies without
+qualifying orders are skipped; included `PENDING` orders become `PLANNED`.
+BEZORGER sees today’s persisted route (snapshotted stops) with live
+`bezorgerRouteUpdates`.
 
-**Next phase:** Phase 12 — daily route generation from templates (see
-`docs/implementation-roadmap.md`).
+**Next phase:** Phase 13 — tomorrow `RoutePreview` (computed, not persisted).
 
 ## Planned stack
 
@@ -929,6 +928,124 @@ Ownership bridge for later generation:
 9. Deactivate and reactivate the template.
 10. Confirm APOTHEKER and BEZORGER cannot access template operations.
 11. Confirm orders, stock, notifications, and delivery transitions are unchanged.
+
+## Delivery routes (Phase 12)
+
+Persisted daily plans. A `RouteTemplate` is reusable configuration; a
+`DeliveryRoute` is the courier’s plan for one calendar date.
+
+### DeliveryRoute versus RouteTemplate
+
+|             | `RouteTemplate`                    | `DeliveryRoute`                                  |
+| ----------- | ---------------------------------- | ------------------------------------------------ |
+| Purpose     | Reusable stop order + courier link | One day plan for one courier                     |
+| Persistence | Long-lived config                  | Upserted per `(bezorgerProfileId, deliveryDate)` |
+| Stops       | Profile IDs only                   | **Snapshots** of pharmacy name, address, doses   |
+| Orders      | None                               | Qualifying orders → `PLANNED`                    |
+
+### Snapshot rationale
+
+Each `DeliveryStop` copies pharmacy name and full `Address` at generation time.
+Later edits to `ApothekerProfile` do not rewrite historical routes. Dose lines
+are aggregated `OrderLineSnapshot`s (`vaccineId`, `vaccineName`, `manufacturer`,
+`quantity`) — full `Order` entities are not embedded.
+
+### Qualifying orders and skip rules
+
+An order qualifies when:
+
+- `deliveryDate` matches the requested `YYYY-MM-DD`;
+- ownership: `Order.apothekerId` = `ApothekerProfile.userId` for the template stop;
+- status is `PENDING` or `PLANNED`;
+- not `CANCELLED` or `DELIVERED`.
+
+Template stops without qualifying orders are omitted from `stops` and recorded in
+`skippedApothekerProfileIds` (skipped **pharmacies**, not order IDs). Relative
+template order is preserved; generated `sequence` is renormalized to `1..n`.
+
+If every stop is skipped, an **empty route** is still persisted (`stops: []`) with
+the full skipped list (FLOW-006). ADMIN and BEZORGER UIs show a meaningful empty
+state — not an error.
+
+### Order.apothekerId profile bridge
+
+```
+RouteTemplateStop.apothekerProfileId
+  → ApothekerProfile.userId
+  → Order.apothekerId
+```
+
+`Order.apothekerId` remains a **User** id; it is not rewritten to a profile id.
+
+### Route uniqueness and regeneration
+
+Unique compound index `(bezorgerProfileId, deliveryDate)` — at most one route per
+courier per date. Regeneration updates the same document (stable id), refreshes
+snapshots, and updates `generatedAt` / `generatedByUserId`.
+
+Regeneration is allowed for `ASSIGNED` and `CANCELLED` (architecture §6.2).
+`IN_PROGRESS` and `COMPLETED` are rejected (`DELIVERY_ROUTE_NOT_REGENERABLE`).
+Orders that leave the route are **not** reverted from `PLANNED` to `PENDING`.
+
+Initial `statusHistory` records `ASSIGNED` on first create (Phase 14 compatibility).
+Clients cannot supply history metadata.
+
+### PLANNED transition
+
+Included orders move `PENDING → PLANNED` via `OrderService.planOrdersForGeneratedRoute`
+(shared FSM / history logic). Already `PLANNED` orders stay planned without a
+duplicate history entry. No stock change and no delivery notification.
+
+Realtime publishing is deferred until the `DeliveryRoute` upsert succeeds:
+
+1. persist order transitions silently;
+2. upsert route;
+3. publish `orderUpdated` for orders that actually changed;
+4. publish `bezorgerRouteUpdates`.
+
+If route persistence fails, **no** order or route realtime events are published.
+
+### Courier ownership and realtime
+
+| Operation                          | Auth                                                              |
+| ---------------------------------- | ----------------------------------------------------------------- |
+| `generateDeliveryRoute`            | ADMIN                                                             |
+| `deliveryRoutes` / `deliveryRoute` | ADMIN                                                             |
+| `myTodayRoute`                     | BEZORGER (own profile + Europe/Brussels today)                    |
+| `bezorgerRouteUpdates`             | BEZORGER; filter `route.bezorgerProfileId ===` subscriber profile |
+
+Reconnect refetches `myTodayRoute`.
+
+### Consistency limitation
+
+There is no multi-document MongoDB transaction. A crash after orders are saved as
+`PLANNED` but before the route upsert can leave planned orders without an updated
+route snapshot. Regeneration heals that state. Failed route writes do not emit
+realtime events.
+
+### PWA
+
+- `/admin/route-planning` — date + active template, generate/regenerate with
+  confirmation, stop list, skipped/empty-route messaging, routes for the date
+- `/bezorger/today` — mobile-first today route, snapshotted address + doses,
+  empty states, live subscription
+
+### Manual runtime test (Phase 12)
+
+1. Ensure one ADMIN, two BEZORGER profiles, several APOTHEKER profiles, active
+   templates for both couriers, and a mix of qualifying / non-qualifying orders.
+2. Log in as ADMIN → `/admin/route-planning`.
+3. Generate a route for a selected date.
+4. Confirm only pharmacies with qualifying orders appear; skipped list is set.
+5. Confirm included orders become `PLANNED` and stock is unchanged.
+6. Inspect MongoDB: one `DeliveryRoute`, correct courier/date, address snapshots,
+   order IDs and quantities.
+7. Regenerate — same document updated, no duplicate.
+8. Cancel or add a qualifying order, regenerate, confirm recomputation.
+9. Log in as the assigned BEZORGER → `/bezorger/today` shows the route.
+10. Keep the page open; regenerate as ADMIN — realtime update without refresh.
+11. Log in as the other BEZORGER — cannot see the first courier’s route.
+12. Confirm APOTHEKER cannot generate routes; delivery marking still works.
 
 ## CI
 

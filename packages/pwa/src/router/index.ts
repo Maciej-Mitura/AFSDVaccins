@@ -169,6 +169,12 @@ const router = createRouter({
           component: () =>
             import('@/views/admin/ViewAdminRouteTemplates.vue'),
         },
+        {
+          path: 'route-planning',
+          name: 'admin-route-planning',
+          component: () =>
+            import('@/views/admin/ViewAdminRoutePlanning.vue'),
+        },
       ],
     },
     {
@@ -185,6 +191,12 @@ const router = createRouter({
           path: '',
           name: 'bezorger-dashboard',
           component: () => import('@/views/bezorger/ViewBezorgerDashboard.vue'),
+        },
+        {
+          path: 'today',
+          name: 'bezorger-today',
+          component: () =>
+            import('@/views/bezorger/ViewBezorgerTodayRoute.vue'),
         },
       ],
     },

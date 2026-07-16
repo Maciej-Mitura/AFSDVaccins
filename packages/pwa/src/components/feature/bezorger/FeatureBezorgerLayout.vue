@@ -11,6 +11,7 @@ import CommonAppShell, {
 
 const bezorgerNavLinks: AppShellLink[] = [
   { label: 'Dashboard', to: '/bezorger' },
+  { label: 'Route vandaag', to: '/bezorger/today' },
   { label: 'Profiel', to: '/profile' },
 ]
 </script>

@@ -221,6 +221,79 @@ describe('OrderService admin lifecycle', () => {
     expect(orderEventsService.publishOrderStatusChanged).not.toHaveBeenCalled()
   })
 
+  it('planOrdersForGeneratedRoute transitions PENDING without publishing', async () => {
+    const order = baseOrder(OrderStatus.PENDING)
+    repository.findOne.mockResolvedValue(order)
+
+    const changed = await service.planOrdersForGeneratedRoute(admin, [orderId])
+
+    expect(changed).toHaveLength(1)
+    expect(changed[0].status).toBe(OrderStatus.PLANNED)
+    expect(changed[0].statusHistory?.at(-1)?.changedByUserId).toBe(
+      admin._id.toString(),
+    )
+    expect(stockService.applyDeliveryDecrement).not.toHaveBeenCalled()
+    expect(orderEventsService.publishOrderStatusChanged).not.toHaveBeenCalled()
+  })
+
+  it('planOrdersForGeneratedRoute skips already PLANNED orders', async () => {
+    const order = baseOrder(OrderStatus.PLANNED)
+    order.statusHistory?.push({
+      fromStatus: OrderStatus.PENDING,
+      toStatus: OrderStatus.PLANNED,
+      changedAt: new Date('2026-07-14T11:00:00.000Z'),
+      changedByUserId: admin._id.toString(),
+    })
+    repository.findOne.mockResolvedValue(order)
+
+    const changed = await service.planOrdersForGeneratedRoute(admin, [orderId])
+
+    expect(changed).toHaveLength(0)
+    expect(repository.save).not.toHaveBeenCalled()
+    expect(orderEventsService.publishOrderStatusChanged).not.toHaveBeenCalled()
+  })
+
+  it('publishPlannedOrderUpdates emits deferred order events', async () => {
+    const order = baseOrder(OrderStatus.PLANNED)
+
+    await service.publishPlannedOrderUpdates([order])
+
+    expect(orderEventsService.publishOrderStatusChanged).toHaveBeenCalledWith(
+      order,
+    )
+  })
+
+  it('findQualifyingOrdersForPharmacist excludes cancelled and delivered', async () => {
+    const pending = baseOrder(OrderStatus.PENDING)
+    const planned = {
+      ...baseOrder(OrderStatus.PLANNED),
+      _id: 'planned-id',
+      id: 'planned-id',
+    }
+    const cancelled = {
+      ...baseOrder(OrderStatus.CANCELLED),
+      _id: 'cancelled-id',
+      id: 'cancelled-id',
+    }
+    const delivered = {
+      ...baseOrder(OrderStatus.DELIVERED),
+      _id: 'delivered-id',
+      id: 'delivered-id',
+    }
+
+    repository.find.mockResolvedValue([pending, planned, cancelled, delivered])
+    normalizationService.normalizeOrdersIfNeeded.mockImplementation(orders =>
+      Promise.resolve(orders),
+    )
+
+    const result = await service.findQualifyingOrdersForPharmacist(
+      pending.apothekerId,
+      '2026-07-15',
+    )
+
+    expect(result.map(order => order.id)).toEqual([orderId, 'planned-id'])
+  })
+
   it('cancels eligible PENDING orders without stock changes', async () => {
     const order = baseOrder(OrderStatus.PENDING)
     repository.findOne.mockResolvedValue(order)
