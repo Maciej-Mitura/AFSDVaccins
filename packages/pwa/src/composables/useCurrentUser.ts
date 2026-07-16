@@ -39,6 +39,7 @@ const initialized = ref(false)
 const missingProfile = ref(false)
 
 let loadPromise: Promise<void> | null = null
+let loadGeneration = 0
 
 function isUserNotRegisteredError(error: unknown): boolean {
   if (!(error instanceof ApolloError)) {
@@ -117,24 +118,42 @@ export function useCurrentUser() {
       return
     }
 
-    if (loadPromise) {
+    if (!force && loadPromise) {
       await loadPromise
       return
     }
 
+    if (force && loadPromise) {
+      await loadPromise
+    }
+
+    const generation = ++loadGeneration
     loading.value = true
     missingProfile.value = false
 
     loadPromise = (async () => {
       try {
+        if (force) {
+          apolloClient.cache.evict({ fieldName: 'currentUser' })
+          apolloClient.cache.gc()
+        }
+
         const result = await apolloClient.query<CurrentUserQuery>({
           query: CURRENT_USER_QUERY,
           fetchPolicy: 'network-only',
         })
 
+        if (generation !== loadGeneration) {
+          return
+        }
+
         currentUser.value = result.data.currentUser ?? null
         missingProfile.value = currentUser.value === null
       } catch (error: unknown) {
+        if (generation !== loadGeneration) {
+          return
+        }
+
         if (isUserNotRegisteredError(error)) {
           currentUser.value = null
           missingProfile.value = true
@@ -142,9 +161,11 @@ export function useCurrentUser() {
           throw error
         }
       } finally {
-        loading.value = false
-        initialized.value = true
-        loadPromise = null
+        if (generation === loadGeneration) {
+          loading.value = false
+          initialized.value = true
+          loadPromise = null
+        }
       }
     })()
 
@@ -275,6 +296,7 @@ export function useCurrentUser() {
     initialized.value = false
     loading.value = false
     loadPromise = null
+    loadGeneration += 1
   }
 
   return {

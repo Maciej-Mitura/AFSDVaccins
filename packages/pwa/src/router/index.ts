@@ -220,21 +220,24 @@ router.beforeEach(async to => {
   }
 
   if (isAuthenticated) {
-    if (!userInitialized.value && !userLoading.value) {
-      try {
+    const isCompleteProfileRoute = to.name === 'auth-complete-profile'
+
+    try {
+      if (isCompleteProfileRoute) {
+        await loadCurrentUser(true)
+      } else if (!userInitialized.value && !userLoading.value) {
         await loadCurrentUser()
-      } catch {
-        if (to.name !== 'auth-login') {
-          return { name: 'auth-login' }
-        }
+      } else if (userLoading.value) {
+        await loadCurrentUser()
       }
-    } else if (userLoading.value) {
-      await loadCurrentUser()
+    } catch {
+      if (to.name !== 'auth-login') {
+        return { name: 'auth-login' }
+      }
     }
 
     const needsUser = missingProfile.value || !isRegistered.value
     const needsRoleProfile = needsProfileCompletion.value
-    const isCompleteProfileRoute = to.name === 'auth-complete-profile'
 
     if (
       (needsUser || needsRoleProfile) &&
