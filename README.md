@@ -890,6 +890,11 @@ Ownership bridge for later generation:
 
 `RouteTemplateStop.apothekerProfileId` → `ApothekerProfile.userId` → `Order.apothekerId`.
 
+**Storage note (Phase 12 fix):** `Order.apothekerId` is persisted as a MongoDB
+`ObjectId` (`user._id` on create). `ApothekerProfile.userId` is a string.
+Route generation converts the profile `userId` to `ObjectId` via
+`findQualifyingOrdersForRoute` before matching.
+
 ### Validation
 
 - ADMIN-only GraphQL CRUD
@@ -977,7 +982,9 @@ RouteTemplateStop.apothekerProfileId
   → Order.apothekerId
 ```
 
-`Order.apothekerId` remains a **User** id; it is not rewritten to a profile id.
+`Order.apothekerId` remains a **User** id (stored as MongoDB `ObjectId`); it is
+not rewritten to a profile id. Route generation converts the profile `userId`
+string to `ObjectId` when querying.
 
 ### Route uniqueness and regeneration
 

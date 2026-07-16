@@ -4,6 +4,7 @@ import { ObjectId } from 'mongodb'
 import { MongoRepository } from 'typeorm'
 
 import { OrderNotificationService } from '../notifications/order-notification.service'
+import { tryParseGraphqlObjectId } from '../common/mongodb/graphql-object-id.util'
 import { ApplicationSettings } from '../settings/settings.entity'
 import { SettingsService } from '../settings/settings.service'
 import { StockService } from '../stock/stock.service'
@@ -606,27 +607,65 @@ export class OrderService {
   }
 
   /**
-   * Qualifying orders for route generation: matching deliveryDate, pharmacist,
-   * and status PENDING or PLANNED (excludes CANCELLED and DELIVERED).
+   * Qualifying orders for route generation.
+   *
+   * Orders persist `apothekerId` as MongoDB ObjectId (`user._id` on create).
+   * ApothekerProfile stores `userId` as a string. GraphQL/profile IDs therefore
+   * arrive as strings and must be converted before querying.
    */
+  async findQualifyingOrdersForRoute(params: {
+    apothekerUserId: string
+    deliveryDate: string
+  }): Promise<Order[]> {
+    const parsed = tryParseGraphqlObjectId(params.apothekerUserId)
+
+    if (!parsed) {
+      return []
+    }
+
+    try {
+      const [byObjectId, byString] = await Promise.all([
+        this.orderRepository.find({
+          where: {
+            apothekerId: parsed.objectId as unknown as string,
+            deliveryDate: params.deliveryDate,
+          },
+        }),
+        this.orderRepository.find({
+          where: {
+            apothekerId: parsed.stringValue,
+            deliveryDate: params.deliveryDate,
+          },
+        }),
+      ])
+
+      const unique = new Map<string, Order>()
+
+      for (const order of [...byObjectId, ...byString]) {
+        unique.set(order.id.toString(), order)
+      }
+
+      const qualifying = [...unique.values()].filter(
+        order =>
+          order.status === OrderStatus.PENDING ||
+          order.status === OrderStatus.PLANNED,
+      )
+
+      return this.orderNormalizationService.normalizeOrdersIfNeeded(qualifying)
+    } catch {
+      return []
+    }
+  }
+
+  /** @deprecated Use findQualifyingOrdersForRoute — kept for call-site migration. */
   async findQualifyingOrdersForPharmacist(
     apothekerUserId: string,
     deliveryDate: string,
   ): Promise<Order[]> {
-    const orders = await this.orderRepository.find({
-      where: {
-        apothekerId: apothekerUserId,
-        deliveryDate,
-      },
+    return this.findQualifyingOrdersForRoute({
+      apothekerUserId,
+      deliveryDate,
     })
-
-    const qualifying = orders.filter(
-      order =>
-        order.status === OrderStatus.PENDING ||
-        order.status === OrderStatus.PLANNED,
-    )
-
-    return this.orderNormalizationService.normalizeOrdersIfNeeded(qualifying)
   }
 
   /**

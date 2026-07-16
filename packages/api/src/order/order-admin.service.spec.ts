@@ -1,5 +1,6 @@
 import { Test, TestingModule } from '@nestjs/testing'
 import { getRepositoryToken } from '@nestjs/typeorm'
+import { ObjectId } from 'mongodb'
 import { MongoRepository } from 'typeorm'
 
 import { OrderNotificationService } from '../notifications/order-notification.service'
@@ -286,12 +287,44 @@ describe('OrderService admin lifecycle', () => {
       Promise.resolve(orders),
     )
 
-    const result = await service.findQualifyingOrdersForPharmacist(
-      pending.apothekerId,
-      '2026-07-15',
-    )
+    const result = await service.findQualifyingOrdersForRoute({
+      apothekerUserId: pending.apothekerId,
+      deliveryDate: '2026-07-15',
+    })
 
     expect(result.map(order => order.id)).toEqual([orderId, 'planned-id'])
+  })
+
+  it('findQualifyingOrdersForRoute queries ObjectId ownership form', async () => {
+    const pending = baseOrder(OrderStatus.PENDING)
+    repository.find.mockResolvedValue([pending])
+    normalizationService.normalizeOrdersIfNeeded.mockImplementation(orders =>
+      Promise.resolve(orders),
+    )
+
+    await service.findQualifyingOrdersForRoute({
+      apothekerUserId: pending.apothekerId,
+      deliveryDate: '2026-07-15',
+    })
+
+    expect(repository.find).toHaveBeenCalled()
+
+    const firstCall = repository.find.mock.calls[0]?.[0] as {
+      where?: { apothekerId?: unknown; deliveryDate?: string }
+    }
+    expect(firstCall.where?.deliveryDate).toBe('2026-07-15')
+    expect(firstCall.where?.apothekerId).toBeInstanceOf(ObjectId)
+    expect(String(firstCall.where?.apothekerId)).toBe(pending.apothekerId)
+  })
+
+  it('findQualifyingOrdersForRoute returns empty for malformed user ids', async () => {
+    const result = await service.findQualifyingOrdersForRoute({
+      apothekerUserId: 'not-an-id',
+      deliveryDate: '2026-07-15',
+    })
+
+    expect(result).toEqual([])
+    expect(repository.find).not.toHaveBeenCalled()
   })
 
   it('cancels eligible PENDING orders without stock changes', async () => {

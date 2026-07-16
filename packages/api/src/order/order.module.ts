@@ -34,6 +34,7 @@ const orderServiceProvider = isSchemaGeneration
         getAdminDailyOrderOverview: () => Promise.resolve(null),
         getAdminWeeklyStatistics: () => Promise.resolve(null),
         findQualifyingOrdersForPharmacist: () => Promise.resolve([]),
+        findQualifyingOrdersForRoute: () => Promise.resolve([]),
         planOrdersForGeneratedRoute: () => Promise.resolve([]),
         publishPlannedOrderUpdates: () => Promise.resolve(),
       },

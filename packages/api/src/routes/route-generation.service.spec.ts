@@ -42,6 +42,7 @@ describe('RouteGenerationService', () => {
     Pick<
       OrderService,
       | 'findQualifyingOrdersForPharmacist'
+      | 'findQualifyingOrdersForRoute'
       | 'planOrdersForGeneratedRoute'
       | 'publishPlannedOrderUpdates'
     >
@@ -198,6 +199,19 @@ describe('RouteGenerationService', () => {
 
           return Promise.resolve([])
         }),
+      findQualifyingOrdersForRoute: jest
+        .fn()
+        .mockImplementation(
+          (params: { apothekerUserId: string; deliveryDate: string }) => {
+            if (params.apothekerUserId === pharmacyAUserId) {
+              return Promise.resolve([
+                makeOrder(orderAId, pharmacyAUserId, OrderStatus.PENDING),
+              ])
+            }
+
+            return Promise.resolve([])
+          },
+        ),
       planOrdersForGeneratedRoute: jest
         .fn()
         .mockResolvedValue([
@@ -297,9 +311,9 @@ describe('RouteGenerationService', () => {
   })
 
   it('preserves relative template order when both pharmacies qualify', async () => {
-    orderService.findQualifyingOrdersForPharmacist.mockImplementation(
-      (userId: string) => {
-        if (userId === pharmacyAUserId) {
+    orderService.findQualifyingOrdersForRoute.mockImplementation(
+      (params: { apothekerUserId: string; deliveryDate: string }) => {
+        if (params.apothekerUserId === pharmacyAUserId) {
           return Promise.resolve([
             makeOrder(orderAId, pharmacyAUserId, OrderStatus.PENDING),
           ])
@@ -329,7 +343,7 @@ describe('RouteGenerationService', () => {
   })
 
   it('persists an empty route when no stops qualify', async () => {
-    orderService.findQualifyingOrdersForPharmacist.mockResolvedValue([])
+    orderService.findQualifyingOrdersForRoute.mockResolvedValue([])
     orderService.planOrdersForGeneratedRoute.mockResolvedValue([])
 
     const route = await service.generateDeliveryRoute(

@@ -154,10 +154,10 @@ export class RouteGenerationService {
         )
 
       const qualifyingOrders =
-        await this.orderService.findQualifyingOrdersForPharmacist(
-          profile.userId.toString(),
+        await this.orderService.findQualifyingOrdersForRoute({
+          apothekerUserId: profile.userId.toString(),
           deliveryDate,
-        )
+        })
 
       if (qualifyingOrders.length === 0) {
         skippedApothekerProfileIds.push(profile.id)
