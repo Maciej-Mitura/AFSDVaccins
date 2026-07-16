@@ -106,12 +106,12 @@ async function onSubmit(event: FormSubmitEvent<LoginForm>) {
     await login(event.data.email, event.data.password)
     await loadCurrentUser(true)
 
-    const { role, missingProfile } = useCurrentUser()
+    const { role, needsProfileCompletion } = useCurrentUser()
 
     const redirect =
       typeof route.query.redirect === 'string'
         ? route.query.redirect
-        : missingProfile.value
+        : needsProfileCompletion.value
           ? '/auth/complete-profile'
           : getDefaultRouteForRole(role.value)
 

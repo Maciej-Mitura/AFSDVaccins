@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, ref } from 'vue'
+import { computed, onMounted, onUnmounted } from 'vue'
 import { useQuery } from '@vue/apollo-composable'
 
 import { UserRole } from '@vaccin-delivery/types'

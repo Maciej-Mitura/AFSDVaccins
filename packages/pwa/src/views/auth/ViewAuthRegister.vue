@@ -14,7 +14,6 @@ const {
   createOwnUser,
   loadCurrentUser,
   mapGraphQLError,
-  getDefaultRouteForRole,
 } = useCurrentUser()
 
 const loading = ref(false)
@@ -50,12 +49,9 @@ async function onSubmit(event: FormSubmitEvent<RegisterForm>) {
     )
 
     try {
-      const user = await createOwnUser(
-        event.data.firstName,
-        event.data.lastName,
-      )
+      await createOwnUser(event.data.firstName, event.data.lastName)
       await loadCurrentUser(true)
-      await router.push(getDefaultRouteForRole(user.role))
+      await router.push('/auth/complete-profile')
     } catch (profileError: unknown) {
       profileWarning.value =
         'Je Firebase-account is aangemaakt, maar het applicatieprofiel kon niet worden opgeslagen. Log in en voltooi je profiel via “Profiel aanvullen”.'

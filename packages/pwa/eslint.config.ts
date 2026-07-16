@@ -7,7 +7,7 @@ import skipFormatting from '@vue/eslint-config-prettier'
 
 export default defineConfigWithVueTs(
   {
-    ignores: ['dist/**', 'node_modules/**'],
+    ignores: ['dist/**', 'node_modules/**', 'vitest.config.ts'],
   },
   {
     name: 'app/files-to-lint',

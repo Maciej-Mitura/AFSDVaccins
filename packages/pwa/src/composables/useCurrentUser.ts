@@ -12,10 +12,26 @@ import {
   CURRENT_USER_QUERY,
   type CurrentUserQuery,
 } from '@/assets/graphql/current-user.query'
+import {
+  COMPLETE_APOTHEKER_PROFILE_MUTATION,
+  COMPLETE_BEZORGER_PROFILE_MUTATION,
+  UPDATE_OWN_APOTHEKER_PROFILE_MUTATION,
+  UPDATE_OWN_BEZORGER_PROFILE_MUTATION,
+  type CompleteApothekerProfileMutation,
+  type CompleteApothekerProfileMutationVariables,
+  type CompleteBezorgerProfileMutation,
+  type CompleteBezorgerProfileMutationVariables,
+  type UpdateOwnApothekerProfileMutation,
+  type UpdateOwnApothekerProfileMutationVariables,
+  type UpdateOwnBezorgerProfileMutation,
+  type UpdateOwnBezorgerProfileMutationVariables,
+} from '@/assets/graphql/profile.mutation'
 import useGraphQL from '@/composables/useGraphQL'
 
 export type ApplicationUser = NonNullable<CurrentUserQuery['currentUser']>
 export type ApplicationRole = ApplicationUser['role']
+export type ApothekerProfile = NonNullable<ApplicationUser['apothekerProfile']>
+export type BezorgerProfile = NonNullable<ApplicationUser['bezorgerProfile']>
 
 const currentUser = ref<ApplicationUser | null>(null)
 const loading = ref(false)
@@ -31,7 +47,8 @@ function isUserNotRegisteredError(error: unknown): boolean {
 
   return error.graphQLErrors.some(graphQLError => {
     const originalError = graphQLError.extensions?.originalError as
-      { error?: string } | undefined
+      | { error?: string }
+      | undefined
 
     return (
       graphQLError.extensions?.code === 'USER_NOT_REGISTERED' ||
@@ -67,11 +84,33 @@ export function getDefaultRouteForRole(role?: UserRole | null): string {
   }
 }
 
+function needsRoleSpecificProfile(user: ApplicationUser | null): boolean {
+  if (!user) {
+    return false
+  }
+
+  if (user.role === UserRole.Apotheker) {
+    return user.apothekerProfile == null
+  }
+
+  if (user.role === UserRole.Bezorger) {
+    return user.bezorgerProfile == null
+  }
+
+  return false
+}
+
 export function useCurrentUser() {
   const { apolloClient } = useGraphQL()
 
   const role = computed(() => currentUser.value?.role ?? null)
   const isRegistered = computed(() => currentUser.value !== null)
+  const missingRoleProfile = computed(() =>
+    needsRoleSpecificProfile(currentUser.value),
+  )
+  const needsProfileCompletion = computed(
+    () => missingProfile.value || missingRoleProfile.value,
+  )
 
   async function loadCurrentUser(force = false): Promise<void> {
     if (!force && initialized.value) {
@@ -130,11 +169,13 @@ export function useCurrentUser() {
       throw new Error('Kon het applicatieprofiel niet aanmaken.')
     }
 
-    currentUser.value = result.data.createOwnUser
-    missingProfile.value = false
-    initialized.value = true
+    await loadCurrentUser(true)
 
-    return result.data.createOwnUser
+    if (!currentUser.value) {
+      throw new Error('Kon het applicatieprofiel niet laden.')
+    }
+
+    return currentUser.value
   }
 
   async function updateOwnUser(
@@ -155,9 +196,77 @@ export function useCurrentUser() {
       throw new Error('Kon het profiel niet bijwerken.')
     }
 
-    currentUser.value = result.data.updateOwnUser
+    await loadCurrentUser(true)
 
-    return result.data.updateOwnUser
+    if (!currentUser.value) {
+      throw new Error('Kon het applicatieprofiel niet laden.')
+    }
+
+    return currentUser.value
+  }
+
+  async function completeApothekerProfile(
+    input: CompleteApothekerProfileMutationVariables['input'],
+  ): Promise<ApothekerProfile> {
+    const result = await apolloClient.mutate<CompleteApothekerProfileMutation>({
+      mutation: COMPLETE_APOTHEKER_PROFILE_MUTATION,
+      variables: { input },
+    })
+
+    if (!result.data?.completeApothekerProfile) {
+      throw new Error('Kon het apotheekprofiel niet aanmaken.')
+    }
+
+    await loadCurrentUser(true)
+    return result.data.completeApothekerProfile
+  }
+
+  async function updateOwnApothekerProfile(
+    input: UpdateOwnApothekerProfileMutationVariables['input'],
+  ): Promise<ApothekerProfile> {
+    const result = await apolloClient.mutate<UpdateOwnApothekerProfileMutation>({
+      mutation: UPDATE_OWN_APOTHEKER_PROFILE_MUTATION,
+      variables: { input },
+    })
+
+    if (!result.data?.updateOwnApothekerProfile) {
+      throw new Error('Kon het apotheekprofiel niet bijwerken.')
+    }
+
+    await loadCurrentUser(true)
+    return result.data.updateOwnApothekerProfile
+  }
+
+  async function completeBezorgerProfile(
+    input: CompleteBezorgerProfileMutationVariables['input'],
+  ): Promise<BezorgerProfile> {
+    const result = await apolloClient.mutate<CompleteBezorgerProfileMutation>({
+      mutation: COMPLETE_BEZORGER_PROFILE_MUTATION,
+      variables: { input },
+    })
+
+    if (!result.data?.completeBezorgerProfile) {
+      throw new Error('Kon het bezorgerprofiel niet aanmaken.')
+    }
+
+    await loadCurrentUser(true)
+    return result.data.completeBezorgerProfile
+  }
+
+  async function updateOwnBezorgerProfile(
+    input: UpdateOwnBezorgerProfileMutationVariables['input'],
+  ): Promise<BezorgerProfile> {
+    const result = await apolloClient.mutate<UpdateOwnBezorgerProfileMutation>({
+      mutation: UPDATE_OWN_BEZORGER_PROFILE_MUTATION,
+      variables: { input },
+    })
+
+    if (!result.data?.updateOwnBezorgerProfile) {
+      throw new Error('Kon het bezorgerprofiel niet bijwerken.')
+    }
+
+    await loadCurrentUser(true)
+    return result.data.updateOwnBezorgerProfile
   }
 
   function clearCurrentUser(): void {
@@ -174,10 +283,16 @@ export function useCurrentUser() {
     loading,
     initialized,
     missingProfile,
+    missingRoleProfile,
+    needsProfileCompletion,
     isRegistered,
     loadCurrentUser,
     createOwnUser,
     updateOwnUser,
+    completeApothekerProfile,
+    updateOwnApothekerProfile,
+    completeBezorgerProfile,
+    updateOwnBezorgerProfile,
     clearCurrentUser,
     getDefaultRouteForRole,
     mapGraphQLError,

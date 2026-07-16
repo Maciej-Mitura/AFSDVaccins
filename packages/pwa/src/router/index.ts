@@ -24,13 +24,13 @@ const router = createRouter({
       path: '/',
       redirect: () => {
         const { isAuthenticated } = useFirebase()
-        const { isRegistered, role } = useCurrentUser()
+        const { isRegistered, role, needsProfileCompletion } = useCurrentUser()
 
         if (!isAuthenticated.value) {
           return '/auth/login'
         }
 
-        if (!isRegistered.value) {
+        if (!isRegistered.value || needsProfileCompletion.value) {
           return '/auth/complete-profile'
         }
 
@@ -203,6 +203,7 @@ router.beforeEach(async to => {
     initialized: userInitialized,
     isRegistered,
     missingProfile,
+    needsProfileCompletion,
     role,
     getDefaultRouteForRole: getRouteForRole,
   } = useCurrentUser()
@@ -231,11 +232,12 @@ router.beforeEach(async to => {
       await loadCurrentUser()
     }
 
-    const needsProfile = missingProfile.value || !isRegistered.value
+    const needsUser = missingProfile.value || !isRegistered.value
+    const needsRoleProfile = needsProfileCompletion.value
     const isCompleteProfileRoute = to.name === 'auth-complete-profile'
 
     if (
-      needsProfile &&
+      (needsUser || needsRoleProfile) &&
       !isCompleteProfileRoute &&
       to.meta.requiresProfile !== false
     ) {
@@ -245,13 +247,14 @@ router.beforeEach(async to => {
       }
     }
 
-    if (!needsProfile && isCompleteProfileRoute) {
+    if (!needsUser && !needsRoleProfile && isCompleteProfileRoute) {
       return { path: getRouteForRole(role.value) }
     }
 
     if (
       to.meta.preventLoggedIn &&
       isRegistered.value &&
+      !needsRoleProfile &&
       to.name !== 'auth-complete-profile'
     ) {
       return { path: getRouteForRole(role.value) }

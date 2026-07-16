@@ -93,9 +93,11 @@ describe('OrderService admin lifecycle', () => {
     repository = {
       findOne: jest.fn(),
       find: jest.fn(),
-      save: jest.fn((order: Order) => Promise.resolve(order)) as MongoRepository<Order>['save'],
+      save: jest.fn(),
       updateOne: jest.fn(),
     }
+
+    repository.save.mockImplementation(order => Promise.resolve(order as Order))
 
     stockService = {
       applyDeliveryDecrement: jest.fn(),

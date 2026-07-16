@@ -226,12 +226,12 @@ async function onCancel(id: string) {
     actingOrderId.value = null
   }
 }
-async function closeDeliverModal() {
+function closeDeliverModal() {
   confirmDeliverId.value = null
   actionError.value = null
 }
 
-async function closeCancelModal() {
+function closeCancelModal() {
   confirmCancelId.value = null
 }
 </script>
@@ -456,7 +456,7 @@ async function closeCancelModal() {
     <UModal
       :open="confirmDeliverId !== null"
       title="Bestelling leveren"
-      @update:open="open => { if (!open) void closeDeliverModal() }"
+      @update:open="open => { if (!open) closeDeliverModal() }"
     >
       <template #body>
         <p class="text-sm">
@@ -472,7 +472,7 @@ async function closeCancelModal() {
         />
       </template>
       <template #footer>
-        <UButton variant="ghost" @click="() => { void closeDeliverModal() }">
+        <UButton variant="ghost" @click="closeDeliverModal">
           Terug
         </UButton>
         <UButton
@@ -488,7 +488,7 @@ async function closeCancelModal() {
     <UModal
       :open="confirmCancelId !== null"
       title="Bestelling annuleren"
-      @update:open="open => { if (!open) void closeCancelModal() }"
+      @update:open="open => { if (!open) closeCancelModal() }"
     >
       <template #body>
         <p class="text-sm">
@@ -497,7 +497,7 @@ async function closeCancelModal() {
         </p>
       </template>
       <template #footer>
-        <UButton variant="ghost" @click="() => { void closeCancelModal() }">
+        <UButton variant="ghost" @click="closeCancelModal">
           Terug
         </UButton>
         <UButton

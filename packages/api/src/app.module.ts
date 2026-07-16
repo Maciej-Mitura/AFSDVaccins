@@ -20,6 +20,7 @@ import { PubSubModule } from './common/pubsub/pubsub.module'
 import { HealthModule } from './health/health.module'
 import { NotificationsModule } from './notifications/notifications.module'
 import { OrderModule } from './order/order.module'
+import { ProfileModule } from './profile/profile.module'
 import { SettingsModule } from './settings/settings.module'
 import { UserModule } from './user/user.module'
 import { StockModule } from './stock/stock.module'
@@ -130,6 +131,7 @@ const databaseImports = isSchemaGeneration
     HealthModule,
     AuthenticationModule,
     UserModule,
+    ProfileModule,
     SettingsModule,
     VaccineModule,
     StockModule,

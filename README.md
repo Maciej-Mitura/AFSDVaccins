@@ -7,11 +7,17 @@ screens.
 
 ## Current status
 
-**Phase 10 — admin order management and delivery transition complete.**
-Administrators manage order status (`PENDING` → `PLANNED` → `DELIVERED`), delivery
-decrements stock idempotently through `StockService`, daily/weekly operational
-aggregates are available, and the `adminOperationsFeed` subscription delivers live
-operational events to ADMIN only.
+**Phase 5 profile prerequisite complete (corrective).** Application users now have
+role-specific profiles required for routing:
+
+- `Address` embedded value (`street`, `houseNumber`, `postalCode`, `city`, `country`)
+- `ApothekerProfile` (pharmacy name + address, linked by `userId` → `User.id`)
+- `BezorgerProfile` (`displayName`, optional `vehicleLabel`, linked by `userId`)
+
+**Orders remain linked by `Order.apothekerId` → `User.id`.** Route templates
+(Phase 11) will reference `ApothekerProfile.id` and resolve orders through:
+
+`RouteTemplateStop.apothekerProfileId` → `ApothekerProfile.userId` → `Order.apothekerId`.
 
 **Next phase:** Phase 11 — route templates (see `docs/implementation-roadmap.md`).
 
@@ -265,43 +271,89 @@ If a Firebase account exists without a MongoDB `User` (for example a Phase 4
 test account), login redirects to `/auth/complete-profile` to call
 `createOwnUser`.
 
+**APOTHEKER** users without an `ApothekerProfile` are also redirected to
+`/auth/complete-profile` to collect pharmacy name and delivery address
+(`completeApothekerProfile`). The form may call `createOwnUser` first when the
+application user is missing, then `completeApothekerProfile` — they remain
+separate GraphQL mutations.
+
+**BEZORGER** users without a `BezorgerProfile` complete courier fields
+(`displayName`, optional `vehicleLabel`) via `completeBezorgerProfile`.
+
+**ADMIN** does not require a role-specific profile.
+
+### Pharmacy and courier profiles (Phase 5 corrective)
+
+| Entity             | Collection           | Link                          | Purpose                                             |
+| ------------------ | -------------------- | ----------------------------- | --------------------------------------------------- |
+| `Address`          | embedded             | on `ApothekerProfile`         | Delivery stop location                              |
+| `ApothekerProfile` | `apotheker_profiles` | `userId` → `User.id` (unique) | Pharmacy identity for routing                       |
+| `BezorgerProfile`  | `bezorger_profiles`  | `userId` → `User.id` (unique) | Courier identity for template ownership (Phase 11+) |
+
+Address fields: `street`, `houseNumber`, `postalCode` (4-digit Belgian), `city`,
+`country` (default `BE`). No coordinates in this phase.
+
+**Existing orders:** `Order.apothekerId` continues to reference `User.id`. Do not
+rewrite historical orders. Phase 11/12 join:
+
+```
+RouteTemplateStop.apothekerProfileId
+  → ApothekerProfile.userId
+  → Order.apothekerId
+```
+
+Helpers: `findApothekerProfileById`, `findApothekerProfileByUserId` (and bezorger
+equivalents).
+
 ### GraphQL operations added
 
-| Operation       | Auth            | Purpose                                      |
-| --------------- | --------------- | -------------------------------------------- |
-| `createOwnUser` | Firebase Bearer | Create application profile                   |
-| `currentUser`   | Firebase Bearer | Load MongoDB user (or `USER_NOT_REGISTERED`) |
-| `updateOwnUser` | Firebase Bearer | Update first/last name                       |
-| `apothekerArea` | APOTHEKER       | Phase 5 role proof                           |
-| `adminArea`     | ADMIN           | Phase 5 role proof                           |
-| `bezorgerArea`  | BEZORGER        | Phase 5 role proof                           |
+| Operation                   | Auth            | Purpose                                    |
+| --------------------------- | --------------- | ------------------------------------------ |
+| `createOwnUser`             | Firebase Bearer | Create application profile                 |
+| `currentUser`               | Firebase Bearer | Load MongoDB user + resolved role profiles |
+| `updateOwnUser`             | Firebase Bearer | Update first/last name                     |
+| `currentApothekerProfile`   | APOTHEKER       | Own pharmacy profile (nullable)            |
+| `completeApothekerProfile`  | APOTHEKER       | Create pharmacy profile (idempotent)       |
+| `updateOwnApothekerProfile` | APOTHEKER       | Update pharmacy name/address               |
+| `currentBezorgerProfile`    | BEZORGER        | Own courier profile (nullable)             |
+| `completeBezorgerProfile`   | BEZORGER        | Create courier profile (idempotent)        |
+| `updateOwnBezorgerProfile`  | BEZORGER        | Update courier fields                      |
+| `apothekerProfiles`         | ADMIN           | List pharmacies (Phase 11 prep)            |
+| `bezorgerProfiles`          | ADMIN           | List couriers (Phase 11 prep)              |
+| `apothekerArea`             | APOTHEKER       | Phase 5 role proof                         |
+| `adminArea`                 | ADMIN           | Phase 5 role proof                         |
+| `bezorgerArea`              | BEZORGER        | Phase 5 role proof                         |
 
 ### Development role testing
 
 There is no public role-promotion mutation. For local testing of ADMIN or
 BEZORGER:
 
-1. Register or complete a profile (creates APOTHEKER).
+1. Register or complete a profile (creates APOTHEKER + later pharmacy profile).
 2. Open **MongoDB Compass** → database `vaccin-delivery` → collection `users`.
 3. Edit the `role` field to `ADMIN` or `BEZORGER`.
-4. Log out and back in (or refresh) so `currentUser` reloads.
+4. For BEZORGER, complete `/auth/complete-profile` to create `BezorgerProfile`.
+5. Log out and back in (or refresh) so `currentUser` reloads.
 
 ### Manual runtime test
 
 1. Start MongoDB and `npm run dev`.
 2. Log in with an existing Phase 4 Firebase account → expect redirect to
    `/auth/complete-profile`.
-3. Submit first and last name → MongoDB user created with matching `firebaseUid`,
-   Firebase email, role `APOTHEKER`.
-4. Refresh → `currentUser` restores; `/apotheker` works; `/admin` → `/forbidden`.
-5. Update profile at `/profile` → persists after refresh.
-6. Log out → application user state clears.
-7. Register a new account → Firebase + MongoDB records created.
+3. Submit names + pharmacy/address → MongoDB `User` + one `ApothekerProfile`
+   with matching `userId`.
+4. Refresh → no repeat profile prompt; `/apotheker` works; `/admin` → `/forbidden`.
+5. Edit pharmacy fields at `/profile` → persists after refresh.
+6. Confirm existing orders still list; `Order.apothekerId` still equals `User.id`.
+7. Promote a user to BEZORGER → complete courier profile → no redirect loop.
+8. ADMIN is not forced into pharmacy completion.
+9. Log out → application user state clears.
+10. Register a new account → Firebase + User, then pharmacy completion.
 
 PWA composables:
 
 - `useFirebase` — authentication identity
-- `useCurrentUser` — application profile and role
+- `useCurrentUser` — application profile, role, and role-specific profile completion
 
 ## Application settings and vaccine catalogue (Phase 6)
 

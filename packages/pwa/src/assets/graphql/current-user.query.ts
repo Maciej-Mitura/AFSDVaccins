@@ -10,6 +10,24 @@ export const currentUserQuerySource = gql`
       role
       createdAt
       updatedAt
+      apothekerProfile {
+        id
+        userId
+        pharmacyName
+        address {
+          street
+          houseNumber
+          postalCode
+          city
+          country
+        }
+      }
+      bezorgerProfile {
+        id
+        userId
+        displayName
+        vehicleLabel
+      }
     }
   }
 `
