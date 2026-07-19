@@ -1,12 +1,16 @@
-import { Injectable } from '@nestjs/common'
+import { Inject, Injectable } from '@nestjs/common'
 import { InjectRepository } from '@nestjs/typeorm'
 import { MongoRepository } from 'typeorm'
 
 import { GraphqlRequestContext } from '../authentication/firebase.types'
 import { getApplicationUser } from '../authentication/graphql-auth.context'
 import { tryParseGraphqlObjectId } from '../common/mongodb/graphql-object-id.util'
+import type { Clock } from '../order/clock.provider'
+import { CLOCK } from '../order/clock.provider'
+import { getLocalCalendarDate } from '../order/delivery-date.util'
 import { BezorgerProfileService } from '../profile/bezorger/bezorger-profile.service'
 import { BezorgerProfileNotFoundException } from '../profile/exceptions/profile.exceptions'
+import { SettingsService } from '../settings/settings.service'
 import { User } from '../user/user.entity'
 import { UserRole } from '../user/user-role.enum'
 import { canReceiveBezorgerRouteUpdate } from './bezorger-route-subscription.filter'
@@ -18,6 +22,8 @@ import {
   InvalidDeliveryDateException,
 } from './exceptions/delivery-route.exceptions'
 import { RouteGenerationService } from './route-generation.service'
+import { RoutePreviewService } from './route-preview.service'
+import { RoutePreview } from './route-preview.type'
 
 @Injectable()
 export class RoutesService {
@@ -25,7 +31,10 @@ export class RoutesService {
     @InjectRepository(DeliveryRoute)
     private readonly deliveryRouteRepository: MongoRepository<DeliveryRoute>,
     private readonly routeGenerationService: RouteGenerationService,
+    private readonly routePreviewService: RoutePreviewService,
     private readonly bezorgerProfileService: BezorgerProfileService,
+    private readonly settingsService: SettingsService,
+    @Inject(CLOCK) private readonly clock: Clock,
   ) {}
 
   async generateDeliveryRoute(
@@ -101,12 +110,17 @@ export class RoutesService {
       throw new BezorgerProfileNotFoundException()
     }
 
-    const today = await this.routeGenerationService.getLocalTodayDeliveryDate()
+    const settings = await this.settingsService.getApplicationSettings()
+    const today = getLocalCalendarDate(this.clock.now(), settings.timezone)
 
     return this.routeGenerationService.findByBezorgerAndDate(
-      profile.id,
+      profile.id.toString(),
       today,
     )
+  }
+
+  async findMyTomorrowRoutePreview(user: User): Promise<RoutePreview> {
+    return this.routePreviewService.computeTomorrowPreview(user)
   }
 
   async filterRouteUpdateForSubscriber(

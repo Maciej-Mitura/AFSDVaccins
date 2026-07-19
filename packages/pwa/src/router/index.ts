@@ -198,6 +198,12 @@ const router = createRouter({
           component: () =>
             import('@/views/bezorger/ViewBezorgerTodayRoute.vue'),
         },
+        {
+          path: 'tomorrow',
+          name: 'bezorger-tomorrow',
+          component: () =>
+            import('@/views/bezorger/ViewBezorgerTomorrowPreview.vue'),
+        },
       ],
     },
     {

@@ -7,13 +7,12 @@ screens.
 
 ## Current status
 
-**Phase 12 complete — delivery-route generation.** ADMIN generates daily
-`DeliveryRoute` documents from active `RouteTemplate`s. Pharmacies without
-qualifying orders are skipped; included `PENDING` orders become `PLANNED`.
-BEZORGER sees today’s persisted route (snapshotted stops) with live
-`bezorgerRouteUpdates`.
+**Phase 13 complete — computed tomorrow `RoutePreview`.** BEZORGER can open
+`/bezorger/tomorrow` for a live, non-persisted preview of tomorrow’s stops
+derived from the assigned active `RouteTemplate` and qualifying orders.
+`DeliveryRoute` documents are never created or updated by this query.
 
-**Next phase:** Phase 13 — tomorrow `RoutePreview` (computed, not persisted).
+**Next phase:** Phase 14 — route execution lifecycle (start / complete / cancel).
 
 ## Planned stack
 
@@ -1023,6 +1022,11 @@ If route persistence fails, **no** order or route realtime events are published.
 | `myTodayRoute`                     | BEZORGER (own profile + Europe/Brussels today)                    |
 | `bezorgerRouteUpdates`             | BEZORGER; filter `route.bezorgerProfileId ===` subscriber profile |
 
+`myTodayRoute` looks up `(bezorgerProfileId, deliveryDate)` with the same
+**ObjectId/string-safe** dual match used for order ownership: persisted
+`DeliveryRoute.bezorgerProfileId` is a string, while TypeORM `profile.id` may be
+an `ObjectId` instance. A string-only or ObjectId-only query misses the route.
+
 Reconnect refetches `myTodayRoute`.
 
 ### Consistency limitation
@@ -1055,6 +1059,123 @@ realtime events.
 10. Keep the page open; regenerate as ADMIN — realtime update without refresh.
 11. Log in as the other BEZORGER — cannot see the first courier’s route.
 12. Confirm APOTHEKER cannot generate routes; delivery marking still works.
+
+## Tomorrow RoutePreview (Phase 13)
+
+Live, **computed** courier preview for **tomorrow**. Never persisted.
+
+### DeliveryRoute versus RoutePreview
+
+|                | `DeliveryRoute`                                | `RoutePreview`                                        |
+| -------------- | ---------------------------------------------- | ----------------------------------------------------- |
+| Purpose        | Historical day plan after ADMIN generation     | Live vooruitblik for tomorrow                         |
+| Persistence    | MongoDB document                               | GraphQL response only — **no collection / no entity** |
+| Who creates it | ADMIN via `generateDeliveryRoute`              | Computed on `myTomorrowRoutePreview`                  |
+| Snapshot       | Pharmacy name/address frozen at generation     | Current profile name/address at query time            |
+| Side effects   | May set orders `PLANNED`, publish route events | **None** — read-only                                  |
+
+Why preview is not persisted (ADR-015): it must reflect live orders until an
+ADMIN generates a real `DeliveryRoute`. Persisting a preview would stale or
+collide with generation.
+
+### Tomorrow calculation
+
+```
+tomorrow = formatLocalDate(addLocalDays(getZonedDateParts(now, timezone), 1))
+```
+
+Timezone comes from `ApplicationSettings.timezone` (seeded `Europe/Brussels`).
+Returns `YYYY-MM-DD`. Uses the injectable `CLOCK` in tests — not
+`toISOString().slice(0, 10)`.
+
+### Closing-time / cutoff rule (RULE-013)
+
+Phase 7 still assigns `deliveryDate` via
+`resolveDeliveryDate(submittedAt, timezone, orderingClosingTime)`:
+
+- Before closing → `deliveryDate` = that local day
+- At/after closing → `deliveryDate` = next local day
+
+**Tomorrow preview is stricter than Phase 12 generation.** After loading
+route-qualifying orders for `deliveryDate === tomorrow`, preview keeps only
+orders whose `submittedAt` is **before** the configured closing time in
+Europe/Brussels (`!isAtOrAfterClosingTime`). Exactly at closing is treated as
+after closing (same boundary as Phase 7) and is **excluded**.
+
+| Case                                                           | Preview  |
+| -------------------------------------------------------------- | -------- |
+| `deliveryDate === tomorrow` and submitted **before** closing   | included |
+| `deliveryDate === tomorrow` and submitted **at/after** closing | excluded |
+| Wrong `deliveryDate` / `CANCELLED` / `DELIVERED`               | excluded |
+
+Phase 12 `generateDeliveryRoute` is unchanged and still includes post-closing
+tomorrow orders. Under normal Phase 7 placement, same-day post-closing orders
+are the usual `deliveryDate=tomorrow` set, so the live preview may be empty
+until pre-closing fixtures/orders exist — by design (RULE-013).
+
+### Qualifying statuses
+
+Base set from Phase 12 `findQualifyingOrdersForRoute`, then RULE-013 filter:
+
+- `PENDING` and `PLANNED` included (if pre-closing)
+- `CANCELLED` and `DELIVERED` excluded
+- Ownership: `Order.apothekerId` ↔ `ApothekerProfile.userId` (ObjectId-safe)
+
+### Template ownership
+
+```
+authenticated User → BezorgerProfile → exactly one active RouteTemplate
+  where template.bezorgerProfileId === profile.id
+```
+
+| Situation                      | Result                            |
+| ------------------------------ | --------------------------------- |
+| No BezorgerProfile             | `BEZORGER_PROFILE_NOT_FOUND`      |
+| No active template             | `ROUTE_TEMPLATE_NOT_ASSIGNED`     |
+| Multiple active templates      | `MULTIPLE_ACTIVE_ROUTE_TEMPLATES` |
+| Template stop with zero orders | skipped (listed in skipped ids)   |
+
+### Empty-preview behaviour
+
+Assigned template + no qualifying orders → valid response with `stops: []`,
+zero totals, and `skippedApothekerProfileIds` filled. Not an error.
+
+### Lack of side effects
+
+`myTomorrowRoutePreview` does **not**:
+
+- create/update `DeliveryRoute`
+- change `Order` status or history
+- touch stock
+- create notifications
+- publish PubSub events
+
+### Authorization
+
+BEZORGER only (own profile). APOTHEKER and ADMIN are forbidden. No courier ID
+argument — another courier cannot be selected.
+
+### GraphQL / PWA
+
+| Surface                  | Notes                                                 |
+| ------------------------ | ----------------------------------------------------- |
+| `myTomorrowRoutePreview` | `RoutePreview!` — server derives date/template        |
+| `/bezorger/tomorrow`     | “Voorbeeldroute voor morgen” (vs “Route van vandaag”) |
+| Reconnect                | Refetch preview (no preview subscription)             |
+
+### Manual runtime test (Phase 13)
+
+1. Ensure one BEZORGER has an active `RouteTemplate` with several pharmacies.
+2. Create tomorrow-dated orders with `submittedAt` before vs after the configured
+   closing time; confirm only **pre-closing** orders appear in the preview
+   (post-closing `deliveryDate=tomorrow` orders are excluded — RULE-013).
+3. Log in as BEZORGER → `/bezorger/tomorrow`.
+4. Confirm template name, ordered stops, addresses, vaccine totals, order counts.
+5. Confirm empty pharmacies are skipped; empty preview is a valid empty state.
+6. Inspect MongoDB before/after opening the preview — no new/updated
+   `DeliveryRoute`, unchanged order statuses/stock/notifications.
+7. Confirm APOTHEKER/ADMIN cannot query `myTomorrowRoutePreview`.
+8. Confirm `/bezorger/today` still works.
 
 ## CI
 

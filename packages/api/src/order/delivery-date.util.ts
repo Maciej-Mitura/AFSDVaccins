@@ -109,6 +109,24 @@ export function resolveDeliveryDate(
   return formatLocalDate(local)
 }
 
+/** Local calendar date (YYYY-MM-DD) for `instant` in `timeZone`. */
+export function getLocalCalendarDate(
+  instant: Date,
+  timeZone: string,
+): string {
+  return formatLocalDate(getZonedDateParts(instant, timeZone))
+}
+
+/** Tomorrow’s local calendar date (YYYY-MM-DD) relative to `instant` in `timeZone`. */
+export function getLocalTomorrowDate(
+  instant: Date,
+  timeZone: string,
+): string {
+  return formatLocalDate(
+    addLocalDays(getZonedDateParts(instant, timeZone), 1),
+  )
+}
+
 export function getIsoWeekYearForDeliveryDate(
   deliveryDate: string,
 ): IsoWeekYear {

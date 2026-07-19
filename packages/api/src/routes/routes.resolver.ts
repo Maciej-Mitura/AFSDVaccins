@@ -21,6 +21,7 @@ import { RolesGuard } from '../user/guards/roles.guard'
 import { User } from '../user/user.entity'
 import { UserRole } from '../user/user-role.enum'
 import { DeliveryRoute } from './delivery-route.entity'
+import { RoutePreview } from './route-preview.type'
 import { RoutesService } from './routes.service'
 
 @Resolver(() => DeliveryRoute)
@@ -84,6 +85,16 @@ export class RoutesResolver {
   @Roles(UserRole.BEZORGER)
   myTodayRoute(@CurrentUser() user: User): Promise<DeliveryRoute | null> {
     return this.routesService.findMyTodayRoute(user)
+  }
+
+  @Query(() => RoutePreview, {
+    description:
+      'Computed non-persisted tomorrow route preview for the authenticated bezorger',
+  })
+  @UseGuards(AuthorizationGuard, RolesGuard)
+  @Roles(UserRole.BEZORGER)
+  myTomorrowRoutePreview(@CurrentUser() user: User): Promise<RoutePreview> {
+    return this.routesService.findMyTomorrowRoutePreview(user)
   }
 
   @Subscription(() => DeliveryRoute, {

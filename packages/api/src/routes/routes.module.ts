@@ -3,6 +3,7 @@ import { TypeOrmModule } from '@nestjs/typeorm'
 
 import { AuthenticationModule } from '../authentication/authentication.module'
 import { PubSubModule } from '../common/pubsub/pubsub.module'
+import { CLOCK, SystemClock } from '../order/clock.provider'
 import { OrderModule } from '../order/order.module'
 import { ProfileModule } from '../profile/profile.module'
 import { RouteTemplatesModule } from '../route-templates/route-templates.module'
@@ -11,6 +12,7 @@ import { UserModule } from '../user/user.module'
 import { DeliveryRoute } from './delivery-route.entity'
 import { DeliveryRouteEventsService } from './delivery-route-events.service'
 import { RouteGenerationService } from './route-generation.service'
+import { RoutePreviewService } from './route-preview.service'
 import { RoutesResolver } from './routes.resolver'
 import { RoutesService } from './routes.service'
 
@@ -29,6 +31,27 @@ const routeGenerationServiceProvider = isSchemaGeneration
     }
   : RouteGenerationService
 
+const routePreviewServiceProvider = isSchemaGeneration
+  ? {
+      provide: RoutePreviewService,
+      useValue: {
+        computeTomorrowPreview: () =>
+          Promise.resolve({
+            deliveryDate: '2026-01-02',
+            bezorgerProfileId: '0',
+            routeTemplateId: '0',
+            routeTemplateName: 'schema',
+            stops: [],
+            skippedApothekerProfileIds: [],
+            totalStops: 0,
+            totalOrders: 0,
+            totalQuantity: 0,
+            computedAt: new Date('2026-01-01T00:00:00.000Z'),
+          }),
+      },
+    }
+  : RoutePreviewService
+
 const routesServiceProvider = isSchemaGeneration
   ? {
       provide: RoutesService,
@@ -37,6 +60,7 @@ const routesServiceProvider = isSchemaGeneration
         findDeliveryRoutes: () => Promise.resolve([]),
         findDeliveryRouteById: () => Promise.resolve(null),
         findMyTodayRoute: () => Promise.resolve(null),
+        findMyTomorrowRoutePreview: () => Promise.resolve(null),
         filterRouteUpdateForSubscriber: () => Promise.resolve(false),
       },
     }
@@ -59,10 +83,15 @@ const persistenceImports = isSchemaGeneration
   ],
   providers: [
     routeGenerationServiceProvider,
+    routePreviewServiceProvider,
     routesServiceProvider,
     DeliveryRouteEventsService,
     RoutesResolver,
+    {
+      provide: CLOCK,
+      useClass: SystemClock,
+    },
   ],
-  exports: [RoutesService, RouteGenerationService],
+  exports: [RoutesService, RouteGenerationService, RoutePreviewService],
 })
 export class RoutesModule {}

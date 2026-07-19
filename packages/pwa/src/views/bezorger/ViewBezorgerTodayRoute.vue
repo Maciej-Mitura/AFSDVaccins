@@ -52,12 +52,12 @@ onUnmounted(() => {
     />
 
     <CommonEmptyState
-      v-else-if="!myTodayRoute"
+      v-else-if="!loading && !myTodayRoute"
       title="Geen route voor vandaag"
       description="Er is nog geen gegenereerde route voor jouw profiel op de huidige leveringsdatum."
     />
 
-    <template v-else>
+    <template v-else-if="myTodayRoute">
       <div class="rounded-lg bg-elevated/50 px-4 py-3">
         <p class="text-sm text-muted">Status</p>
         <p class="text-lg font-semibold">{{ myTodayRoute.status }}</p>

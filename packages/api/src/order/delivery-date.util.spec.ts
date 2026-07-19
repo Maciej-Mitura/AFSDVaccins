@@ -1,5 +1,7 @@
 import {
   getIsoWeekYearForDeliveryDate,
+  getLocalCalendarDate,
+  getLocalTomorrowDate,
   getZonedDateParts,
   isAtOrAfterClosingTime,
   resolveDeliveryDate,
@@ -65,5 +67,21 @@ describe('delivery-date.util', () => {
       isoWeek: 1,
       isoYear: 2026,
     })
+  })
+
+  it('computes local calendar and tomorrow dates in Europe/Brussels', () => {
+    const instant = new Date('2026-07-15T12:00:00.000Z')
+
+    expect(getLocalCalendarDate(instant, TIMEZONE)).toBe('2026-07-15')
+    expect(getLocalTomorrowDate(instant, TIMEZONE)).toBe('2026-07-16')
+  })
+
+  it('computes tomorrow across month and year boundaries', () => {
+    expect(
+      getLocalTomorrowDate(new Date('2026-07-31T12:00:00.000Z'), TIMEZONE),
+    ).toBe('2026-08-01')
+    expect(
+      getLocalTomorrowDate(new Date('2025-12-31T12:00:00.000Z'), TIMEZONE),
+    ).toBe('2026-01-01')
   })
 })

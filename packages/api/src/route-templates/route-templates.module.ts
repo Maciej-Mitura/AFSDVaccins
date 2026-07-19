@@ -19,6 +19,7 @@ const routeTemplatesServiceProvider = isSchemaGeneration
         createRouteTemplate: () => Promise.resolve(null),
         findRouteTemplates: () => Promise.resolve([]),
         findRouteTemplateById: () => Promise.resolve(null),
+        findActiveTemplatesForBezorgerProfile: () => Promise.resolve([]),
         updateRouteTemplate: () => Promise.resolve(null),
         setRouteTemplateActive: () => Promise.resolve(null),
       },

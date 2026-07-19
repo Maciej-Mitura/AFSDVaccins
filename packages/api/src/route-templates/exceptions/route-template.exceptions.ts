@@ -48,3 +48,22 @@ export class RouteTemplateDuplicateStopException extends BadRequestException {
     })
   }
 }
+
+export class RouteTemplateNotAssignedException extends NotFoundException {
+  constructor() {
+    super({
+      message: 'Er is geen actieve routetemplate aan jouw bezorgerprofiel gekoppeld.',
+      error: 'ROUTE_TEMPLATE_NOT_ASSIGNED',
+    })
+  }
+}
+
+export class MultipleActiveRouteTemplatesException extends ConflictException {
+  constructor() {
+    super({
+      message:
+        'Er zijn meerdere actieve routetemplates aan jouw bezorgerprofiel gekoppeld.',
+      error: 'MULTIPLE_ACTIVE_ROUTE_TEMPLATES',
+    })
+  }
+}

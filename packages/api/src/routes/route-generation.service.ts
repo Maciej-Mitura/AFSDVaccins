@@ -3,10 +3,7 @@ import { InjectRepository } from '@nestjs/typeorm'
 import { MongoRepository } from 'typeorm'
 
 import { tryParseGraphqlObjectId } from '../common/mongodb/graphql-object-id.util'
-import {
-  formatLocalDate,
-  getZonedDateParts,
-} from '../order/delivery-date.util'
+import { getLocalCalendarDate } from '../order/delivery-date.util'
 import { Order } from '../order/order.entity'
 import { OrderLine } from '../order/order-line.entity'
 import { OrderService } from '../order/order.service'
@@ -269,22 +266,42 @@ export class RouteGenerationService {
     return saved
   }
 
-  async getLocalTodayDeliveryDate(): Promise<string> {
+  async getLocalTodayDeliveryDate(now: Date = new Date()): Promise<string> {
     const settings = await this.settingsService.getApplicationSettings()
-    const local = getZonedDateParts(new Date(), settings.timezone)
-    return formatLocalDate(local)
+    return getLocalCalendarDate(now, settings.timezone)
   }
 
+  /**
+   * ObjectId/string-safe lookup. Routes persist `bezorgerProfileId` as a string;
+   * TypeORM `profile.id` is often an ObjectId instance — querying only one form
+   * misses the document (same class of bug as Order.apothekerId).
+   */
   async findByBezorgerAndDate(
     bezorgerProfileId: string,
     deliveryDate: string,
   ): Promise<DeliveryRoute | null> {
-    return this.deliveryRouteRepository.findOne({
-      where: {
-        bezorgerProfileId,
-        deliveryDate,
-      },
-    })
+    const parsed = tryParseGraphqlObjectId(bezorgerProfileId.toString())
+
+    if (!parsed) {
+      return null
+    }
+
+    const [byString, byObjectId] = await Promise.all([
+      this.deliveryRouteRepository.findOne({
+        where: {
+          bezorgerProfileId: parsed.stringValue,
+          deliveryDate,
+        },
+      }),
+      this.deliveryRouteRepository.findOne({
+        where: {
+          bezorgerProfileId: parsed.objectId as unknown as string,
+          deliveryDate,
+        },
+      }),
+    ])
+
+    return byString ?? byObjectId ?? null
   }
 
   private assertRegenerable(route: DeliveryRoute): void {

@@ -206,6 +206,26 @@ export class RouteTemplatesService {
     return this.requireById(id)
   }
 
+  async findActiveTemplatesForBezorgerProfile(
+    bezorgerProfileId: string,
+  ): Promise<RouteTemplate[]> {
+    const parsed = tryParseGraphqlObjectId(bezorgerProfileId)
+
+    if (!parsed) {
+      return []
+    }
+
+    const templates = await this.routeTemplateRepository.find({
+      where: {
+        bezorgerProfileId: parsed.stringValue,
+        active: true,
+      },
+      order: { name: 'ASC' },
+    })
+
+    return templates.map(template => this.withOrderedStops(template))
+  }
+
   async updateRouteTemplate(
     id: string,
     input: UpdateRouteTemplateInput,

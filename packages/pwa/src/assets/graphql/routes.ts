@@ -231,3 +231,46 @@ export type { BezorgerRouteUpdatesSubscription } from '@vaccin-delivery/types'
 export {
   BezorgerRouteUpdatesDocument as BEZORGER_ROUTE_UPDATES_SUBSCRIPTION,
 } from '@vaccin-delivery/types'
+
+export const myTomorrowRoutePreviewQuerySource = gql`
+  query MyTomorrowRoutePreview {
+    myTomorrowRoutePreview {
+      deliveryDate
+      bezorgerProfileId
+      routeTemplateId
+      routeTemplateName
+      stops {
+        sequence
+        apothekerProfileId
+        apothekerUserId
+        pharmacyName
+        address {
+          street
+          houseNumber
+          postalCode
+          city
+          country
+        }
+        orderIds
+        orderCount
+        totalQuantity
+        lines {
+          vaccineId
+          vaccineName
+          manufacturer
+          quantity
+        }
+      }
+      skippedApothekerProfileIds
+      totalStops
+      totalOrders
+      totalQuantity
+      computedAt
+    }
+  }
+`
+
+export type { MyTomorrowRoutePreviewQuery } from '@vaccin-delivery/types'
+export {
+  MyTomorrowRoutePreviewDocument as MY_TOMORROW_ROUTE_PREVIEW_QUERY,
+} from '@vaccin-delivery/types'
