@@ -22,6 +22,7 @@ import { User } from '../user/user.entity'
 import { UserRole } from '../user/user-role.enum'
 import { DeliveryRoute } from './delivery-route.entity'
 import { RoutePreview } from './route-preview.type'
+import { RouteStatus } from './route-status.enum'
 import { RoutesService } from './routes.service'
 
 @Resolver(() => DeliveryRoute)
@@ -74,6 +75,21 @@ export class RoutesResolver {
     @Args('id', { type: () => ID }) id: string,
   ): Promise<DeliveryRoute> {
     return this.routesService.findDeliveryRouteById(id)
+  }
+
+  @Mutation(() => DeliveryRoute, {
+    description:
+      'Updates delivery route status according to the route execution state machine',
+  })
+  @UseGuards(AuthorizationGuard, RolesGuard)
+  @Roles(UserRole.ADMIN, UserRole.BEZORGER)
+  updateRouteStatus(
+    @CurrentUser() user: User,
+    @Args('id', { type: () => ID }) id: string,
+    @Args('status', { type: () => RouteStatus }) status: RouteStatus,
+    @Args('reason', { nullable: true }) reason?: string,
+  ): Promise<DeliveryRoute> {
+    return this.routesService.updateRouteStatus(user, id, status, reason)
   }
 
   @Query(() => DeliveryRoute, {

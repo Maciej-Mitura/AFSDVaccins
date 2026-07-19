@@ -101,6 +101,10 @@ describe('RoutesService.findMyTodayRoute', () => {
           useValue: { computeTomorrowPreview: jest.fn() },
         },
         {
+          provide: DeliveryRouteEventsService,
+          useValue: { publishBezorgerRouteUpdated: jest.fn() },
+        },
+        {
           provide: BezorgerProfileService,
           useValue: { findByUserId },
         },

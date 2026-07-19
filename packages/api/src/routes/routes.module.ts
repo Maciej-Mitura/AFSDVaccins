@@ -61,6 +61,7 @@ const routesServiceProvider = isSchemaGeneration
         findDeliveryRouteById: () => Promise.resolve(null),
         findMyTodayRoute: () => Promise.resolve(null),
         findMyTomorrowRoutePreview: () => Promise.resolve(null),
+        updateRouteStatus: () => Promise.resolve(null),
         filterRouteUpdateForSubscriber: () => Promise.resolve(false),
       },
     }

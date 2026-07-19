@@ -16,14 +16,24 @@ import { UserRole } from '../user/user-role.enum'
 import { canReceiveBezorgerRouteUpdate } from './bezorger-route-subscription.filter'
 import { isValidDeliveryDateString } from './delivery-date-validation.util'
 import { DeliveryRoute } from './delivery-route.entity'
+import { DeliveryRouteEventsService } from './delivery-route-events.service'
 import {
   DeliveryRouteForbiddenException,
   DeliveryRouteNotFoundException,
   InvalidDeliveryDateException,
+  InvalidRouteStatusTransitionException,
+  RouteCannotBeCancelledException,
 } from './exceptions/delivery-route.exceptions'
 import { RouteGenerationService } from './route-generation.service'
 import { RoutePreviewService } from './route-preview.service'
 import { RoutePreview } from './route-preview.type'
+import { RouteStatus } from './route-status.enum'
+import {
+  canBezorgerTransitionRouteStatus,
+  canCancelRoute,
+  canTransitionRouteStatus,
+} from './route-status.policy'
+import { RouteStatusHistoryEntry } from './route-status-history.type'
 
 @Injectable()
 export class RoutesService {
@@ -32,6 +42,7 @@ export class RoutesService {
     private readonly deliveryRouteRepository: MongoRepository<DeliveryRoute>,
     private readonly routeGenerationService: RouteGenerationService,
     private readonly routePreviewService: RoutePreviewService,
+    private readonly deliveryRouteEventsService: DeliveryRouteEventsService,
     private readonly bezorgerProfileService: BezorgerProfileService,
     private readonly settingsService: SettingsService,
     @Inject(CLOCK) private readonly clock: Clock,
@@ -123,6 +134,78 @@ export class RoutesService {
     return this.routePreviewService.computeTomorrowPreview(user)
   }
 
+  /**
+   * Controlled route FSM transition. Does not modify orders or stock.
+   * Same-status requests are idempotent (no history append, no publish).
+   */
+  async updateRouteStatus(
+    actor: User,
+    id: string,
+    targetStatus: RouteStatus,
+    reason?: string | null,
+  ): Promise<DeliveryRoute> {
+    const route = await this.findDeliveryRouteById(id)
+    await this.assertActorMayAccessRoute(actor, route)
+
+    if (route.status === targetStatus) {
+      return route
+    }
+
+    this.assertTransitionAllowed(actor, route.status, targetStatus)
+
+    const previousStatus = route.status
+    const now = this.clock.now()
+    const history = this.normalizeStatusHistory(route)
+    const historyEntry: RouteStatusHistoryEntry = {
+      fromStatus: previousStatus,
+      toStatus: targetStatus,
+      changedAt: now,
+      changedByUserId: actor._id.toString(),
+      reason: reason?.trim() ? reason.trim() : null,
+    }
+    const nextHistory = [...history, historyEntry]
+
+    const parsed = tryParseGraphqlObjectId(id)
+
+    if (!parsed) {
+      throw new DeliveryRouteNotFoundException()
+    }
+
+    const updatedDocument = await this.deliveryRouteRepository.findOneAndUpdate(
+      {
+        _id: parsed.objectId,
+        status: previousStatus,
+      },
+      {
+        $set: {
+          status: targetStatus,
+          statusHistory: nextHistory,
+          updatedAt: now,
+        },
+      },
+      { returnDocument: 'after' },
+    )
+
+    if (!updatedDocument) {
+      const reloaded = await this.findDeliveryRouteById(id)
+
+      if (reloaded.status === targetStatus) {
+        return reloaded
+      }
+
+      this.assertTransitionAllowed(actor, reloaded.status, targetStatus)
+      throw new InvalidRouteStatusTransitionException(
+        reloaded.status,
+        targetStatus,
+      )
+    }
+
+    const saved = await this.findDeliveryRouteById(id)
+    await this.deliveryRouteEventsService.publishBezorgerRouteUpdated(saved)
+
+    return saved
+  }
+
   async filterRouteUpdateForSubscriber(
     context: GraphqlRequestContext,
     route: DeliveryRoute,
@@ -146,5 +229,78 @@ export class RoutesService {
       route,
       profile?.id ?? null,
     )
+  }
+
+  private assertTransitionAllowed(
+    actor: User,
+    fromStatus: RouteStatus,
+    toStatus: RouteStatus,
+  ): void {
+    if (toStatus === RouteStatus.CANCELLED) {
+      if (actor.role !== UserRole.ADMIN) {
+        throw new DeliveryRouteForbiddenException()
+      }
+
+      if (!canCancelRoute(fromStatus)) {
+        throw new RouteCannotBeCancelledException(fromStatus)
+      }
+
+      return
+    }
+
+    if (!canTransitionRouteStatus(fromStatus, toStatus)) {
+      throw new InvalidRouteStatusTransitionException(fromStatus, toStatus)
+    }
+
+    if (actor.role === UserRole.BEZORGER) {
+      if (!canBezorgerTransitionRouteStatus(fromStatus, toStatus)) {
+        throw new DeliveryRouteForbiddenException()
+      }
+    } else if (actor.role !== UserRole.ADMIN) {
+      throw new DeliveryRouteForbiddenException()
+    }
+  }
+
+  private async assertActorMayAccessRoute(
+    actor: User,
+    route: DeliveryRoute,
+  ): Promise<void> {
+    if (actor.role === UserRole.ADMIN) {
+      return
+    }
+
+    if (actor.role !== UserRole.BEZORGER) {
+      throw new DeliveryRouteForbiddenException()
+    }
+
+    const profile = await this.bezorgerProfileService.findByUserId(
+      actor._id.toString(),
+    )
+
+    if (!profile) {
+      throw new BezorgerProfileNotFoundException()
+    }
+
+    if (route.bezorgerProfileId.toString() !== profile.id.toString()) {
+      throw new DeliveryRouteForbiddenException()
+    }
+  }
+
+  private normalizeStatusHistory(
+    route: DeliveryRoute,
+  ): RouteStatusHistoryEntry[] {
+    if (Array.isArray(route.statusHistory) && route.statusHistory.length > 0) {
+      return [...route.statusHistory]
+    }
+
+    return [
+      {
+        fromStatus: null,
+        toStatus: route.status,
+        changedAt: route.generatedAt ?? route.createdAt ?? this.clock.now(),
+        changedByUserId: route.generatedByUserId ?? 'system',
+        reason: 'Legacy route history normalized',
+      },
+    ]
   }
 }

@@ -1,5 +1,6 @@
-import { ref } from 'vue'
 import { ApolloError } from '@apollo/client/core'
+import { RouteStatus } from '@vaccin-delivery/types'
+import { ref } from 'vue'
 
 import {
   BEZORGER_ROUTE_UPDATES_SUBSCRIPTION,
@@ -7,6 +8,7 @@ import {
   GENERATE_DELIVERY_ROUTE_MUTATION,
   MY_TODAY_ROUTE_QUERY,
   MY_TOMORROW_ROUTE_PREVIEW_QUERY,
+  UPDATE_ROUTE_STATUS_MUTATION,
   type BezorgerRouteUpdatesSubscription,
   type DeliveryRoutesQuery,
   type DeliveryRoutesQueryVariables,
@@ -14,22 +16,26 @@ import {
   type GenerateDeliveryRouteMutationVariables,
   type MyTodayRouteQuery,
   type MyTomorrowRoutePreviewQuery,
+  type UpdateRouteStatusMutation,
+  type UpdateRouteStatusMutationVariables,
 } from '@/assets/graphql/routes'
 import { ROUTE_TEMPLATES_QUERY } from '@/assets/graphql/route-templates'
 import type { RouteTemplatesQuery } from '@/assets/graphql/route-templates'
 import { mapGraphQLError } from '@/composables/useCurrentUser'
-import useGraphQL, {
-  registerReconnectHandler,
-} from '@/composables/useGraphQL'
+import useGraphQL, { registerReconnectHandler } from '@/composables/useGraphQL'
 
 export type DeliveryRouteItem = NonNullable<
   DeliveryRoutesQuery['deliveryRoutes'][number]
 >
 export type DeliveryStopItem = DeliveryRouteItem['stops'][number]
-export type RoutePreviewItem = MyTomorrowRoutePreviewQuery['myTomorrowRoutePreview']
+export type RouteStatusHistoryItem = DeliveryRouteItem['statusHistory'][number]
+export type RoutePreviewItem =
+  MyTomorrowRoutePreviewQuery['myTomorrowRoutePreview']
 export type RoutePreviewStopItem = RoutePreviewItem['stops'][number]
 export type ActiveRouteTemplateOption =
   RouteTemplatesQuery['routeTemplates'][number]
+export type RouteStatusValue = RouteStatus
+export { RouteStatus }
 
 const deliveryRoutes = ref<DeliveryRouteItem[]>([])
 const myTodayRoute = ref<DeliveryRouteItem | null>(null)
@@ -39,10 +45,12 @@ const loading = ref(false)
 const previewLoading = ref(false)
 const templatesLoading = ref(false)
 const generating = ref(false)
+const updatingStatus = ref(false)
 const errorMessage = ref<string | null>(null)
 const previewErrorMessage = ref<string | null>(null)
 const previewErrorCode = ref<string | null>(null)
 const generateError = ref<string | null>(null)
+const statusError = ref<string | null>(null)
 const successMessage = ref<string | null>(null)
 
 let todayRouteSubscriptionCleanup: (() => void) | null = null
@@ -56,10 +64,23 @@ function extractGraphQLErrorCode(error: unknown): string | null {
 
   const graphQLError = error.graphQLErrors[0]
   const originalError = graphQLError?.extensions?.originalError as
-    | { error?: string }
-    | undefined
+    { error?: string } | undefined
 
   return originalError?.error ?? null
+}
+
+function upsertDeliveryRoute(route: DeliveryRouteItem): void {
+  const existingIndex = deliveryRoutes.value.findIndex(
+    item => item.id === route.id,
+  )
+
+  if (existingIndex === -1) {
+    deliveryRoutes.value = [route, ...deliveryRoutes.value]
+  } else {
+    const next = [...deliveryRoutes.value]
+    next[existingIndex] = route
+    deliveryRoutes.value = next
+  }
 }
 
 export function useDeliveryRoutes() {
@@ -169,17 +190,7 @@ export function useDeliveryRoutes() {
       const route = result.data?.generateDeliveryRoute ?? null
 
       if (route) {
-        const existingIndex = deliveryRoutes.value.findIndex(
-          item => item.id === route.id,
-        )
-
-        if (existingIndex === -1) {
-          deliveryRoutes.value = [route, ...deliveryRoutes.value]
-        } else {
-          const next = [...deliveryRoutes.value]
-          next[existingIndex] = route
-          deliveryRoutes.value = next
-        }
+        upsertDeliveryRoute(route)
 
         successMessage.value =
           route.stops.length === 0
@@ -193,6 +204,53 @@ export function useDeliveryRoutes() {
       return null
     } finally {
       generating.value = false
+    }
+  }
+
+  async function updateRouteStatus(
+    id: string,
+    status: RouteStatusValue,
+    reason?: string | null,
+  ): Promise<DeliveryRouteItem | null> {
+    updatingStatus.value = true
+    statusError.value = null
+    successMessage.value = null
+
+    try {
+      const result = await apolloClient.mutate<
+        UpdateRouteStatusMutation,
+        UpdateRouteStatusMutationVariables
+      >({
+        mutation: UPDATE_ROUTE_STATUS_MUTATION,
+        variables: {
+          id,
+          status,
+          reason: reason?.trim() ? reason.trim() : undefined,
+        },
+      })
+
+      const route = result.data?.updateRouteStatus ?? null
+
+      if (route) {
+        upsertDeliveryRoute(route)
+
+        if (myTodayRoute.value?.id === route.id) {
+          myTodayRoute.value = route
+          apolloClient.writeQuery({
+            query: MY_TODAY_ROUTE_QUERY,
+            data: { myTodayRoute: route },
+          })
+        }
+
+        successMessage.value = `Routestatus bijgewerkt naar ${route.status}.`
+      }
+
+      return route
+    } catch (error) {
+      statusError.value = mapGraphQLError(error)
+      return null
+    } finally {
+      updatingStatus.value = false
     }
   }
 
@@ -262,6 +320,13 @@ export function useDeliveryRoutes() {
     return `${address.street} ${address.houseNumber}, ${address.postalCode} ${address.city}`
   }
 
+  function formatStatusHistoryEntry(entry: RouteStatusHistoryItem): string {
+    const from = entry.fromStatus ?? '—'
+    const reason = entry.reason ? ` (${entry.reason})` : ''
+    const when = new Date(entry.changedAt).toLocaleString('nl-BE')
+    return `${from} → ${entry.toStatus} · ${when}${reason}`
+  }
+
   function isRouteTemplateInactiveError(error: unknown): boolean {
     return extractGraphQLErrorCode(error) === 'ROUTE_TEMPLATE_INACTIVE'
   }
@@ -278,6 +343,10 @@ export function useDeliveryRoutes() {
     )
   }
 
+  function canRegenerateRoute(status: RouteStatusValue): boolean {
+    return status === RouteStatus.Assigned || status === RouteStatus.Cancelled
+  }
+
   return {
     deliveryRoutes,
     myTodayRoute,
@@ -287,24 +356,29 @@ export function useDeliveryRoutes() {
     previewLoading,
     templatesLoading,
     generating,
+    updatingStatus,
     errorMessage,
     previewErrorMessage,
     previewErrorCode,
     generateError,
+    statusError,
     successMessage,
     loadActiveTemplates,
     loadDeliveryRoutes,
     loadMyTodayRoute,
     loadMyTomorrowRoutePreview,
     generateDeliveryRoute,
+    updateRouteStatus,
     subscribeToTodayRouteUpdates,
     stopTodayRouteSubscription,
     subscribeToTomorrowPreviewReconnect,
     stopTomorrowPreviewReconnect,
     formatAddress,
+    formatStatusHistoryEntry,
     isRouteTemplateInactiveError,
     isDeliveryRouteNotRegenerableError,
     isMissingTemplatePreviewError,
+    canRegenerateRoute,
     mapGraphQLError,
   }
 }

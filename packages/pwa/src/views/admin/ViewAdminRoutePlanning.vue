@@ -4,7 +4,12 @@ import { computed, onMounted, ref, watch } from 'vue'
 import CommonEmptyState from '@/components/common/CommonEmptyState.vue'
 import CommonErrorState from '@/components/common/CommonErrorState.vue'
 import CommonLoadingSkeleton from '@/components/common/CommonLoadingSkeleton.vue'
-import { useDeliveryRoutes } from '@/composables/useDeliveryRoutes'
+import {
+  RouteStatus,
+  useDeliveryRoutes,
+  type DeliveryRouteItem,
+  type RouteStatusValue,
+} from '@/composables/useDeliveryRoutes'
 import { useRouteTemplates } from '@/composables/useRouteTemplates'
 
 function todayLocalDate(): string {
@@ -21,13 +26,18 @@ const {
   loading,
   templatesLoading,
   generating,
+  updatingStatus,
   errorMessage,
   generateError,
+  statusError,
   successMessage,
   loadActiveTemplates,
   loadDeliveryRoutes,
   generateDeliveryRoute,
+  updateRouteStatus,
   formatAddress,
+  formatStatusHistoryEntry,
+  canRegenerateRoute,
 } = useDeliveryRoutes()
 
 const { loadProfileOptions, findBezorgerProfile } = useRouteTemplates()
@@ -35,6 +45,13 @@ const { loadProfileOptions, findBezorgerProfile } = useRouteTemplates()
 const deliveryDate = ref(todayLocalDate())
 const selectedTemplateId = ref<string | undefined>(undefined)
 const confirmRegenerate = ref(false)
+const confirmAction = ref<{
+  routeId: string
+  status: RouteStatusValue
+  label: string
+} | null>(null)
+const cancelReason = ref('')
+const actingRouteId = ref<string | null>(null)
 
 const selectedTemplate = computed(() =>
   activeTemplates.value.find(
@@ -68,6 +85,16 @@ const existingRouteForSelection = computed(() => {
   )
 })
 
+const canGenerateSelected = computed(() => {
+  const existing = existingRouteForSelection.value
+
+  if (!existing) {
+    return true
+  }
+
+  return canRegenerateRoute(existing.status)
+})
+
 const templateOptions = computed(() =>
   activeTemplates.value.map(template => {
     const courier = findBezorgerProfile(template.bezorgerProfileId)
@@ -94,7 +121,7 @@ async function refresh(): Promise<void> {
 }
 
 async function onGenerate(): Promise<void> {
-  if (!selectedTemplateId.value) {
+  if (!selectedTemplateId.value || !canGenerateSelected.value) {
     return
   }
 
@@ -110,6 +137,60 @@ async function onGenerate(): Promise<void> {
 
 function cancelRegenerateConfirm(): void {
   confirmRegenerate.value = false
+}
+
+function requestStatusChange(
+  route: DeliveryRouteItem,
+  status: RouteStatusValue,
+  label: string,
+): void {
+  confirmAction.value = { routeId: route.id, status, label }
+  cancelReason.value = ''
+}
+
+function closeStatusModal(): void {
+  confirmAction.value = null
+  cancelReason.value = ''
+}
+
+async function confirmStatusChange(): Promise<void> {
+  if (!confirmAction.value) {
+    return
+  }
+
+  const { routeId, status } = confirmAction.value
+  actingRouteId.value = routeId
+
+  const reason =
+    status === RouteStatus.Cancelled ? cancelReason.value.trim() || null : null
+
+  const updated = await updateRouteStatus(routeId, status, reason)
+  actingRouteId.value = null
+
+  if (updated) {
+    closeStatusModal()
+    await loadDeliveryRoutes({ deliveryDate: deliveryDate.value })
+  }
+}
+
+function availableAdminActions(
+  status: RouteStatusValue,
+): Array<{ status: RouteStatusValue; label: string; color?: 'error' }> {
+  if (status === RouteStatus.Assigned) {
+    return [
+      { status: RouteStatus.InProgress, label: 'Starten' },
+      { status: RouteStatus.Cancelled, label: 'Annuleren', color: 'error' },
+    ]
+  }
+
+  if (status === RouteStatus.InProgress) {
+    return [
+      { status: RouteStatus.Completed, label: 'Voltooien' },
+      { status: RouteStatus.Cancelled, label: 'Annuleren', color: 'error' },
+    ]
+  }
+
+  return []
 }
 
 watch(deliveryDate, () => {
@@ -131,7 +212,8 @@ onMounted(() => {
     <div>
       <h1 class="text-2xl font-semibold">Routeplanning</h1>
       <p class="mt-1 text-sm text-muted">
-        Genereer dagelijkse bezorgroutes vanuit actieve routetemplates.
+        Genereer dagelijkse bezorgroutes vanuit actieve routetemplates en beheer
+        uitvoeringsstatus.
       </p>
     </div>
 
@@ -167,7 +249,18 @@ onMounted(() => {
       </div>
 
       <UAlert
-        v-if="existingRouteForSelection && confirmRegenerate"
+        v-if="existingRouteForSelection && !canGenerateSelected"
+        class="mt-4"
+        color="warning"
+        variant="subtle"
+        title="Route niet regenererbaar"
+        :description="`Route met status ${existingRouteForSelection.status} kan niet opnieuw gegenereerd worden.`"
+      />
+
+      <UAlert
+        v-if="
+          existingRouteForSelection && canGenerateSelected && confirmRegenerate
+        "
         class="mt-4"
         color="warning"
         variant="subtle"
@@ -178,7 +271,7 @@ onMounted(() => {
       <div class="mt-4 flex flex-wrap gap-2">
         <UButton
           :loading="generating"
-          :disabled="!selectedTemplateId || generating"
+          :disabled="!selectedTemplateId || generating || !canGenerateSelected"
           @click="onGenerate"
         >
           {{
@@ -261,6 +354,39 @@ onMounted(() => {
             </UBadge>
           </div>
 
+          <div
+            v-if="availableAdminActions(route.status).length > 0"
+            class="flex flex-wrap gap-2"
+          >
+            <UButton
+              v-for="action in availableAdminActions(route.status)"
+              :key="`${route.id}-${action.status}`"
+              size="sm"
+              :color="action.color === 'error' ? 'error' : 'primary'"
+              :variant="action.color === 'error' ? 'outline' : 'solid'"
+              :loading="actingRouteId === route.id && updatingStatus"
+              :disabled="updatingStatus"
+              @click="requestStatusChange(route, action.status, action.label)"
+            >
+              {{ action.label }}
+            </UButton>
+          </div>
+
+          <div
+            v-if="route.statusHistory.length > 0"
+            class="rounded-md bg-elevated/30 px-3 py-2 text-sm"
+          >
+            <p class="font-medium">Statusgeschiedenis</p>
+            <ul class="mt-1 space-y-1 text-muted">
+              <li
+                v-for="(entry, index) in route.statusHistory"
+                :key="`${route.id}-${entry.toStatus}-${index}`"
+              >
+                {{ formatStatusHistoryEntry(entry) }}
+              </li>
+            </ul>
+          </div>
+
           <CommonEmptyState
             v-if="route.stops.length === 0"
             title="Lege route"
@@ -290,6 +416,72 @@ onMounted(() => {
           </ul>
         </div>
       </div>
+
+      <CommonErrorState
+        v-if="statusError"
+        class="mt-4"
+        title="Statuswijziging mislukt"
+        :description="statusError"
+      />
     </UCard>
+
+    <UModal
+      :open="confirmAction !== null"
+      :title="confirmAction ? `Route ${confirmAction.label.toLowerCase()}` : ''"
+      @update:open="
+        open => {
+          if (!open) closeStatusModal()
+        }
+      "
+    >
+      <template #body>
+        <p class="text-sm">
+          <template v-if="confirmAction?.status === RouteStatus.Cancelled">
+            Bevestig annulering van deze route. Bestellingen en voorraad blijven
+            ongewijzigd.
+          </template>
+          <template
+            v-else-if="confirmAction?.status === RouteStatus.InProgress"
+          >
+            Bevestig dat deze route gestart wordt.
+          </template>
+          <template v-else>
+            Bevestig dat deze route voltooid is. Bestellingen worden niet
+            automatisch als geleverd gemarkeerd.
+          </template>
+        </p>
+        <UFormField
+          v-if="confirmAction?.status === RouteStatus.Cancelled"
+          class="mt-4"
+          label="Reden (optioneel)"
+        >
+          <UInput
+            v-model="cancelReason"
+            placeholder="Bijv. bezorger niet beschikbaar"
+          />
+        </UFormField>
+        <UAlert
+          v-if="statusError"
+          class="mt-3"
+          color="error"
+          variant="subtle"
+          :title="statusError"
+        />
+      </template>
+      <template #footer>
+        <UButton variant="ghost" @click="closeStatusModal"> Terug </UButton>
+        <UButton
+          :color="
+            confirmAction?.status === RouteStatus.Cancelled
+              ? 'error'
+              : 'primary'
+          "
+          :loading="updatingStatus"
+          @click="confirmStatusChange"
+        >
+          Bevestig
+        </UButton>
+      </template>
+    </UModal>
   </div>
 </template>

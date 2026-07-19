@@ -7,12 +7,13 @@ screens.
 
 ## Current status
 
-**Phase 13 complete — computed tomorrow `RoutePreview`.** BEZORGER can open
-`/bezorger/tomorrow` for a live, non-persisted preview of tomorrow’s stops
-derived from the assigned active `RouteTemplate` and qualifying orders.
-`DeliveryRoute` documents are never created or updated by this query.
+**Phase 14 complete — delivery route execution lifecycle.** Routes move through
+`ASSIGNED → IN_PROGRESS → COMPLETED`, with admin cancellation of non-terminal
+routes. Couriers start/complete their own today route; admins may perform all
+approved transitions. Route completion does **not** mark orders delivered or
+change stock.
 
-**Next phase:** Phase 14 — route execution lifecycle (start / complete / cancel).
+**Next phase:** Phase 15 — seed system.
 
 ## Planned stack
 
@@ -1176,6 +1177,79 @@ argument — another courier cannot be selected.
    `DeliveryRoute`, unchanged order statuses/stock/notifications.
 7. Confirm APOTHEKER/ADMIN cannot query `myTomorrowRoutePreview`.
 8. Confirm `/bezorger/today` still works.
+
+## Route execution lifecycle (Phase 14)
+
+### Route FSM
+
+| From                       | To            | Actor                     |
+| -------------------------- | ------------- | ------------------------- |
+| `ASSIGNED`                 | `IN_PROGRESS` | BEZORGER (own) or ADMIN   |
+| `IN_PROGRESS`              | `COMPLETED`   | BEZORGER (own) or ADMIN   |
+| `ASSIGNED` / `IN_PROGRESS` | `CANCELLED`   | ADMIN only                |
+| `COMPLETED` / `CANCELLED`  | —             | terminal (no transitions) |
+
+Same-status requests are **idempotent**: return the existing route, append no
+history, publish no realtime event.
+
+### Mutation
+
+`updateRouteStatus(id, status, reason?)` — ADMIN or BEZORGER. Clients cannot
+supply `changedByUserId`, timestamps, history, or courier ownership. BEZORGER
+ownership is derived from the authenticated user → `BezorgerProfile` →
+`DeliveryRoute.bezorgerProfileId` (ObjectId/string-safe).
+
+### Status history
+
+Immutable embedded `statusHistory` entries: `fromStatus` (nullable for initial
+`ASSIGNED`), `toStatus`, `changedAt`, `changedByUserId`, optional `reason`.
+Generation creates the initial `ASSIGNED` entry. Each real transition appends
+exactly one entry. Legacy routes missing history are normalized on the next
+real transition.
+
+### Idempotency and concurrency
+
+Transitions use a conditional MongoDB update matching `_id` + expected current
+`status`. Concurrent duplicates: one wins; the loser reloads and returns an
+idempotent result or a safe transition error. No duplicate history.
+
+### Realtime
+
+After a **persisted** status change, publish on `bezorgerRouteUpdates` (owning
+courier only). Failed, unauthorized, invalid, and idempotent requests publish
+nothing. Reconnect refetches `myTodayRoute`.
+
+### Route completion vs order delivery
+
+Completing a route means the courier finished the route workflow. It does **not**:
+
+- change `Order` status or mark orders `DELIVERED`;
+- decrement stock or create `StockAdjustment`;
+- modify `RouteTemplate` or regenerate stops.
+
+Order delivery remains a separate admin action (Phase 10).
+
+### UI
+
+| Surface                 | Behaviour                                                                                                      |
+| ----------------------- | -------------------------------------------------------------------------------------------------------------- |
+| `/bezorger/today`       | Start / complete with confirmation; completed/cancelled states; history; large mobile buttons                  |
+| `/admin/route-planning` | Status, history, start/complete/cancel with confirmation; regeneration blocked for `IN_PROGRESS` / `COMPLETED` |
+
+### Manual runtime test (Phase 14)
+
+1. Generate a persisted route for today.
+2. Log in as the assigned BEZORGER → `/bezorger/today` → status `ASSIGNED`.
+3. Click **Route starten** → confirm → `IN_PROGRESS`; refresh to confirm persistence.
+4. Click **Route voltooien** → confirm → `COMPLETED`; no further action controls.
+5. Inspect MongoDB `statusHistory`: initial `ASSIGNED`, then `IN_PROGRESS`, then
+   `COMPLETED`.
+6. Confirm orders remain `PLANNED` (or prior statuses); stock unchanged; no new
+   `StockAdjustment`.
+7. Attempt an invalid/terminal transition — safe error or idempotent no-op.
+8. Generate another `ASSIGNED` route; as ADMIN cancel with optional reason;
+   courier sees `CANCELLED` via refetch/realtime.
+9. Confirm `/bezorger/tomorrow` remains computed and unaffected.
 
 ## CI
 

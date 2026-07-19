@@ -59,3 +59,24 @@ export class DeliveryRouteForbiddenException extends ForbiddenException {
     })
   }
 }
+
+export class InvalidRouteStatusTransitionException extends BadRequestException {
+  constructor(fromStatus: string, toStatus: string) {
+    super({
+      message: `Statusovergang van ${fromStatus} naar ${toStatus} is niet toegestaan.`,
+      error: 'INVALID_ROUTE_STATUS_TRANSITION',
+      fromStatus,
+      toStatus,
+    })
+  }
+}
+
+export class RouteCannotBeCancelledException extends BadRequestException {
+  constructor(status: string) {
+    super({
+      message: `Route met status ${status} kan niet geannuleerd worden.`,
+      error: 'ROUTE_CANNOT_BE_CANCELLED',
+      status,
+    })
+  }
+}
