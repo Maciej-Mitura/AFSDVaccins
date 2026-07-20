@@ -27,7 +27,8 @@
     "lint:pwa": "npm run lint --workspace=@vaccin-delivery/pwa",
     "typecheck:api": "npm run typecheck --workspace=@vaccin-delivery/api",
     "typecheck:pwa": "npm run generate:graphql && npm run typecheck --workspace=@vaccin-delivery/pwa",
-    "test:api": "npm run test --workspace=@vaccin-delivery/api"
+    "test:api": "npm run test --workspace=@vaccin-delivery/api",
+    "seed:database:all": "npm run seed:database:all --workspace=@vaccin-delivery/api"
   },
   "devDependencies": {
     "concurrently": "^9.1.2",

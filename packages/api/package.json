@@ -14,7 +14,8 @@
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "test": "jest",
     "test:watch": "jest --watch",
-    "test:cov": "jest --coverage"
+    "test:cov": "jest --coverage",
+    "seed:database:all": "nest build && node dist/cli.js"
   },
   "dependencies": {
     "@apollo/server": "^4.12.2",

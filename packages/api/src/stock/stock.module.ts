@@ -57,6 +57,7 @@ const stockAdjustmentRepositoryProvider = isSchemaGeneration
       useValue: {
         insertManualAdjustment: () => Promise.resolve(null),
         insertIdempotentAdjustment: () => Promise.resolve(null),
+        findByIdempotencyKey: () => Promise.resolve(null),
       },
     }
   : StockAdjustmentRepository
@@ -94,6 +95,6 @@ const persistenceImports = isSchemaGeneration
     stockAdjustmentPersistenceProvider,
     StockResolver,
   ],
-  exports: [StockService],
+  exports: [StockService, StockAdjustmentRepository, VaccineStockRepository],
 })
 export class StockModule {}

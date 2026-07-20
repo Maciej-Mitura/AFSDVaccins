@@ -7,13 +7,12 @@ screens.
 
 ## Current status
 
-**Phase 14 complete — delivery route execution lifecycle.** Routes move through
-`ASSIGNED → IN_PROGRESS → COMPLETED`, with admin cancellation of non-terminal
-routes. Couriers start/complete their own today route; admins may perform all
-approved transitions. Route completion does **not** mark orders delivered or
-change stock.
+**Phase 15 complete — deterministic development seed system.** An idempotent CLI
+seeds Firebase Auth demo users (hybrid Admin provisioning) and the full MongoDB
+domain graph for presentation and authz demos. Safe to rerun; production is
+always refused.
 
-**Next phase:** Phase 15 — seed system.
+**Next phase:** Phase 16 — PWA / offline support.
 
 ## Planned stack
 
@@ -205,6 +204,132 @@ docker compose -f infrastructure/docker-compose-dev.yml up -d
 ```
 
 **Or** use an existing MongoDB instance on `mongodb://localhost:27017`.
+
+## Database seed (Phase 15)
+
+### Purpose
+
+Populate Firebase Authentication and MongoDB with a **deterministic, idempotent**
+demo dataset for presentation, role testing, and authz demos. The seed does
+**not** start on API boot — run it explicitly.
+
+### Prerequisites
+
+1. MongoDB running (`infrastructure/docker-compose-dev.yml` or local).
+2. Firebase Admin credentials via `GOOGLE_APPLICATION_CREDENTIALS` (same as API).
+3. `packages/api/.env` configured (see `.env.example`).
+
+### Firebase vs MongoDB responsibility
+
+| Layer                     | Responsibility                                                                |
+| ------------------------- | ----------------------------------------------------------------------------- |
+| Firebase Auth             | Identity accounts (email/password) for demo users                             |
+| MongoDB `User`            | Application role (`ADMIN` / `APOTHEKER` / `BEZORGER`) linked by `firebaseUid` |
+| MongoDB profiles / domain | Pharmacies, couriers, vaccines, stock, orders, templates, routes              |
+
+Public self-registration remains limited to **APOTHEKER** and **BEZORGER**.
+**ADMIN** is never available through public registration — only via seed (or
+future admin provisioning).
+
+### Required environment variables
+
+In `packages/api/.env`:
+
+```env
+NODE_ENV=development
+ALLOW_DATABASE_SEED=true
+SEED_DEMO_PASSWORD=change-me-demo-only
+```
+
+Optional UID overrides (link to existing Firebase accounts; omit for normal
+email-based resolve/create):
+
+```env
+# SEED_DOCENT_FIREBASE_UID=
+# SEED_APOTHEKER1_FIREBASE_UID=
+# SEED_APOTHEKER2_FIREBASE_UID=
+# SEED_APOTHEKER3_FIREBASE_UID=
+# SEED_BEZORGER1_FIREBASE_UID=
+# SEED_BEZORGER2_FIREBASE_UID=
+```
+
+How to obtain a Firebase UID for an existing account: Firebase console →
+**Authentication → Users** → open the user → copy **User UID**. Prefer email
+resolve when possible; use overrides only when you intentionally reuse an
+existing Auth user.
+
+### Production safety
+
+The seed aborts with a non-zero exit code (no Firebase/Mongo writes) unless
+**both** are true:
+
+- `NODE_ENV=development`
+- `ALLOW_DATABASE_SEED=true`
+
+`NODE_ENV=production` is always refused. Safety is **not** inferred from the
+database hostname.
+
+### Command
+
+From the repository root:
+
+```bash
+npm run seed:database:all
+```
+
+Uses `NestFactory.createApplicationContext` (no HTTP/GraphQL server). Safe to
+rerun; the second and third runs should report mostly **reused** counts.
+
+### Demo accounts (evaluation only)
+
+| Email                | Role      | Notes                              |
+| -------------------- | --------- | ---------------------------------- |
+| `docent@howest.be`   | ADMIN     | Evaluator admin                    |
+| `apotheker1@demo.be` | APOTHEKER | Happy path / near daily FLU limit  |
+| `apotheker2@demo.be` | APOTHEKER | Weekly limit boundary (~195 doses) |
+| `apotheker3@demo.be` | APOTHEKER | Empty history; skipped route stop  |
+| `bezorger1@demo.be`  | BEZORGER  | Today route assignee               |
+| `bezorger2@demo.be`  | BEZORGER  | Cross-authz isolation              |
+
+Password: set `SEED_DEMO_PASSWORD` locally (never commit real values). Documented
+assignment evaluation passwords belong in your local `.env` / dossier only —
+they are **not** hardcoded in TypeScript.
+
+### Expected dataset
+
+- Application settings singleton (`Europe/Brussels`, closing `14:00`)
+- Vaccines: Influenza, COVID-19 (low stock), MMR
+- Stock reconciled to fixed targets (idempotent adjustment keys)
+- Orders for today + tomorrow (deterministic ObjectIds); today orders planned
+  into the generated route
+- Active route templates for both couriers; bezorger1 template includes the
+  empty pharmacy (skipped on generation)
+- Persisted **ASSIGNED** delivery route for **today** only
+- Tomorrow remains a **computed** `RoutePreview` (not persisted)
+- No order is automatically marked **DELIVERED**
+
+Today/tomorrow dates use `Europe/Brussels` via shared delivery-date utilities
+(not UTC string slicing).
+
+### Idempotency
+
+Upsert by natural keys (`firebaseUid`, `userId`, `normalizedName`, singleton
+key, fixed order ObjectIds, `(bezorgerProfileId, deliveryDate)`). Reruns do not
+duplicate users, profiles, vaccines, stock adjustments, order/route history, or
+active templates.
+
+There is **no** `seed:reset` command: entities lack reliable seed-ownership
+markers, so selective cleanup cannot be guaranteed. Use the normal seed to
+reconcile the deterministic dataset, or clear Mongo collections manually in
+development if needed. Firebase Auth accounts are never deleted by the seed.
+
+### Verify
+
+1. Run `npm run seed:database:all` twice; both exit 0; reused counts dominate.
+2. Log in as each role and confirm settings, vaccines, stock, orders, templates,
+   today route (ASSIGNED), and tomorrow preview.
+3. Confirm no automatic DELIVERED orders and no duplicate Mongo documents for
+   seed keys.
 
 ## Development
 

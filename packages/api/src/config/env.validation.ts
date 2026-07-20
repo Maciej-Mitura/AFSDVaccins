@@ -15,6 +15,19 @@ export const envValidationSchema = Joi.object({
     }),
   DB_NAME: Joi.string().min(1).required(),
   GOOGLE_APPLICATION_CREDENTIALS: Joi.string().min(1).optional(),
+  /** Explicit opt-in for the development seed CLI (never default-on). */
+  ALLOW_DATABASE_SEED: Joi.boolean()
+    .truthy('true')
+    .falsy('false')
+    .default(false),
+  /** Shared demo password for seeded Firebase accounts (evaluation only). */
+  SEED_DEMO_PASSWORD: Joi.string().min(1).optional(),
+  SEED_DOCENT_FIREBASE_UID: Joi.string().min(1).optional(),
+  SEED_APOTHEKER1_FIREBASE_UID: Joi.string().min(1).optional(),
+  SEED_APOTHEKER2_FIREBASE_UID: Joi.string().min(1).optional(),
+  SEED_APOTHEKER3_FIREBASE_UID: Joi.string().min(1).optional(),
+  SEED_BEZORGER1_FIREBASE_UID: Joi.string().min(1).optional(),
+  SEED_BEZORGER2_FIREBASE_UID: Joi.string().min(1).optional(),
 })
 
 export type EnvConfig = {
@@ -24,6 +37,14 @@ export type EnvConfig = {
   DB_HOST: string
   DB_NAME: string
   GOOGLE_APPLICATION_CREDENTIALS?: string
+  ALLOW_DATABASE_SEED: boolean
+  SEED_DEMO_PASSWORD?: string
+  SEED_DOCENT_FIREBASE_UID?: string
+  SEED_APOTHEKER1_FIREBASE_UID?: string
+  SEED_APOTHEKER2_FIREBASE_UID?: string
+  SEED_APOTHEKER3_FIREBASE_UID?: string
+  SEED_BEZORGER1_FIREBASE_UID?: string
+  SEED_BEZORGER2_FIREBASE_UID?: string
 }
 
 export const buildMongoUrl = (dbHost: string, dbName: string): string => {
