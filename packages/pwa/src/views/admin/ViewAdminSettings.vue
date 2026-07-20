@@ -7,6 +7,9 @@ import * as z from 'zod'
 import CommonErrorState from '@/components/common/CommonErrorState.vue'
 import CommonLoadingSkeleton from '@/components/common/CommonLoadingSkeleton.vue'
 import { useApplicationSettings } from '@/composables/useApplicationSettings'
+import { useOnlineStatus } from '@/composables/useOnlineStatus'
+
+const { isOnline } = useOnlineStatus()
 
 const {
   settings,
@@ -173,7 +176,9 @@ async function onSubmit(event: FormSubmitEvent<SettingsForm>) {
             :title="successMessage"
           />
 
-          <UButton type="submit" :loading="saving">Opslaan</UButton>
+          <UButton type="submit" :loading="saving" :disabled="!isOnline">
+            Opslaan
+          </UButton>
         </UForm>
       </div>
     </UCard>

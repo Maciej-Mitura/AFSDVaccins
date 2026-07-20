@@ -7,12 +7,12 @@ screens.
 
 ## Current status
 
-**Phase 15 complete — deterministic development seed system.** An idempotent CLI
-seeds Firebase Auth demo users (hybrid Admin provisioning) and the full MongoDB
-domain graph for presentation and authz demos. Safe to rerun; production is
-always refused.
+**Phase 16 complete — installable PWA with safe offline shell support.** The Vue
+client ships a web app manifest, service worker (static assets only), offline
+fallback page, online/offline UI, reconnect refetch, and an explicit update
+prompt. Private GraphQL/Firebase data is never cached by the service worker.
 
-**Next phase:** Phase 16 — PWA / offline support.
+**Next phase:** Phase 17 — backend GraphQL end-to-end tests.
 
 ## Planned stack
 
@@ -820,9 +820,118 @@ npm run generate:schema
 ```bash
 npm run dev:pwa
 npm run build:pwa
+npm run preview --workspace=@vaccin-delivery/pwa
 npm run lint:pwa
 npm run typecheck:pwa
+npm run test:pwa
 ```
+
+## Progressive Web App (Phase 16)
+
+### What is provided
+
+| Capability       | Behaviour                                                                  |
+| ---------------- | -------------------------------------------------------------------------- |
+| Web app manifest | `Vaccinatie-levering` / short name `Vaccin`, `display: standalone`         |
+| Icons            | 192×192, 512×512, maskable 512, favicon under `packages/pwa/public/`       |
+| Service worker   | `vite-plugin-pwa` + Workbox, **production builds** (see below for dev)     |
+| Precache         | Built JS/CSS/HTML shell, icons, `offline.html` only                        |
+| Runtime cache    | **None** — no GraphQL, Firebase Auth, or private API caching               |
+| Offline UI       | Banner: live data and actions temporarily unavailable                      |
+| Offline fallback | `/offline.html` for failed navigations when the network is down            |
+| Reconnect        | Browser `online` + WebSocket reconnect refetch critical authenticated data |
+| Update prompt    | “Er is een nieuwe versie beschikbaar.” → **Bijwerken**                     |
+| Install prompt   | Optional “App installeren” when Chromium fires `beforeinstallprompt`       |
+
+### Install prerequisites
+
+- Chromium-based browser (Chrome / Edge) over **HTTPS** or `localhost`
+- Production build served (manifest + service worker emitted by `vite build`)
+- Valid icons and manifest (no DevTools Application errors)
+
+### Service-worker strategy
+
+- `registerType: 'prompt'` — user confirms before a waiting worker activates
+- Precache: revisioned static build assets only (including `index.html` and
+  `offline.html`)
+- `navigateFallback: '/index.html'` for Vue Router history routes (never
+  `/offline.html`)
+- `navigateFallbackDenylist` excludes `/api` and `/graphql`
+- Navigations also use Workbox `NetworkOnly` + `precacheFallback` →
+  `/offline.html` **only** after a genuine network failure
+- API / GraphQL / Firebase Auth are **not** runtime-cached
+- **No** offline mutation queue
+- **No** authenticated route/order/stock response caching
+- Development (`npm run dev`) keeps the service worker **disabled** unless
+  `VITE_PWA_DEV=true` — offline refresh in dev uses the browser native page
+
+### Offline fallback recovery
+
+`/offline.html` is a static page. **Opnieuw proberen** and the browser `online`
+event both call `location.replace('/')` so the SPA can load again. Do not reload
+the offline document itself.
+
+After changing SW config, unregister any old `localhost` service worker and clear
+site data once so a previous `/offline.html` NavigationRoute cannot stick.
+
+### Offline limitations
+
+When offline:
+
+- The previously loaded app shell may open
+- Live route/order/stock data is **not** treated as freshly authoritative
+- Mutation controls (orders, stock, route status, settings, profile) are disabled
+- Login/register require network
+- Failed navigations can show `/offline.html`
+
+### Reconnect behaviour
+
+When connectivity returns, a centralized handler refetches data already registered
+via `registerReconnectHandler` (current user notifications, today route, tomorrow
+preview, admin feeds, etc.) and Apollo subscriptions reconnect as before.
+
+### Update behaviour
+
+A new production deploy registers a waiting service worker. The in-app banner
+offers **Bijwerken**, which activates the worker and reloads. The app does not
+auto-reload during an active mutation.
+
+### Install flow
+
+1. Build and serve the production PWA (`npm run build:pwa` then preview).
+2. Open the app in Chromium → DevTools → Application → Manifest / Service Workers.
+3. Use the browser install affordance or the in-app **App installeren** control when shown.
+4. Launch in standalone mode and confirm role navigation still works.
+
+### Testing with DevTools
+
+1. `npm run build:pwa`
+2. `npm run preview --workspace=@vaccin-delivery/pwa`
+3. Application → Manifest: name, icons, no errors
+4. Application → Service Workers: registered
+5. Network → Offline → reload: shell or offline page + offline banner; no GraphQL flood
+6. Network → Online: banner clears; data refetches
+7. Cache Storage: confirm **no** GraphQL bodies, tokens, orders, routes, or stock records
+8. Deploy a new build and confirm the update banner appears
+
+### Unregistering a stale service worker
+
+If a development or old worker interferes:
+
+1. DevTools → Application → Service Workers → **Unregister**
+2. Application → Storage → **Clear site data** (optional)
+3. Hard-reload the page
+
+Development mode does **not** register a service worker unless you set
+`VITE_PWA_DEV=true` when starting Vite.
+
+### Excluded from Phase 16
+
+- Offline order creation / mutation queues
+- Background sync of authenticated mutations
+- Authenticated courier-route Cache API storage
+- Push notifications
+- Playwright installability suite (Phase 18)
 
 ## Types commands
 

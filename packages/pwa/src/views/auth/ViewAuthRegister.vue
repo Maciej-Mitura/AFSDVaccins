@@ -11,8 +11,10 @@ import {
   useCurrentUser,
 } from '@/composables/useCurrentUser'
 import { useFirebase } from '@/composables/useFirebase'
+import { useOnlineStatus } from '@/composables/useOnlineStatus'
 
 const router = useRouter()
+const { isOnline } = useOnlineStatus()
 const { register } = useFirebase()
 const {
   createOwnUser,
@@ -183,7 +185,7 @@ async function onSubmit(event: FormSubmitEvent<RegisterForm>) {
         />
       </UFormField>
 
-      <UButton :loading="loading" block type="submit">
+      <UButton :loading="loading" :disabled="!isOnline" block type="submit">
         Account aanmaken
       </UButton>
     </UForm>

@@ -16,5 +16,6 @@ export default defineConfig({
   test: {
     environment: 'node',
     include: ['src/**/*.spec.ts'],
+    // Specs that need DOM APIs opt in with `@vitest-environment happy-dom`.
   },
 })

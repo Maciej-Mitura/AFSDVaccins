@@ -39,10 +39,35 @@ export function registerReconnectHandler(
   }
 }
 
-async function notifyReconnectHandlers(): Promise<void> {
-  await Promise.all(
+let reconnectDispatchTimer: ReturnType<typeof setTimeout> | null = null
+let reconnectDispatchInFlight: Promise<void> | null = null
+
+export async function triggerReconnectHandlers(): Promise<void> {
+  if (reconnectDispatchTimer) {
+    clearTimeout(reconnectDispatchTimer)
+  }
+
+  await new Promise<void>(resolve => {
+    reconnectDispatchTimer = setTimeout(() => {
+      reconnectDispatchTimer = null
+      resolve()
+    }, 150)
+  })
+
+  if (reconnectDispatchInFlight) {
+    await reconnectDispatchInFlight
+    return
+  }
+
+  reconnectDispatchInFlight = Promise.all(
     [...reconnectHandlers].map(handler => Promise.resolve(handler())),
-  )
+  ).then(() => undefined)
+
+  try {
+    await reconnectDispatchInFlight
+  } finally {
+    reconnectDispatchInFlight = null
+  }
 }
 
 function resolveBackendWsUrl(): string {
@@ -198,7 +223,7 @@ function createWebSocketClient(ownerUid: string): Client {
 
         if (pendingReconnect) {
           pendingReconnect = false
-          void notifyReconnectHandlers()
+          void triggerReconnectHandlers()
         }
       },
       closed: () => {

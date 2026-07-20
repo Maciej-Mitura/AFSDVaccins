@@ -9,8 +9,11 @@ import CommonLoadingSkeleton from '@/components/common/CommonLoadingSkeleton.vue
 import CommonRealtimeStatus from '@/components/common/CommonRealtimeStatus.vue'
 import { registerReconnectHandler } from '@/composables/useGraphQL'
 import { useAdminOperationsFeed } from '@/composables/useAdminOperationsFeed'
+import { useOnlineStatus } from '@/composables/useOnlineStatus'
 import { useOrders } from '@/composables/useOrders'
 import { useStock } from '@/composables/useStock'
+
+const { isOnline } = useOnlineStatus()
 
 const {
   adminOrders,
@@ -478,6 +481,7 @@ function closeCancelModal() {
         <UButton
           color="primary"
           :loading="statusActionLoading"
+          :disabled="!isOnline"
           @click="() => { if (confirmDeliverId) void onMarkDelivered(confirmDeliverId) }"
         >
           Bevestig levering
@@ -502,6 +506,7 @@ function closeCancelModal() {
         </UButton>
         <UButton
           color="error"
+          :disabled="!isOnline"
           @click="() => { if (confirmCancelId) void onCancel(confirmCancelId) }"
         >
           Bevestig annulering

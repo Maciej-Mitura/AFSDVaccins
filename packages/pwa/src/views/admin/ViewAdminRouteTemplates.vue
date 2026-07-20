@@ -11,6 +11,9 @@ import {
   useRouteTemplates,
   type RouteTemplateListItem,
 } from '@/composables/useRouteTemplates'
+import { useOnlineStatus } from '@/composables/useOnlineStatus'
+
+const { isOnline } = useOnlineStatus()
 
 const {
   templates,
@@ -284,7 +287,9 @@ function stopSummary(template: RouteTemplateListItem): string {
         >
           {{ includeInactive ? 'Incl. inactief' : 'Alleen actief' }}
         </UButton>
-        <UButton size="sm" @click="openCreateForm">Nieuwe template</UButton>
+        <UButton size="sm" :disabled="!isOnline" @click="openCreateForm">
+          Nieuwe template
+        </UButton>
       </div>
     </div>
 
@@ -465,7 +470,9 @@ function stopSummary(template: RouteTemplateListItem): string {
           />
 
           <div class="flex gap-2">
-            <UButton type="submit" :loading="saving">Opslaan</UButton>
+            <UButton type="submit" :loading="saving" :disabled="!isOnline">
+              Opslaan
+            </UButton>
             <UButton color="neutral" variant="ghost" @click="closeForm">
               Annuleren
             </UButton>

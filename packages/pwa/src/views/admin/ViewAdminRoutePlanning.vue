@@ -10,6 +10,7 @@ import {
   type DeliveryRouteItem,
   type RouteStatusValue,
 } from '@/composables/useDeliveryRoutes'
+import { useOnlineStatus } from '@/composables/useOnlineStatus'
 import { useRouteTemplates } from '@/composables/useRouteTemplates'
 
 function todayLocalDate(): string {
@@ -40,6 +41,7 @@ const {
   canRegenerateRoute,
 } = useDeliveryRoutes()
 
+const { isOnline } = useOnlineStatus()
 const { loadProfileOptions, findBezorgerProfile } = useRouteTemplates()
 
 const deliveryDate = ref(todayLocalDate())
@@ -271,7 +273,9 @@ onMounted(() => {
       <div class="mt-4 flex flex-wrap gap-2">
         <UButton
           :loading="generating"
-          :disabled="!selectedTemplateId || generating || !canGenerateSelected"
+          :disabled="
+            !isOnline || !selectedTemplateId || generating || !canGenerateSelected
+          "
           @click="onGenerate"
         >
           {{
@@ -365,7 +369,7 @@ onMounted(() => {
               :color="action.color === 'error' ? 'error' : 'primary'"
               :variant="action.color === 'error' ? 'outline' : 'solid'"
               :loading="actingRouteId === route.id && updatingStatus"
-              :disabled="updatingStatus"
+              :disabled="!isOnline || updatingStatus"
               @click="requestStatusChange(route, action.status, action.label)"
             >
               {{ action.label }}
@@ -477,6 +481,7 @@ onMounted(() => {
               : 'primary'
           "
           :loading="updatingStatus"
+          :disabled="!isOnline"
           @click="confirmStatusChange"
         >
           Bevestig

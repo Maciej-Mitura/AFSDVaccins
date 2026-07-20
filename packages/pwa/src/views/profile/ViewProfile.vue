@@ -8,6 +8,9 @@ import * as z from 'zod'
 import CommonErrorState from '@/components/common/CommonErrorState.vue'
 import CommonLoadingSkeleton from '@/components/common/CommonLoadingSkeleton.vue'
 import { useCurrentUser } from '@/composables/useCurrentUser'
+import { useOnlineStatus } from '@/composables/useOnlineStatus'
+
+const { isOnline } = useOnlineStatus()
 
 const {
   currentUser,
@@ -264,7 +267,7 @@ async function onSubmitBezorger(event: FormSubmitEvent<BezorgerForm>) {
             <UInput v-model="apothekerState.country" class="w-full" />
           </UFormField>
 
-          <UButton :loading="saving" type="submit">
+          <UButton :loading="saving" type="submit" :disabled="!isOnline">
             Wijzigingen opslaan
           </UButton>
         </UForm>
@@ -292,7 +295,7 @@ async function onSubmitBezorger(event: FormSubmitEvent<BezorgerForm>) {
             <UInput v-model="bezorgerState.vehicleLabel" class="w-full" />
           </UFormField>
 
-          <UButton :loading="saving" type="submit">
+          <UButton :loading="saving" type="submit" :disabled="!isOnline">
             Wijzigingen opslaan
           </UButton>
         </UForm>
@@ -312,7 +315,7 @@ async function onSubmitBezorger(event: FormSubmitEvent<BezorgerForm>) {
             <UInput v-model="adminState.lastName" class="w-full" />
           </UFormField>
 
-          <UButton :loading="saving" type="submit">
+          <UButton :loading="saving" type="submit" :disabled="!isOnline">
             Wijzigingen opslaan
           </UButton>
         </UForm>

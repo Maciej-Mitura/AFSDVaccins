@@ -49,7 +49,9 @@
           Wachtwoord vergeten?
         </RouterLink>
 
-        <UButton :loading="loading" block type="submit"> Inloggen </UButton>
+        <UButton :loading="loading" :disabled="!isOnline" block type="submit">
+          Inloggen
+        </UButton>
       </div>
     </UForm>
 
@@ -71,9 +73,11 @@ import * as z from 'zod'
 
 import { useCurrentUser } from '@/composables/useCurrentUser'
 import { useFirebase } from '@/composables/useFirebase'
+import { useOnlineStatus } from '@/composables/useOnlineStatus'
 
 const route = useRoute()
 const router = useRouter()
+const { isOnline } = useOnlineStatus()
 const { login } = useFirebase()
 const { loadCurrentUser, getDefaultRouteForRole } = useCurrentUser()
 

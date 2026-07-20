@@ -28,6 +28,7 @@
     "typecheck:api": "npm run typecheck --workspace=@vaccin-delivery/api",
     "typecheck:pwa": "npm run generate:graphql && npm run typecheck --workspace=@vaccin-delivery/pwa",
     "test:api": "npm run test --workspace=@vaccin-delivery/api",
+    "test:pwa": "npm run test --workspace=@vaccin-delivery/pwa",
     "seed:database:all": "npm run seed:database:all --workspace=@vaccin-delivery/api"
   },
   "devDependencies": {

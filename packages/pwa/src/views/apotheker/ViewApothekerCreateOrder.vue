@@ -7,6 +7,7 @@ import * as z from 'zod'
 
 import CommonLoadingSkeleton from '@/components/common/CommonLoadingSkeleton.vue'
 import { useApplicationSettings } from '@/composables/useApplicationSettings'
+import { useOnlineStatus } from '@/composables/useOnlineStatus'
 import { useOrders } from '@/composables/useOrders'
 import { useVaccines } from '@/composables/useVaccines'
 
@@ -16,6 +17,7 @@ type OrderLineDraft = {
 }
 
 const router = useRouter()
+const { isOnline } = useOnlineStatus()
 const { activeVaccines, loading: vaccinesLoading, loadVaccines } = useVaccines()
 const {
   weeklySummary,
@@ -260,7 +262,11 @@ async function submitOrder() {
       />
 
       <div class="mt-4 flex gap-2">
-        <UButton :loading="submitting" :disabled="lines.length === 0" @click="submitOrder">
+        <UButton
+          :loading="submitting"
+          :disabled="!isOnline || lines.length === 0"
+          @click="submitOrder"
+        >
           Bestelling plaatsen
         </UButton>
         <UButton to="/apotheker/orders" variant="ghost" color="neutral">

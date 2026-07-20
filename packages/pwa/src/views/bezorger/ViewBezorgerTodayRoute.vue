@@ -5,6 +5,7 @@ import CommonEmptyState from '@/components/common/CommonEmptyState.vue'
 import CommonErrorState from '@/components/common/CommonErrorState.vue'
 import CommonLoadingSkeleton from '@/components/common/CommonLoadingSkeleton.vue'
 import { RouteStatus, useDeliveryRoutes } from '@/composables/useDeliveryRoutes'
+import { useOnlineStatus } from '@/composables/useOnlineStatus'
 import { useRealtimeConnection } from '@/composables/useRealtimeConnection'
 
 const {
@@ -22,6 +23,7 @@ const {
 } = useDeliveryRoutes()
 
 const { connectionState } = useRealtimeConnection()
+const { isOnline } = useOnlineStatus()
 
 const confirmStart = ref(false)
 const confirmComplete = ref(false)
@@ -165,7 +167,7 @@ onUnmounted(() => {
           size="xl"
           class="min-h-14 text-base"
           :loading="updatingStatus"
-          :disabled="updatingStatus"
+          :disabled="!isOnline || updatingStatus"
           @click="onStartRoute"
         >
           {{ confirmStart ? 'Bevestig starten' : 'Route starten' }}
@@ -175,7 +177,7 @@ onUnmounted(() => {
           block
           size="lg"
           variant="ghost"
-          :disabled="updatingStatus"
+          :disabled="!isOnline || updatingStatus"
           @click="cancelStartConfirm"
         >
           Annuleren
@@ -188,7 +190,7 @@ onUnmounted(() => {
           class="min-h-14 text-base"
           color="primary"
           :loading="updatingStatus"
-          :disabled="updatingStatus"
+          :disabled="!isOnline || updatingStatus"
           @click="onCompleteRoute"
         >
           {{ confirmComplete ? 'Bevestig voltooien' : 'Route voltooien' }}
@@ -198,7 +200,7 @@ onUnmounted(() => {
           block
           size="lg"
           variant="ghost"
-          :disabled="updatingStatus"
+          :disabled="!isOnline || updatingStatus"
           @click="cancelCompleteConfirm"
         >
           Annuleren

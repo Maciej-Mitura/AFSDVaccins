@@ -8,6 +8,9 @@ import CommonEmptyState from '@/components/common/CommonEmptyState.vue'
 import CommonErrorState from '@/components/common/CommonErrorState.vue'
 import CommonLoadingSkeleton from '@/components/common/CommonLoadingSkeleton.vue'
 import { useVaccines, type VaccineListItem } from '@/composables/useVaccines'
+import { useOnlineStatus } from '@/composables/useOnlineStatus'
+
+const { isOnline } = useOnlineStatus()
 
 const {
   vaccines,
@@ -133,7 +136,9 @@ async function toggleActive(vaccine: VaccineListItem) {
   <div class="space-y-6">
     <div class="flex flex-wrap items-center justify-between gap-3">
       <h2 class="text-lg font-semibold">Vaccincatalogus</h2>
-      <UButton size="sm" @click="openCreateForm">Nieuw vaccin</UButton>
+      <UButton size="sm" :disabled="!isOnline" @click="openCreateForm">
+        Nieuw vaccin
+      </UButton>
     </div>
 
     <UAlert
@@ -245,7 +250,9 @@ async function toggleActive(vaccine: VaccineListItem) {
           />
 
           <div class="flex gap-2">
-            <UButton type="submit" :loading="saving">Opslaan</UButton>
+            <UButton type="submit" :loading="saving" :disabled="!isOnline">
+              Opslaan
+            </UButton>
             <UButton color="neutral" variant="ghost" @click="closeForm">
               Annuleren
             </UButton>

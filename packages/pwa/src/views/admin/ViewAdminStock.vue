@@ -13,8 +13,10 @@ import {
   useStock,
   type StockOverviewItem,
 } from '@/composables/useStock'
+import { useOnlineStatus } from '@/composables/useOnlineStatus'
 
 const router = useRouter()
+const { isOnline } = useOnlineStatus()
 
 const {
   overview,
@@ -269,7 +271,11 @@ function openHistory(vaccineId: string): void {
           </div>
 
           <div class="flex flex-wrap gap-2">
-            <UButton size="sm" @click="openAdjustForm(vaccine)">
+            <UButton
+              size="sm"
+              :disabled="!isOnline"
+              @click="openAdjustForm(vaccine)"
+            >
               Aanpassen
             </UButton>
             <UButton
@@ -321,7 +327,9 @@ function openHistory(vaccineId: string): void {
           />
 
           <div class="flex gap-2">
-            <UButton type="submit" :loading="adjusting">Opslaan</UButton>
+            <UButton type="submit" :loading="adjusting" :disabled="!isOnline">
+              Opslaan
+            </UButton>
             <UButton color="neutral" variant="ghost" @click="closeForm">
               Annuleren
             </UButton>

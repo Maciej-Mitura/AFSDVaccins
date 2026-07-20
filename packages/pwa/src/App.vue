@@ -1,6 +1,6 @@
 <template>
   <UApp>
-    <CommonOfflineBanner />
+    <CommonPwaStatus />
 
     <div
       v-if="!authReady"
@@ -17,7 +17,7 @@
 import { inject, type Ref } from 'vue'
 
 import CommonLoadingSkeleton from '@/components/common/CommonLoadingSkeleton.vue'
-import CommonOfflineBanner from '@/components/common/CommonOfflineBanner.vue'
+import CommonPwaStatus from '@/components/common/CommonPwaStatus.vue'
 
 const authReady = inject<Ref<boolean>>('authReady')
 </script>

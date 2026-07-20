@@ -18,6 +18,7 @@ declare module 'vue' {
     CommonNotificationBell: typeof import('./src/components/common/CommonNotificationBell.vue')['default']
     CommonOfflineBanner: typeof import('./src/components/common/CommonOfflineBanner.vue')['default']
     CommonPermissionDenied: typeof import('./src/components/common/CommonPermissionDenied.vue')['default']
+    CommonPwaStatus: typeof import('./src/components/common/CommonPwaStatus.vue')['default']
     CommonRealtimeStatus: typeof import('./src/components/common/CommonRealtimeStatus.vue')['default']
     FeatureAdminLayout: typeof import('./src/components/feature/admin/FeatureAdminLayout.vue')['default']
     FeatureApothekerLayout: typeof import('./src/components/feature/apotheker/FeatureApothekerLayout.vue')['default']
