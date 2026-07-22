@@ -60,3 +60,13 @@ export const buildMongoUrl = (dbHost: string, dbName: string): string => {
   const normalizedHost = dbHost.endsWith('/') ? dbHost.slice(0, -1) : dbHost
   return `${normalizedHost}/${dbName}`
 }
+
+/** Extract hostname only — never return credentials or full connection URLs. */
+export function safeMongoHostname(dbHost: string): string {
+  try {
+    const parsed = new URL(dbHost)
+    return parsed.hostname.length > 0 ? parsed.hostname : 'unknown'
+  } catch {
+    return 'unparsed'
+  }
+}

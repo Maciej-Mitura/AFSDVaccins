@@ -23,6 +23,7 @@ describe('SeedService', () => {
   function createMocks() {
     const seedSafetyService = {
       assertSeedAllowed: jest.fn(),
+      logSeedTargetConfirmation: jest.fn(),
       requireDemoPassword: jest.fn().mockReturnValue('demo-password'),
     } as unknown as SeedSafetyService
 

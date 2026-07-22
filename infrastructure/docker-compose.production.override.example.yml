@@ -1,0 +1,25 @@
+# Optional local override pattern when you need to customize credential mounting
+# without editing the committed compose file.
+#
+# 1. Copy this file to (gitignored):
+#      infrastructure/docker-compose.production.override.yml
+# 2. Set FIREBASE_CREDENTIALS_HOST_PATH in infrastructure/.env.prod
+# 3. Start with both files:
+#
+# docker compose \
+#   -f infrastructure/docker-compose-production.yml \
+#   -f infrastructure/docker-compose.production.override.yml \
+#   --env-file infrastructure/.env.prod \
+#   up -d --build
+#
+# The base compose already mounts FIREBASE_CREDENTIALS_HOST_PATH when set.
+# Use an override only for machine-specific extras (extra ports, logging, etc.).
+# Never commit personal absolute paths.
+
+services:
+  api:
+    volumes:
+      - type: bind
+        source: ${FIREBASE_CREDENTIALS_HOST_PATH:?Set FIREBASE_CREDENTIALS_HOST_PATH in infrastructure/.env.prod}
+        target: /run/secrets/firebase-sa.json
+        read_only: true

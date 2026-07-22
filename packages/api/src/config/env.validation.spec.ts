@@ -1,4 +1,4 @@
-import { buildMongoUrl, envValidationSchema } from './env.validation'
+import { buildMongoUrl, envValidationSchema, safeMongoHostname } from './env.validation'
 
 describe('envValidationSchema', () => {
   it('accepts valid development configuration', () => {
@@ -132,5 +132,15 @@ describe('buildMongoUrl', () => {
     expect(
       buildMongoUrl('mongodb://localhost:27017/', 'vaccin-delivery'),
     ).toBe('mongodb://localhost:27017/vaccin-delivery')
+  })
+})
+
+describe('safeMongoHostname', () => {
+  it('returns host only without credentials or connection strings', () => {
+    expect(safeMongoHostname('mongodb://mongo:27017')).toBe('mongo')
+    expect(
+      safeMongoHostname('mongodb://user:secret@mongo:27017/vaccin-delivery'),
+    ).toBe('mongo')
+    expect(safeMongoHostname('not-a-url')).toBe('unparsed')
   })
 })

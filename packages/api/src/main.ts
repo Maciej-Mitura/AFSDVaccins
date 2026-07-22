@@ -44,6 +44,9 @@ async function bootstrap(): Promise<void> {
     }),
   )
 
+  // Allow Nest to close HTTP/GraphQL cleanly on SIGTERM/SIGINT (Docker stop).
+  app.enableShutdownHooks()
+
   await app.listen(port)
   Logger.log(`Application is running on: ${await app.getUrl()}`)
   Logger.log(`GraphiQL available at: ${await app.getUrl()}/graphql`)

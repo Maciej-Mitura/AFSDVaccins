@@ -2,7 +2,7 @@ import { Logger, Module } from '@nestjs/common'
 import { ConfigModule, ConfigService } from '@nestjs/config'
 import { TypeOrmModule } from '@nestjs/typeorm'
 
-import { buildMongoUrl, envValidationSchema } from '../config/env.validation'
+import { buildMongoUrl, envValidationSchema, safeMongoHostname } from '../config/env.validation'
 import { SeedModule } from './seed.module'
 
 /**
@@ -33,7 +33,9 @@ import { SeedModule } from './seed.module'
         }
 
         const url = buildMongoUrl(dbHost, dbName)
-        Logger.log(`Seed connecting to MongoDB at ${dbHost} (database: ${dbName})`)
+        Logger.log(
+          `Seed connecting to MongoDB host ${safeMongoHostname(dbHost)} (database: ${dbName})`,
+        )
 
         return {
           type: 'mongodb' as const,

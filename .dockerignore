@@ -1,0 +1,51 @@
+# Docker build context is the examMaciej repository root.
+# Nothing outside this repository should be in the build context.
+
+.git
+.gitignore
+.github
+.cursor
+.vscode
+.idea
+
+**/node_modules
+**/dist
+**/coverage
+**/playwright-report
+**/test-results
+**/blob-report
+**/.cache
+**/*.tsbuildinfo
+
+**/.env
+**/.env.*
+!**/.env.example
+!**/.env.prod.example
+
+**/firebase-service-account.json
+**/*firebase*sa*.json
+**/*.pem
+**/*.p12
+**/maciejafsdvaccin*.json
+
+**/*.log
+**/npm-debug.log*
+
+infrastructure/.env.prod
+infrastructure/docker-compose.production.override.yml
+
+# Dev / test artefacts
+packages/api/test/.e2e-mongo-runtime.json
+packages/api/test/.playwright-api-runtime.json
+packages/api/coverage
+packages/pwa/coverage
+
+# Docs and agent files are not required in runtime images
+AGENTS.md
+docs
+*.md
+!packages/**/README.md
+
+# Keep Playwright browsers and MongoMemoryServer downloads out of images
+**/mongodb-memory-server*
+playwright/.cache

@@ -1,0 +1,111 @@
+# Production / presentation stack (Phase 19)
+#
+# From repository root (examMaciej/):
+#   cp infrastructure/.env.prod.example infrastructure/.env.prod
+#   # set FIREBASE_CREDENTIALS_HOST_PATH and public VITE_* values
+#   docker compose -f infrastructure/docker-compose-production.yml --env-file infrastructure/.env.prod up -d --build
+#
+# Browser URLs (defaults):
+#   PWA  http://localhost:8080
+#   API  http://localhost:3000
+#   GQL  http://localhost:3000/graphql
+#   WS   ws://localhost:3000/graphql
+#
+# Internal Docker DNS (containers only — never use these in the browser):
+#   mongo:27017 , api:3000
+
+name: vaccin-delivery-production
+
+services:
+  mongo:
+    image: mongo:7
+    restart: unless-stopped
+    volumes:
+      - vaccin-delivery-mongo-prod-data:/data/db
+    environment:
+      MONGO_INITDB_DATABASE: ${DB_NAME:-vaccin-delivery-production-demo}
+    healthcheck:
+      test: ['CMD', 'mongosh', '--eval', "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+    # No host port published — API reaches mongo via Docker DNS only.
+
+  api:
+    build:
+      context: ..
+      dockerfile: packages/api/Dockerfile
+    image: vaccin-delivery-api:local
+    restart: unless-stopped
+    depends_on:
+      mongo:
+        condition: service_healthy
+    ports:
+      - '${API_PORT:-3000}:3000'
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      URL_FRONTEND: ${URL_FRONTEND:-http://localhost:8080}
+      DB_HOST: mongodb://mongo:27017
+      DB_NAME: ${DB_NAME:-vaccin-delivery-production-demo}
+      GOOGLE_APPLICATION_CREDENTIALS: /run/secrets/firebase-sa.json
+      # Seed and Playwright bypass must stay off on the long-running API.
+      ALLOW_DATABASE_SEED: 'false'
+      ALLOW_E2E_AUTH_BYPASS: 'false'
+    volumes:
+      # Path comes from ignored infrastructure/.env.prod — never hardcode a host path.
+      - type: bind
+        source: ${FIREBASE_CREDENTIALS_HOST_PATH:?Set FIREBASE_CREDENTIALS_HOST_PATH in infrastructure/.env.prod}
+        target: /run/secrets/firebase-sa.json
+        read_only: true
+    healthcheck:
+      test:
+        [
+          'CMD',
+          'node',
+          '-e',
+          "fetch('http://127.0.0.1:3000/health').then((r)=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))",
+        ]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  pwa:
+    build:
+      context: ..
+      dockerfile: packages/pwa/Dockerfile
+      args:
+        VITE_BACKEND_URL: ${VITE_BACKEND_URL:-http://localhost:3000/graphql}
+        VITE_BACKEND_WS_URL: ${VITE_BACKEND_WS_URL:-ws://localhost:3000/graphql}
+        VITE_FIREBASE_API_KEY: ${VITE_FIREBASE_API_KEY:-replace-me}
+        VITE_FIREBASE_AUTH_DOMAIN: ${VITE_FIREBASE_AUTH_DOMAIN:-replace-me.firebaseapp.com}
+        VITE_FIREBASE_PROJECT_ID: ${VITE_FIREBASE_PROJECT_ID:-replace-me}
+        VITE_FIREBASE_STORAGE_BUCKET: ${VITE_FIREBASE_STORAGE_BUCKET:-replace-me.appspot.com}
+        VITE_FIREBASE_MESSAGING_SENDER_ID: ${VITE_FIREBASE_MESSAGING_SENDER_ID:-replace-me}
+        VITE_FIREBASE_APP_ID: ${VITE_FIREBASE_APP_ID:-replace-me}
+        # Never enable; empty/false only. Dockerfile fails the build if set to true/1.
+        VITE_E2E_AUTH_BYPASS: ''
+    image: vaccin-delivery-pwa:local
+    restart: unless-stopped
+    depends_on:
+      api:
+        condition: service_healthy
+    ports:
+      - '${PWA_PORT:-8080}:8080'
+    read_only: true
+    tmpfs:
+      - /tmp
+      - /var/cache/nginx
+      - /var/run
+    healthcheck:
+      test: ['CMD', 'wget', '-qO-', 'http://127.0.0.1:8080/health']
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+volumes:
+  vaccin-delivery-mongo-prod-data:
+    name: vaccin-delivery-mongo-prod-data

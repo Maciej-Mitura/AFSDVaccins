@@ -100,6 +100,7 @@ export class SeedService {
 
   async run(): Promise<SeedCounters> {
     this.seedSafetyService.assertSeedAllowed()
+    this.seedSafetyService.logSeedTargetConfirmation()
     const password = this.seedSafetyService.requireDemoPassword()
 
     const counters = this.emptyCounters()

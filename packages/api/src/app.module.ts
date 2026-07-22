@@ -4,7 +4,7 @@ import { GraphQLModule } from '@nestjs/graphql'
 import { ApolloDriver, ApolloDriverConfig } from '@nestjs/apollo'
 import { TypeOrmModule } from '@nestjs/typeorm'
 import { join } from 'node:path'
-import { buildMongoUrl, envValidationSchema } from './config/env.validation'
+import { buildMongoUrl, envValidationSchema, safeMongoHostname } from './config/env.validation'
 import { AuthenticationModule } from './authentication/authentication.module'
 import { GraphqlWsContextExtra } from './authentication/firebase.types'
 import {
@@ -115,7 +115,9 @@ const databaseImports = isSchemaGeneration
           }
 
           const url = buildMongoUrl(dbHost, dbName)
-          Logger.log(`Connecting to MongoDB at ${dbHost} (database: ${dbName})`)
+          Logger.log(
+            `Connecting to MongoDB host ${safeMongoHostname(dbHost)} (database: ${dbName})`,
+          )
 
           // synchronize in development and isolated GraphQL E2E (NODE_ENV=test).
           // E2E bootstraps must assert DB_NAME contains a test marker before connect.

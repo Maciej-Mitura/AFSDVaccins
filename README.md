@@ -7,12 +7,12 @@ screens.
 
 ## Current status
 
-**Phase 18 complete — Playwright frontend end-to-end tests.** Chromium browser
-tests exercise critical ADMIN, APOTHEKER, and BEZORGER journeys against an
-isolated MongoMemoryServer API and a production-like Vite preview. Auth uses a
-dual-gated test-only bypass (no personal Firebase accounts).
+**Phase 19 complete — production Docker Compose stack.** Multi-stage API and
+PWA images, MongoDB with a dedicated production-demo volume, health checks,
+nginx SPA hosting, and a documented one-off seed path that preserves the
+Phase 15 safety gate (`NODE_ENV=production` API never auto-seeds).
 
-**Next phase:** Phase 19 — production Docker stack.
+**Next phase:** Phase 20 — CI / Husky completion.
 
 ## Planned stack
 
@@ -867,7 +867,6 @@ and E2E infrastructure safety checks.
 
 - Full WebSocket subscription E2E (HTTP GraphQL coverage is Phase 17 focus; unit filters remain)
 - CI `ci-api-e2e` / `ci-playwright` workflow hardening (Phase 20)
-- Production Docker stack (Phase 19)
 
 ## Playwright browser E2E (Phase 18)
 
@@ -1078,6 +1077,7 @@ npm run dev
 npm run generate:graphql
 npm run format
 npm run format:check
+npm run test:docker:safety
 ```
 
 ## Stock management (Phase 9)
@@ -1616,6 +1616,196 @@ Order delivery remains a separate admin action (Phase 10).
 8. Generate another `ASSIGNED` route; as ADMIN cancel with optional reason;
    courier sees `CANCELLED` via refetch/realtime.
 9. Confirm `/bezorger/tomorrow` remains computed and unaffected.
+
+## Production Docker stack (Phase 19)
+
+Presentation / production-like stack: MongoDB + NestJS API + nginx-served PWA.
+
+```
+Browser → localhost:8080 (pwa/nginx) → localhost:3000 (api)
+                ↑                              ↑
+         static SPA build              GraphQL HTTP + WS
+                                              ↓
+                                    mongo:27017 (internal)
+```
+
+| Service | Image                     | Public URL            | Health        |
+| ------- | ------------------------- | --------------------- | ------------- |
+| mongo   | `mongo:7`                 | _(not published)_     | mongosh ping  |
+| api     | `packages/api/Dockerfile` | http://localhost:3000 | `GET /health` |
+| pwa     | `packages/pwa/Dockerfile` | http://localhost:8080 | `GET /health` |
+
+**Internal hostnames** (`mongo`, `api`) are for container-to-container traffic
+only. The **browser** must use `localhost` published ports — never
+`http://api:3000`.
+
+### Prerequisites
+
+- Docker Engine + Compose v2
+- Node 22+ only needed for host-side npm tooling (not required to run the stack)
+- A local Firebase Admin service-account JSON **outside** the Git repository
+
+### Environment setup
+
+```bash
+cp infrastructure/.env.prod.example infrastructure/.env.prod
+```
+
+Edit `infrastructure/.env.prod` (gitignored):
+
+1. Set `FIREBASE_CREDENTIALS_HOST_PATH` to the absolute host path of your
+   Firebase Admin JSON (never commit this path into Compose).
+2. Set public `VITE_FIREBASE_*` values for the browser SDK.
+3. Keep `DB_NAME=vaccin-delivery-production-demo` (separate from host development
+   DB `vaccin-delivery`).
+4. Do **not** set `VITE_E2E_AUTH_BYPASS`.
+
+Optional credential override pattern (if you need machine-specific mounts):
+
+```bash
+cp infrastructure/docker-compose.production.override.example.yml \
+  infrastructure/docker-compose.production.override.yml
+```
+
+Then pass both `-f` files. The committed Compose file never hardcodes a personal
+path.
+
+### Build and start
+
+**First boot** (empty volume): TypeORM runs with `synchronize: false` under
+`NODE_ENV=production`, so Mongo collections/indexes must exist before the API
+stays healthy. Start Mongo, run the one-off seed (below), then start the full
+stack:
+
+```bash
+docker compose -f infrastructure/docker-compose-production.yml \
+  --env-file infrastructure/.env.prod \
+  up -d mongo
+
+docker compose -f infrastructure/docker-compose-production.yml \
+  --env-file infrastructure/.env.prod \
+  run --rm \
+  -e NODE_ENV=development \
+  -e ALLOW_DATABASE_SEED=true \
+  -e SEED_DEMO_PASSWORD=change-me-demo-only \
+  api npm run seed:database:cli
+
+docker compose -f infrastructure/docker-compose-production.yml \
+  --env-file infrastructure/.env.prod \
+  up -d --build
+```
+
+Later starts (volume already seeded):
+
+```bash
+docker compose -f infrastructure/docker-compose-production.yml \
+  --env-file infrastructure/.env.prod \
+  up -d --build
+```
+
+Clean rebuild:
+
+```bash
+docker compose -f infrastructure/docker-compose-production.yml \
+  --env-file infrastructure/.env.prod \
+  build --no-cache
+```
+
+### Service URLs
+
+| Surface           | URL                              |
+| ----------------- | -------------------------------- |
+| PWA               | http://localhost:8080            |
+| Login             | http://localhost:8080/auth/login |
+| API health        | http://localhost:3000/health     |
+| GraphQL HTTP      | http://localhost:3000/graphql    |
+| GraphQL WebSocket | ws://localhost:3000/graphql      |
+
+PWA Vite variables are **build-time**. Changing `VITE_BACKEND_URL` or Firebase
+web config requires rebuilding the `pwa` image.
+
+### Health checks and logs
+
+```bash
+docker compose -f infrastructure/docker-compose-production.yml --env-file infrastructure/.env.prod ps
+docker compose -f infrastructure/docker-compose-production.yml --env-file infrastructure/.env.prod logs --tail 200
+```
+
+Startup order: **mongo healthy → api healthy → pwa**.
+
+### Seed (explicit one-off — not on every start)
+
+The long-running API container stays `NODE_ENV=production` with
+`ALLOW_DATABASE_SEED=false` and **TypeORM synchronize disabled**.
+
+On a **fresh volume**, run seed **before** expecting the API to stay healthy
+(see Build and start). Seed against the **production Compose Mongo service**
+(hostname `mongo`, database `vaccin-delivery-production-demo`) — not the host
+development Mongo — by running the compiled CLI with an explicit development
+seed override:
+
+```bash
+docker compose -f infrastructure/docker-compose-production.yml \
+  --env-file infrastructure/.env.prod \
+  run --rm \
+  -e NODE_ENV=development \
+  -e ALLOW_DATABASE_SEED=true \
+  -e SEED_DEMO_PASSWORD=change-me-demo-only \
+  api npm run seed:database:cli
+```
+
+Before writes, the CLI prints only safe confirmation values:
+
+- database name (`vaccin-delivery-production-demo`)
+- Mongo service hostname (`mongo`)
+- environment (`development`)
+- `ALLOW_DATABASE_SEED` flag
+
+It does **not** print credentials or full connection strings. Seed creates
+indexes/singletons via development `synchronize` for that one-off process only.
+The Phase 15 production refusal gate is unchanged.
+
+### Stopping and volumes
+
+```bash
+# Stop containers — keeps named volume vaccin-delivery-mongo-prod-data
+docker compose -f infrastructure/docker-compose-production.yml --env-file infrastructure/.env.prod down
+```
+
+**Warning:** `docker compose … down -v` deletes the production-demo Mongo volume
+and all seeded data. Do not use `-v` unless you intend to wipe local demo data.
+
+Dev Mongo (`infrastructure/docker-compose-dev.yml` →
+`vaccin-delivery-mongo-data`) is a **different** volume and is not touched by
+the production Compose file.
+
+### Security notes
+
+- Multi-stage images; production API runs as non-root `vaccin`
+- PWA uses `nginxinc/nginx-unprivileged` on port 8080 with a read-only root FS
+- Firebase Admin JSON is bind-mounted read-only; never copied into the image
+- `.dockerignore` excludes `.env*`, credentials, `node_modules`, reports
+- Playwright `VITE_E2E_AUTH_BYPASS` is refused at PWA image build time
+- CORS `URL_FRONTEND` defaults to `http://localhost:8080` (no wildcard)
+
+### Troubleshooting
+
+| Symptom                   | Likely cause / fix                                                                 |
+| ------------------------- | ---------------------------------------------------------------------------------- |
+| API unhealthy             | Fresh empty volume without seed; missing/invalid Firebase mount; check `api` logs  |
+| Mongo unhealthy           | Docker engine / volume permissions; wait for health start period                   |
+| PWA cannot reach API      | Rebuild PWA with browser-visible `VITE_BACKEND_URL=http://localhost:3000/graphql`  |
+| CORS errors               | `URL_FRONTEND` must match the browser origin (`http://localhost:8080`)             |
+| WebSocket failure         | Confirm `VITE_BACKEND_WS_URL=ws://localhost:3000/graphql` and API port published   |
+| Stale service worker      | Hard refresh / unregister SW; `sw.js` is served with `Cache-Control: no-cache`     |
+| Seed refused (production) | Expected on the API service — use the one-off `run` command with development flags |
+
+### Safety checks
+
+```bash
+npm run test:docker:safety
+docker compose -f infrastructure/docker-compose-production.yml --env-file infrastructure/.env.prod config
+```
 
 ## CI
 
