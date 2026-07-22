@@ -263,6 +263,7 @@ async function submitOrder() {
 
       <div class="mt-4 flex gap-2">
         <UButton
+          data-testid="place-order"
           :loading="submitting"
           :disabled="!isOnline || lines.length === 0"
           @click="submitOrder"

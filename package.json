@@ -30,9 +30,13 @@
     "test:api": "npm run test --workspace=@vaccin-delivery/api",
     "test:e2e:api": "npm run test:e2e --workspace=@vaccin-delivery/api",
     "test:pwa": "npm run test --workspace=@vaccin-delivery/pwa",
+    "test:e2e:pwa": "playwright test",
+    "test:e2e:pwa:ui": "playwright test --ui",
+    "test:e2e:pwa:report": "playwright show-report",
     "seed:database:all": "npm run seed:database:all --workspace=@vaccin-delivery/api"
   },
   "devDependencies": {
+    "@playwright/test": "^1.54.2",
     "concurrently": "^9.1.2",
     "prettier": "^3.6.2"
   },

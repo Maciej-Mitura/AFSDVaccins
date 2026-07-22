@@ -29,7 +29,14 @@
       :title="formError"
     />
 
-    <UForm :schema="schema" :state="state" class="space-y-4" @submit="onSubmit">
+    <UForm
+      :schema="schema"
+      :state="state"
+      class="space-y-4"
+      data-testid="login-form"
+      :data-e2e-auth-bypass="e2eAuthBypassEnabled ? 'true' : 'false'"
+      @submit="onSubmit"
+    >
       <UFormField label="E-mailadres" name="email" required>
         <UInput
           v-model="state.email"
@@ -93,12 +100,14 @@ import {
   LOGIN_OFFLINE_MESSAGE,
   shouldBlockLoginWhileOffline,
 } from '@/views/auth/login-offline'
+import { isE2eAuthBypassEnabled } from '@/firebase/e2e-auth-bypass'
 
 const route = useRoute()
 const router = useRouter()
 const { isOnline } = useOnlineStatus()
 const { login } = useFirebase()
 const { loadCurrentUser, getDefaultRouteForRole } = useCurrentUser()
+const e2eAuthBypassEnabled = isE2eAuthBypassEnabled()
 
 const loading = ref(false)
 const formError = ref<string | null>(null)

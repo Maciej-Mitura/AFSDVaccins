@@ -16,7 +16,10 @@ import { createClient } from 'graphql-ws'
 import type { GraphQLFormattedError } from 'graphql'
 import { Kind, OperationTypeNode } from 'graphql'
 
-import { firebaseAuth } from '@/config/firebase'
+import {
+  resolveAuthBearerToken,
+  resolveAuthUid,
+} from '@/firebase/auth-session'
 import { setRealtimeConnectionState } from '@/composables/useRealtimeConnection'
 
 type SessionExpiredHandler = (message: string) => Promise<void> | void
@@ -85,13 +88,11 @@ const httpLink = createHttpLink({
 })
 
 const authLink = setContext(async (_, { headers }) => {
-  const user = firebaseAuth.currentUser
+  const token = await resolveAuthBearerToken()
 
-  if (!user) {
+  if (!token) {
     return { headers }
   }
-
-  const token = await user.getIdToken()
 
   return {
     headers: {
@@ -144,13 +145,12 @@ const authRetryLink = new ApolloLink((operation, forward) => {
         }
 
         try {
-          const user = firebaseAuth.currentUser
+          const token = await resolveAuthBearerToken(true)
 
-          if (!user) {
+          if (!token) {
             throw new Error('No authenticated Firebase user')
           }
 
-          await user.getIdToken(true)
           operation.setContext({ ...context, authRetry: true })
 
           forward(operation).subscribe({
@@ -198,13 +198,17 @@ function createWebSocketClient(ownerUid: string): Client {
     retryAttempts: 5,
     shouldRetry: () => !intentionalWsShutdown,
     connectionParams: async () => {
-      const user = firebaseAuth.currentUser
+      const uid = resolveAuthUid()
 
-      if (!user || user.uid !== ownerUid) {
+      if (!uid || uid !== ownerUid) {
         return {}
       }
 
-      const token = await user.getIdToken()
+      const token = await resolveAuthBearerToken()
+
+      if (!token) {
+        return {}
+      }
 
       return {
         Authorization: `Bearer ${token}`,
@@ -238,20 +242,20 @@ function createWebSocketClient(ownerUid: string): Client {
 }
 
 function getOrCreateWebSocketClient(): Client {
-  const user = firebaseAuth.currentUser
+  const uid = resolveAuthUid()
 
-  if (!user) {
+  if (!uid) {
     throw new Error('Cannot open WebSocket without authenticated user')
   }
 
-  if (wsClient && wsClientOwnerUid === user.uid) {
+  if (wsClient && wsClientOwnerUid === uid) {
     return wsClient
   }
 
   disposeWebSocketClient()
 
-  wsClientOwnerUid = user.uid
-  wsClient = createWebSocketClient(user.uid)
+  wsClientOwnerUid = uid
+  wsClient = createWebSocketClient(uid)
 
   return wsClient
 }

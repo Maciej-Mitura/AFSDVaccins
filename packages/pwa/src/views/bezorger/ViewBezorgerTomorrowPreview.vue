@@ -38,7 +38,10 @@ onUnmounted(() => {
 <template>
   <div class="mx-auto max-w-lg space-y-4 px-1">
     <div>
-      <p class="text-xs font-medium uppercase tracking-wide text-muted">
+      <p
+        class="text-xs font-medium uppercase tracking-wide text-muted"
+        data-testid="tomorrow-preview-label"
+      >
         Voorbeeld — niet opgeslagen
       </p>
       <h1 class="mt-1 text-2xl font-semibold">Voorbeeldroute voor morgen</h1>

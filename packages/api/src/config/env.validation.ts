@@ -20,6 +20,14 @@ export const envValidationSchema = Joi.object({
     .truthy('true')
     .falsy('false')
     .default(false),
+  /**
+   * Playwright / browser E2E only: accept deterministic Bearer tokens.
+   * Requires NODE_ENV=test as well (enforced in FirebaseService).
+   */
+  ALLOW_E2E_AUTH_BYPASS: Joi.boolean()
+    .truthy('true')
+    .falsy('false')
+    .default(false),
   /** Shared demo password for seeded Firebase accounts (evaluation only). */
   SEED_DEMO_PASSWORD: Joi.string().min(1).optional(),
   SEED_DOCENT_FIREBASE_UID: Joi.string().min(1).optional(),
@@ -38,6 +46,7 @@ export type EnvConfig = {
   DB_NAME: string
   GOOGLE_APPLICATION_CREDENTIALS?: string
   ALLOW_DATABASE_SEED: boolean
+  ALLOW_E2E_AUTH_BYPASS: boolean
   SEED_DEMO_PASSWORD?: string
   SEED_DOCENT_FIREBASE_UID?: string
   SEED_APOTHEKER1_FIREBASE_UID?: string

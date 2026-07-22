@@ -54,7 +54,7 @@ describe('envValidationSchema', () => {
     expect(result.error).toBeDefined()
   })
 
-  it('defaults ALLOW_DATABASE_SEED to false', () => {
+  it('defaults ALLOW_DATABASE_SEED and ALLOW_E2E_AUTH_BYPASS to false', () => {
     const result = envValidationSchema.validate({
       NODE_ENV: 'development',
       PORT: 3000,
@@ -66,6 +66,39 @@ describe('envValidationSchema', () => {
     expect(result.error).toBeUndefined()
     expect(
       (result.value as { ALLOW_DATABASE_SEED: boolean }).ALLOW_DATABASE_SEED,
+    ).toBe(false)
+    expect(
+      (result.value as { ALLOW_E2E_AUTH_BYPASS: boolean }).ALLOW_E2E_AUTH_BYPASS,
+    ).toBe(false)
+  })
+
+  it('accepts ALLOW_E2E_AUTH_BYPASS for Playwright browser E2E', () => {
+    const result = envValidationSchema.validate({
+      NODE_ENV: 'test',
+      PORT: 3100,
+      URL_FRONTEND: 'http://localhost:4174',
+      DB_HOST: 'mongodb://127.0.0.1:27017',
+      DB_NAME: 'vaccin_delivery_playwright_e2e',
+      ALLOW_E2E_AUTH_BYPASS: 'true',
+    })
+
+    expect(result.error).toBeUndefined()
+    expect(
+      (result.value as { ALLOW_E2E_AUTH_BYPASS: boolean }).ALLOW_E2E_AUTH_BYPASS,
+    ).toBe(true)
+  })
+
+  it('defaults ALLOW_E2E_AUTH_BYPASS to false even when NODE_ENV is omitted', () => {
+    const result = envValidationSchema.validate({
+      PORT: 3000,
+      URL_FRONTEND: 'http://localhost:5173',
+      DB_HOST: 'mongodb://localhost:27017',
+      DB_NAME: 'vaccin-delivery',
+    })
+
+    expect(result.error).toBeUndefined()
+    expect(
+      (result.value as { ALLOW_E2E_AUTH_BYPASS: boolean }).ALLOW_E2E_AUTH_BYPASS,
     ).toBe(false)
   })
 

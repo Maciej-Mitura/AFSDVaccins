@@ -4,6 +4,7 @@
 interface ImportMetaEnv {
   readonly VITE_BACKEND_URL: string
   readonly VITE_BACKEND_WS_URL?: string
+  readonly VITE_E2E_AUTH_BYPASS?: string
   readonly VITE_FIREBASE_API_KEY: string
   readonly VITE_FIREBASE_AUTH_DOMAIN: string
   readonly VITE_FIREBASE_PROJECT_ID: string

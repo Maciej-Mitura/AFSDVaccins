@@ -119,7 +119,9 @@ onUnmounted(() => {
     <template v-else-if="myTodayRoute">
       <div class="rounded-lg bg-elevated/50 px-4 py-3">
         <p class="text-sm text-muted">Status</p>
-        <p class="text-lg font-semibold">{{ myTodayRoute.status }}</p>
+        <p class="text-lg font-semibold" data-testid="route-status">
+          {{ myTodayRoute.status }}
+        </p>
         <p class="mt-1 text-sm text-muted">
           Datum {{ myTodayRoute.deliveryDate }}
         </p>
@@ -166,6 +168,7 @@ onUnmounted(() => {
           block
           size="xl"
           class="min-h-14 text-base"
+          data-testid="route-start"
           :loading="updatingStatus"
           :disabled="!isOnline || updatingStatus"
           @click="onStartRoute"
@@ -189,6 +192,7 @@ onUnmounted(() => {
           size="xl"
           class="min-h-14 text-base"
           color="primary"
+          data-testid="route-complete"
           :loading="updatingStatus"
           :disabled="!isOnline || updatingStatus"
           @click="onCompleteRoute"
@@ -235,11 +239,12 @@ onUnmounted(() => {
       />
 
       <ol v-else class="space-y-4">
-        <li
-          v-for="stop in myTodayRoute.stops"
-          :key="`${stop.apothekerProfileId}-${stop.sequence}`"
-          class="rounded-lg border border-default px-4 py-4"
-        >
+          <li
+            v-for="stop in myTodayRoute.stops"
+            :key="`${stop.apothekerProfileId}-${stop.sequence}`"
+            class="rounded-lg border border-default px-4 py-4"
+            data-testid="route-stop"
+          >
           <p class="text-xs font-medium uppercase tracking-wide text-muted">
             Stop {{ stop.sequence }}
           </p>

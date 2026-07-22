@@ -1,6 +1,10 @@
 import { initializeApp, type FirebaseApp } from 'firebase/app'
 import { getAuth, type Auth } from 'firebase/auth'
 
+import { isE2eAuthBypassEnabled } from '@/firebase/e2e-auth-bypass'
+
+const bypass = isE2eAuthBypassEnabled()
+
 const firebaseConfig = {
   apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
   authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
@@ -10,5 +14,14 @@ const firebaseConfig = {
   appId: import.meta.env.VITE_FIREBASE_APP_ID,
 }
 
-export const firebaseApp: FirebaseApp = initializeApp(firebaseConfig)
-export const firebaseAuth: Auth = getAuth(firebaseApp)
+/**
+ * Real Firebase is initialized only when the Playwright auth bypass is off.
+ * Bypass builds use placeholder VITE_FIREBASE_* values and never call the SDK.
+ */
+export const firebaseApp: FirebaseApp | null = bypass
+  ? null
+  : initializeApp(firebaseConfig)
+
+export const firebaseAuth: Auth | null = bypass
+  ? null
+  : getAuth(firebaseApp as FirebaseApp)

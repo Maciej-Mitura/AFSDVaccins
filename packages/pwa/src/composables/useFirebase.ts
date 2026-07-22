@@ -1,4 +1,4 @@
-import { computed, ref } from 'vue'
+import { computed, ref, type Ref } from 'vue'
 import {
   createUserWithEmailAndPassword,
   onAuthStateChanged,
@@ -10,6 +10,14 @@ import {
 } from 'firebase/auth'
 
 import { firebaseAuth } from '@/config/firebase'
+import {
+  e2eBypassLogin,
+  e2eBypassLogout,
+  getE2eBypassUser,
+  isE2eAuthBypassEnabled,
+  subscribeE2eBypassAuth,
+  type E2eBypassUser,
+} from '@/firebase/e2e-auth-bypass'
 
 export type AuthErrorCode =
   | 'auth/email-already-in-use'
@@ -22,7 +30,9 @@ export type AuthErrorCode =
   | 'auth/network-request-failed'
   | 'auth/unknown'
 
-const firebaseUser = ref<User | null>(null)
+type AuthUserView = User | E2eBypassUser
+
+const firebaseUser = ref<AuthUserView | null>(null)
 const authLoading = ref(true)
 const authInitialized = ref(false)
 
@@ -67,8 +77,29 @@ function ensureAuthListener(): void {
 
   authListenerRegistered = true
 
+  if (isE2eAuthBypassEnabled()) {
+    authReadyPromise = Promise.resolve().then(() => {
+      firebaseUser.value = getE2eBypassUser()
+      authLoading.value = false
+      authInitialized.value = true
+    })
+
+    subscribeE2eBypassAuth(user => {
+      firebaseUser.value = user
+      authLoading.value = false
+      authInitialized.value = true
+    })
+    return
+  }
+
+  if (!firebaseAuth) {
+    throw new Error('Firebase Auth is not initialized')
+  }
+
+  const auth = firebaseAuth
+
   authReadyPromise = new Promise<void>(resolve => {
-    onAuthStateChanged(firebaseAuth, user => {
+    onAuthStateChanged(auth, user => {
       firebaseUser.value = user
       authLoading.value = false
       authInitialized.value = true
@@ -91,7 +122,17 @@ export function useFirebase() {
     displayName: string,
     email: string,
     password: string,
-  ): Promise<User> {
+  ): Promise<AuthUserView> {
+    if (isE2eAuthBypassEnabled()) {
+      throw new Error(
+        'Registreren is niet beschikbaar in de Playwright auth-bypass modus.',
+      )
+    }
+
+    if (!firebaseAuth) {
+      throw new Error('Firebase Auth is not initialized')
+    }
+
     try {
       const credential = await createUserWithEmailAndPassword(
         firebaseAuth,
@@ -108,7 +149,21 @@ export function useFirebase() {
     }
   }
 
-  async function login(email: string, password: string): Promise<User> {
+  async function login(email: string, password: string): Promise<AuthUserView> {
+    if (isE2eAuthBypassEnabled()) {
+      try {
+        const user = e2eBypassLogin(email, password)
+        firebaseUser.value = user
+        return user
+      } catch (error: unknown) {
+        throw new Error(mapFirebaseAuthError(error))
+      }
+    }
+
+    if (!firebaseAuth) {
+      throw new Error('Firebase Auth is not initialized')
+    }
+
     try {
       const credential = await signInWithEmailAndPassword(
         firebaseAuth,
@@ -124,6 +179,16 @@ export function useFirebase() {
   }
 
   async function requestPasswordReset(email: string): Promise<void> {
+    if (isE2eAuthBypassEnabled()) {
+      throw new Error(
+        'Wachtwoord reset is niet beschikbaar in de Playwright auth-bypass modus.',
+      )
+    }
+
+    if (!firebaseAuth) {
+      throw new Error('Firebase Auth is not initialized')
+    }
+
     try {
       await sendPasswordResetEmail(firebaseAuth, email)
     } catch (error: unknown) {
@@ -132,12 +197,27 @@ export function useFirebase() {
   }
 
   async function logout(): Promise<void> {
+    if (isE2eAuthBypassEnabled()) {
+      e2eBypassLogout()
+      firebaseUser.value = null
+      return
+    }
+
+    if (!firebaseAuth) {
+      throw new Error('Firebase Auth is not initialized')
+    }
+
     await signOut(firebaseAuth)
     firebaseUser.value = null
   }
 
   async function getIdToken(forceRefresh = false): Promise<string | null> {
-    const user = firebaseAuth.currentUser
+    if (isE2eAuthBypassEnabled()) {
+      const user = getE2eBypassUser()
+      return user ? user.getIdToken(forceRefresh) : null
+    }
+
+    const user = firebaseAuth?.currentUser
 
     if (!user) {
       return null
@@ -147,7 +227,7 @@ export function useFirebase() {
   }
 
   return {
-    firebaseUser,
+    firebaseUser: firebaseUser as Ref<AuthUserView | null>,
     authLoading,
     authInitialized,
     isAuthenticated,

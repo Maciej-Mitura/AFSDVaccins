@@ -7,12 +7,12 @@ screens.
 
 ## Current status
 
-**Phase 17 complete — backend GraphQL end-to-end tests.** NestJS GraphQL flows
-are exercised with Supertest against an isolated MongoMemoryServer database.
-Firebase Admin token verification is overridden with deterministic Bearer
-tokens; real guards, Mongo user lookup, roles, and ownership rules stay active.
+**Phase 18 complete — Playwright frontend end-to-end tests.** Chromium browser
+tests exercise critical ADMIN, APOTHEKER, and BEZORGER journeys against an
+isolated MongoMemoryServer API and a production-like Vite preview. Auth uses a
+dual-gated test-only bypass (no personal Firebase accounts).
 
-**Next phase:** Phase 18 — Playwright frontend E2E.
+**Next phase:** Phase 19 — production Docker stack.
 
 ## Planned stack
 
@@ -865,10 +865,87 @@ and E2E infrastructure safety checks.
 
 ### Known exclusions
 
-- Playwright / browser E2E (Phase 18)
 - Full WebSocket subscription E2E (HTTP GraphQL coverage is Phase 17 focus; unit filters remain)
-- CI `ci-api-e2e` workflow hardening (Phase 20)
+- CI `ci-api-e2e` / `ci-playwright` workflow hardening (Phase 20)
 - Production Docker stack (Phase 19)
+
+## Playwright browser E2E (Phase 18)
+
+### Purpose
+
+Playwright drives the real Vue UI against the real Nest GraphQL API to prove
+critical user journeys (login, role navigation, ordering, route lifecycle,
+offline login UX, PWA manifest/SW smoke).
+
+### Difference from API E2E
+
+| Suite          | Command                | Boundary                              |
+| -------------- | ---------------------- | ------------------------------------- |
+| GraphQL E2E    | `npm run test:e2e:api` | HTTP GraphQL + Supertest (no browser) |
+| Playwright E2E | `npm run test:e2e:pwa` | Chromium + Vue UI + GraphQL API       |
+
+### Browser / environment strategy
+
+- **Chromium** baseline (`@playwright/test`)
+- API on port **3100**, PWA preview on **4174** (separate from dev 3000/5173)
+- Isolated **MongoMemoryServer** database `vaccin_delivery_playwright_e2e`
+- `workers: 1` because suites share one API process and reset fixtures via
+  `POST /__e2e__/reset` (only registered when the Playwright stack is running)
+- Artifacts: `playwright-report/`, `test-results/` (gitignored)
+
+### Authentication approach
+
+Controlled **test-only auth bypass** (not Firebase emulator, not personal accounts):
+
+| Layer    | Gate                                                                  |
+| -------- | --------------------------------------------------------------------- |
+| Backend  | `NODE_ENV=test` **and** `ALLOW_E2E_AUTH_BYPASS=true`                  |
+| Frontend | `VITE_E2E_AUTH_BYPASS=true` on the Playwright Vite build/preview only |
+
+Deterministic tokens/emails mirror Phase 17 (`e2e-admin@example.com`, …).
+Guards, Mongo roles, and ownership stay real. Production builds omit the Vite
+flag; the backend bypass never activates when `NODE_ENV` is `development` or
+`production`.
+
+No passwords, tokens, or private keys are committed. Bypass passwords in tests
+are local placeholders and are not verified against Firebase.
+
+### Fixture data
+
+Focused Playwright seed (not Phase 15 CLI, not developer DB): 1 admin, 2
+apothekers, 2 bezorgers, settings, vaccines/stock, orders, route templates,
+today’s persisted route, tomorrow preview inputs. Reset before each test.
+
+### Commands
+
+```bash
+# Install browsers once
+npx playwright install chromium
+
+# Headless suite (starts API stack + PWA preview via webServer)
+npm run test:e2e:pwa
+
+# Interactive UI mode
+npm run test:e2e:pwa:ui
+
+# Open last HTML report
+npm run test:e2e:pwa:report
+```
+
+### Artifact locations
+
+| Path                 | Contents                    |
+| -------------------- | --------------------------- |
+| `playwright-report/` | HTML report                 |
+| `test-results/`      | Traces, screenshots, videos |
+
+### Known limitations
+
+- Auth bypass is intentional for CI-stable browser tests; it is dual-gated and
+  inactive in normal development/production.
+- Service worker checks require the production-like preview build (not `vite` dev).
+- Install-prompt UX is not automated (browser automation limitation).
+- Playwright CI workflow file lands in Phase 20.
 
 ## PWA commands
 
@@ -986,7 +1063,7 @@ Development mode does **not** register a service worker unless you set
 - Background sync of authenticated mutations
 - Authenticated courier-route Cache API storage
 - Push notifications
-- Playwright installability suite (Phase 18)
+- Playwright installability suite (Phase 18) — see `npm run test:e2e:pwa`
 
 ## Types commands
 

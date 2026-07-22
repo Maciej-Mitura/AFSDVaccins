@@ -2,6 +2,11 @@ import { Injectable, Logger } from '@nestjs/common'
 import { App, applicationDefault, initializeApp } from 'firebase-admin/app'
 import { Auth, DecodedIdToken, getAuth } from 'firebase-admin/auth'
 
+import {
+  isE2eAuthBypassEnabled,
+  verifyE2eBypassToken,
+} from './e2e-auth-bypass'
+
 const skipFirebaseInit =
   process.argv.includes('--generate-schema-only') ||
   process.env.GENERATE_SCHEMA_ONLY === 'true'
@@ -39,6 +44,10 @@ export class FirebaseService {
   }
 
   async verifyIdToken(idToken: string): Promise<DecodedIdToken> {
+    if (isE2eAuthBypassEnabled()) {
+      return verifyE2eBypassToken(idToken)
+    }
+
     return this.getAuth().verifyIdToken(idToken, false)
   }
 }

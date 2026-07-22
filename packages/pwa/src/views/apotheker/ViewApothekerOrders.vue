@@ -121,7 +121,11 @@ async function onCancel(id: string) {
       />
 
       <div v-else class="space-y-4">
-        <UCard v-for="order in myOrders" :key="order.id">
+        <UCard
+          v-for="order in myOrders"
+          :key="order.id"
+          data-testid="order-card"
+        >
           <div class="space-y-3 text-sm">
             <div class="flex flex-wrap items-center gap-2">
               <h3 class="font-semibold">Bestelling {{ order.id }}</h3>
