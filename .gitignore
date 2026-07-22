@@ -25,6 +25,7 @@ packages/types/dist/
 coverage/
 playwright-report/
 test-results/
+packages/api/test/.e2e-mongo-runtime.json
 
 # Logs
 *.log

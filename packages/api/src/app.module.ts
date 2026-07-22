@@ -35,6 +35,8 @@ const isSchemaGeneration =
 const sharedImports = [
   ConfigModule.forRoot({
     isGlobal: true,
+    // GraphQL E2E sets process.env explicitly; never load developer .env in test.
+    ignoreEnvFile: process.env.NODE_ENV === 'test',
     envFilePath: ['.env'],
     validationSchema: envValidationSchema,
     validationOptions: {
@@ -115,10 +117,12 @@ const databaseImports = isSchemaGeneration
           const url = buildMongoUrl(dbHost, dbName)
           Logger.log(`Connecting to MongoDB at ${dbHost} (database: ${dbName})`)
 
+          // synchronize in development and isolated GraphQL E2E (NODE_ENV=test).
+          // E2E bootstraps must assert DB_NAME contains a test marker before connect.
           return {
             type: 'mongodb' as const,
             url,
-            synchronize: nodeEnv === 'development',
+            synchronize: nodeEnv === 'development' || nodeEnv === 'test',
             autoLoadEntities: true,
           }
         },

@@ -1,0 +1,19 @@
+{
+  "moduleFileExtensions": ["js", "json", "ts"],
+  "rootDir": ".",
+  "testEnvironment": "node",
+  "testRegex": "test/.*\\.e2e-spec\\.ts$",
+  "transform": {
+    "^.+\\.(t|j)s$": "ts-jest"
+  },
+  "testTimeout": 120000,
+  "maxWorkers": 1,
+  "modulePathIgnorePatterns": ["<rootDir>/dist/"],
+  "globalSetup": "<rootDir>/test/e2e-global-setup.cjs",
+  "globalTeardown": "<rootDir>/test/e2e-global-teardown.cjs",
+  "setupFiles": ["<rootDir>/test/e2e-setup-env.cjs"],
+  "moduleNameMapper": {
+    "^firebase-admin/app$": "<rootDir>/src/authentication/__mocks__/firebase-admin-app.ts",
+    "^firebase-admin/auth$": "<rootDir>/src/authentication/__mocks__/firebase-admin-auth.ts"
+  }
+}

@@ -7,12 +7,12 @@ screens.
 
 ## Current status
 
-**Phase 16 complete — installable PWA with safe offline shell support.** The Vue
-client ships a web app manifest, service worker (static assets only), offline
-fallback page, online/offline UI, reconnect refetch, and an explicit update
-prompt. Private GraphQL/Firebase data is never cached by the service worker.
+**Phase 17 complete — backend GraphQL end-to-end tests.** NestJS GraphQL flows
+are exercised with Supertest against an isolated MongoMemoryServer database.
+Firebase Admin token verification is overridden with deterministic Bearer
+tokens; real guards, Mongo user lookup, roles, and ownership rules stay active.
 
-**Next phase:** Phase 17 — backend GraphQL end-to-end tests.
+**Next phase:** Phase 18 — Playwright frontend E2E.
 
 ## Planned stack
 
@@ -812,8 +812,63 @@ npm run build:api
 npm run lint:api
 npm run typecheck:api
 npm run test:api
+npm run test:e2e:api
 npm run generate:schema
 ```
+
+## Backend GraphQL E2E (Phase 17)
+
+### Purpose
+
+GraphQL E2E tests hit the real NestJS GraphQL HTTP boundary (`POST /graphql`)
+with Supertest. They prove authentication, authorization, ownership, Mongo
+persistence, domain validation, safe errors, and idempotent side effects across
+Phases 1–16.
+
+### Unit vs E2E
+
+| Suite                    | Command                | What it covers                                                                         |
+| ------------------------ | ---------------------- | -------------------------------------------------------------------------------------- |
+| Unit / integration specs | `npm run test:api`     | Fast Jest tests under `packages/api/src/**/*.spec.ts` (mocked repos where appropriate) |
+| GraphQL E2E              | `npm run test:e2e:api` | Full AppModule + real Mongo + GraphQL HTTP (Firebase verify mocked only)               |
+
+E2E is **not** folded into every unit-test run.
+
+### Isolated database
+
+- Jest `globalSetup` starts **MongoMemoryServer**.
+- Database name: `vaccin_delivery_e2e_test` (must contain `_test` or `e2e`).
+- Collections are cleared between scenarios; developer/production DBs are never targeted.
+- Hard safety: wipe/clear aborts if `DB_NAME` lacks a test marker.
+- When `NODE_ENV=test`, AppModule ignores `.env` so local `DB_NAME=vaccin-delivery` cannot leak in.
+
+### Firebase override
+
+- Live Firebase Admin is never used (`NODE_ENV=test` skips SDK init; E2E replaces `FirebaseService.verifyIdToken`).
+- Deterministic tokens: `e2e-admin`, `e2e-apotheker-1`, `e2e-apotheker-2`, `e2e-bezorger-1`, `e2e-bezorger-2`, `e2e-unregistered`.
+- Real `AuthorizationGuard`, `RolesGuard`, and Mongo `User` resolution remain in the path.
+
+### Command
+
+```bash
+npm run test:e2e:api
+```
+
+Workspace equivalent: `npm run test:e2e --workspace=@vaccin-delivery/api`.
+
+### Covered workflows
+
+Auth/users, cross-role authz, settings/vaccines, stock adjustments, orders +
+delivery stock decrement idempotency, route templates/generation, tomorrow
+preview (no persistence), route lifecycle, notifications, safe GraphQL errors,
+and E2E infrastructure safety checks.
+
+### Known exclusions
+
+- Playwright / browser E2E (Phase 18)
+- Full WebSocket subscription E2E (HTTP GraphQL coverage is Phase 17 focus; unit filters remain)
+- CI `ci-api-e2e` workflow hardening (Phase 20)
+- Production Docker stack (Phase 19)
 
 ## PWA commands
 
