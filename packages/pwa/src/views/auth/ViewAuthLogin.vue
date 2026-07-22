@@ -13,7 +13,16 @@
     />
 
     <UAlert
-      v-if="formError"
+      v-if="!isOnline"
+      class="mb-4"
+      color="warning"
+      variant="subtle"
+      :title="LOGIN_OFFLINE_MESSAGE"
+      data-testid="login-offline-alert"
+    />
+
+    <UAlert
+      v-else-if="formError"
       class="mb-4"
       color="error"
       variant="subtle"
@@ -49,7 +58,13 @@
           Wachtwoord vergeten?
         </RouterLink>
 
-        <UButton :loading="loading" :disabled="!isOnline" block type="submit">
+        <UButton
+          :loading="loading"
+          :disabled="!isOnline"
+          block
+          type="submit"
+          data-testid="login-submit"
+        >
           Inloggen
         </UButton>
       </div>
@@ -74,6 +89,10 @@ import * as z from 'zod'
 import { useCurrentUser } from '@/composables/useCurrentUser'
 import { useFirebase } from '@/composables/useFirebase'
 import { useOnlineStatus } from '@/composables/useOnlineStatus'
+import {
+  LOGIN_OFFLINE_MESSAGE,
+  shouldBlockLoginWhileOffline,
+} from '@/views/auth/login-offline'
 
 const route = useRoute()
 const router = useRouter()
@@ -103,6 +122,11 @@ const state = reactive<Partial<LoginForm>>({
 })
 
 async function onSubmit(event: FormSubmitEvent<LoginForm>) {
+  if (shouldBlockLoginWhileOffline(isOnline.value)) {
+    formError.value = LOGIN_OFFLINE_MESSAGE
+    return
+  }
+
   loading.value = true
   formError.value = null
 
