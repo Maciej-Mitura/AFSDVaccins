@@ -27,7 +27,7 @@ import { User } from '../user/user.entity'
 import { Vaccine } from '../vaccine/vaccine.entity'
 import { normalizeVaccineName } from '../vaccine/vaccine.utils'
 import {
-  SEED_ACCOUNTS,
+  resolveSeedAccounts,
   SEED_APOTHEKER_PROFILES,
   SEED_BEZORGER_PROFILES,
   SeedAccountKey,
@@ -49,6 +49,7 @@ export type SeedCounters = {
   usersReused: number
   profilesCreated: number
   profilesReused: number
+  adminProfilesRemoved: number
   settingsCreated: number
   settingsReused: number
   vaccinesCreated: number
@@ -101,11 +102,22 @@ export class SeedService {
   async run(): Promise<SeedCounters> {
     this.seedSafetyService.assertSeedAllowed()
     this.seedSafetyService.logSeedTargetConfirmation()
-    const password = this.seedSafetyService.requireDemoPassword()
+    const demoPassword = this.seedSafetyService.requireDemoPassword()
+    const teacherPassword = this.seedSafetyService.requireTeacherAdminPassword()
+    const personalAdminEmail = this.seedSafetyService.requirePersonalAdminEmail()
 
     const counters = this.emptyCounters()
+    const accounts = resolveSeedAccounts({
+      personalAdminEmail,
+      demoPassword,
+      teacherPassword,
+    })
 
-    const users = await this.seedUsers(password, counters)
+    const users = await this.seedUsers(accounts, counters)
+    await this.clearAccidentalAdminRoleProfiles(
+      [users.personalAdmin, users.docent],
+      counters,
+    )
     const apothekerProfiles = await this.seedApothekerProfiles(users, counters)
     const bezorgerProfiles = await this.seedBezorgerProfiles(users, counters)
     await this.seedSettings(counters)
@@ -158,6 +170,7 @@ export class SeedService {
       usersReused: 0,
       profilesCreated: 0,
       profilesReused: 0,
+      adminProfilesRemoved: 0,
       settingsCreated: 0,
       settingsReused: 0,
       vaccinesCreated: 0,
@@ -174,16 +187,13 @@ export class SeedService {
   }
 
   private async seedUsers(
-    password: string,
+    accounts: ReturnType<typeof resolveSeedAccounts>,
     counters: SeedCounters,
   ): Promise<SeededUsers> {
     const users = {} as SeededUsers
 
-    for (const account of SEED_ACCOUNTS) {
-      const firebase = await this.firebaseProvisioning.ensureFirebaseUser(
-        account,
-        password,
-      )
+    for (const account of accounts) {
+      const firebase = await this.firebaseProvisioning.ensureFirebaseUser(account)
 
       if (firebase.created) {
         counters.firebaseCreated += 1
@@ -216,6 +226,42 @@ export class SeedService {
     }
 
     return users
+  }
+
+  /**
+   * ADMIN must never carry pharmacist/courier profiles. Remove any accidental
+   * role profiles linked to seeded ADMIN user IDs (e.g. after a prior
+   * self-registration that was later promoted to ADMIN by seed).
+   */
+  private async clearAccidentalAdminRoleProfiles(
+    adminUsers: User[],
+    counters: SeedCounters,
+  ): Promise<void> {
+    for (const admin of adminUsers) {
+      const userId = admin._id.toString()
+
+      const apotheker = await this.apothekerProfileRepository.findOne({
+        where: { userId },
+      })
+      if (apotheker) {
+        await this.apothekerProfileRepository.remove(apotheker)
+        counters.adminProfilesRemoved += 1
+        this.logger.warn(
+          `Removed accidental ApothekerProfile linked to ADMIN ${admin.email}`,
+        )
+      }
+
+      const bezorger = await this.bezorgerProfileRepository.findOne({
+        where: { userId },
+      })
+      if (bezorger) {
+        await this.bezorgerProfileRepository.remove(bezorger)
+        counters.adminProfilesRemoved += 1
+        this.logger.warn(
+          `Removed accidental BezorgerProfile linked to ADMIN ${admin.email}`,
+        )
+      }
+    }
   }
 
   private async seedApothekerProfiles(
@@ -705,6 +751,7 @@ export class SeedService {
     )
     this.logger.log(
       `- Profiles: created ${counters.profilesCreated}, reused ${counters.profilesReused}`,
+      `- Accidental ADMIN role profiles removed: ${counters.adminProfilesRemoved}`,
     )
     this.logger.log(
       `- Settings: created ${counters.settingsCreated}, reused ${counters.settingsReused}`,

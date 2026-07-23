@@ -25,6 +25,10 @@ describe('SeedService', () => {
       assertSeedAllowed: jest.fn(),
       logSeedTargetConfirmation: jest.fn(),
       requireDemoPassword: jest.fn().mockReturnValue('demo-password'),
+      requireTeacherAdminPassword: jest.fn().mockReturnValue('teacher-password'),
+      requirePersonalAdminEmail: jest
+        .fn()
+        .mockReturnValue('owner@example.com'),
     } as unknown as SeedSafetyService
 
     const firebaseProvisioning = {
@@ -110,6 +114,10 @@ describe('SeedService', () => {
         profiles.set(`a:${saved.userId}`, saved)
         return saved
       }),
+      remove: jest.fn().mockImplementation(async (entity: { userId: string }) => {
+        profiles.delete(`a:${entity.userId}`)
+        return entity
+      }),
     }
 
     const bezorgerProfileRepository = {
@@ -121,6 +129,10 @@ describe('SeedService', () => {
         const saved = { ...payload, _id: payload._id ?? new ObjectId().toString() }
         profiles.set(`b:${saved.userId}`, saved)
         return saved
+      }),
+      remove: jest.fn().mockImplementation(async (entity: { userId: string }) => {
+        profiles.delete(`b:${entity.userId}`)
+        return entity
       }),
     }
 
@@ -232,7 +244,7 @@ describe('SeedService', () => {
     expect(firebaseProvisioning.ensureFirebaseUser).not.toHaveBeenCalled()
   })
 
-  it('creates ADMIN without a role profile and links pharmacist/courier profiles to User.id', async () => {
+  it('creates two ADMIN users without role profiles and links pharmacist/courier profiles to User.id', async () => {
     const {
       service,
       apothekerProfileRepository,
@@ -245,10 +257,14 @@ describe('SeedService', () => {
     const savedUsers = (userRepository.save as jest.Mock).mock.calls.map(
       call => call[0],
     )
-    const admin = savedUsers.find(
+    const admins = savedUsers.filter(
       (user: { role: UserRole }) => user.role === UserRole.ADMIN,
     )
-    expect(admin).toBeDefined()
+    expect(admins).toHaveLength(2)
+    expect(admins.map((user: { email: string }) => user.email).sort()).toEqual([
+      'docent@howest.be',
+      'owner@example.com',
+    ])
 
     const apothekerProfileUserIds = (
       apothekerProfileRepository.save as jest.Mock
@@ -259,8 +275,46 @@ describe('SeedService', () => {
 
     expect(apothekerProfileUserIds).toHaveLength(3)
     expect(bezorgerProfileUserIds).toHaveLength(2)
-    expect(apothekerProfileUserIds).not.toContain(admin._id)
-    expect(bezorgerProfileUserIds).not.toContain(admin._id)
+    for (const admin of admins) {
+      expect(apothekerProfileUserIds).not.toContain(admin._id)
+      expect(bezorgerProfileUserIds).not.toContain(admin._id)
+    }
+  })
+
+  it('removes accidental role profiles previously linked to ADMIN users', async () => {
+    const mocks = createMocks()
+    const personalUid = 'uid-for-owner@example.com'
+    const personalUser = {
+      _id: 'admin-personal-id',
+      firebaseUid: personalUid,
+      email: 'owner@example.com',
+      role: UserRole.ADMIN,
+    }
+
+    ;(mocks.userRepository.findOne as jest.Mock).mockImplementation(
+      async ({ where }: { where: { firebaseUid?: string } }) => {
+        if (where.firebaseUid === personalUid) {
+          return personalUser
+        }
+        return null
+      },
+    )
+
+    // Simulate a leftover pharmacist profile from an earlier self-registration.
+    ;(mocks.apothekerProfileRepository.findOne as jest.Mock).mockImplementation(
+      async ({ where }: { where: { userId: string } }) => {
+        if (where.userId === personalUser._id) {
+          return { _id: 'accidental-profile', userId: personalUser._id }
+        }
+        return null
+      },
+    )
+
+    await mocks.service.run()
+
+    expect(mocks.apothekerProfileRepository.remove).toHaveBeenCalledWith(
+      expect.objectContaining({ userId: personalUser._id }),
+    )
   })
 
   it('reuses users and profiles on a second run without duplicates', async () => {
@@ -278,7 +332,7 @@ describe('SeedService', () => {
     expect(
       (mocks.firebaseProvisioning.ensureFirebaseUser as jest.Mock).mock.calls
         .length,
-    ).toBe(12)
+    ).toBe(14)
     expect((mocks.userRepository.save as jest.Mock).mock.calls.length).toBe(
       firstUserSaves * 2,
     )

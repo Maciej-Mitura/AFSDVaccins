@@ -68,6 +68,14 @@ describe('production Docker safety', () => {
     assert.match(example, /URL_FRONTEND=http:\/\/localhost:8080/)
   })
 
+  it('env example documents personal and teacher ADMIN seed variables', () => {
+    const example = read(envExamplePath)
+    assert.match(example, /SEED_PERSONAL_ADMIN_EMAIL=/)
+    assert.match(example, /SEED_PERSONAL_ADMIN_FIREBASE_UID=/)
+    assert.match(example, /SEED_TEACHER_ADMIN_PASSWORD=/)
+    assert.match(example, /SEED_DEMO_PASSWORD=/)
+  })
+
   it('PWA Dockerfile refuses enabled VITE_E2E_AUTH_BYPASS', () => {
     const dockerfile = read(pwaDockerfile)
     assert.match(dockerfile, /VITE_E2E_AUTH_BYPASS/)

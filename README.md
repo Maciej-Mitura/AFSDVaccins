@@ -239,12 +239,15 @@ In `packages/api/.env`:
 NODE_ENV=development
 ALLOW_DATABASE_SEED=true
 SEED_DEMO_PASSWORD=change-me-demo-only
+SEED_TEACHER_ADMIN_PASSWORD=change-me-teacher-only
+SEED_PERSONAL_ADMIN_EMAIL=you@example.com
 ```
 
 Optional UID overrides (link to existing Firebase accounts; omit for normal
 email-based resolve/create):
 
 ```env
+# SEED_PERSONAL_ADMIN_FIREBASE_UID=
 # SEED_DOCENT_FIREBASE_UID=
 # SEED_APOTHEKER1_FIREBASE_UID=
 # SEED_APOTHEKER2_FIREBASE_UID=
@@ -256,7 +259,12 @@ email-based resolve/create):
 How to obtain a Firebase UID for an existing account: Firebase console →
 **Authentication → Users** → open the user → copy **User UID**. Prefer email
 resolve when possible; use overrides only when you intentionally reuse an
-existing Auth user.
+existing Auth user. When a UID override is set, the Firebase account email
+must match the seed email (including `SEED_PERSONAL_ADMIN_EMAIL`).
+
+Changing `SEED_DEMO_PASSWORD` or `SEED_TEACHER_ADMIN_PASSWORD` does **not**
+reset passwords for Firebase accounts that already exist — those are reused
+as-is. Only newly created Auth users receive the configured password.
 
 ### Production safety
 
@@ -282,18 +290,24 @@ rerun; the second and third runs should report mostly **reused** counts.
 
 ### Demo accounts (evaluation only)
 
-| Email                | Role      | Notes                              |
-| -------------------- | --------- | ---------------------------------- |
-| `docent@howest.be`   | ADMIN     | Evaluator admin                    |
-| `apotheker1@demo.be` | APOTHEKER | Happy path / near daily FLU limit  |
-| `apotheker2@demo.be` | APOTHEKER | Weekly limit boundary (~195 doses) |
-| `apotheker3@demo.be` | APOTHEKER | Empty history; skipped route stop  |
-| `bezorger1@demo.be`  | BEZORGER  | Today route assignee               |
-| `bezorger2@demo.be`  | BEZORGER  | Cross-authz isolation              |
+| Email                       | Role      | Notes                                       |
+| --------------------------- | --------- | ------------------------------------------- |
+| `SEED_PERSONAL_ADMIN_EMAIL` | ADMIN     | Personal evaluation-owner (no role profile) |
+| `docent@howest.be`          | ADMIN     | Teacher/evaluator admin (no role profile)   |
+| `apotheker1@demo.be`        | APOTHEKER | Happy path / near daily FLU limit           |
+| `apotheker2@demo.be`        | APOTHEKER | Weekly limit boundary (~195 doses)          |
+| `apotheker3@demo.be`        | APOTHEKER | Empty history; skipped route stop           |
+| `bezorger1@demo.be`         | BEZORGER  | Today route assignee                        |
+| `bezorger2@demo.be`         | BEZORGER  | Cross-authz isolation                       |
 
-Password: set `SEED_DEMO_PASSWORD` locally (never commit real values). Documented
-assignment evaluation passwords belong in your local `.env` / dossier only —
-they are **not** hardcoded in TypeScript.
+Passwords (never hardcoded in TypeScript):
+
+- Pharmacist/courier demos: `SEED_DEMO_PASSWORD`
+- Teacher ADMIN (`docent@howest.be`): `SEED_TEACHER_ADMIN_PASSWORD`
+- Personal ADMIN: reuse existing Firebase account (UID/email); create-if-missing
+  uses `SEED_DEMO_PASSWORD`
+
+Public self-registration still cannot choose **ADMIN**.
 
 ### Expected dataset
 
@@ -1687,7 +1701,6 @@ docker compose -f infrastructure/docker-compose-production.yml \
   run --rm \
   -e NODE_ENV=development \
   -e ALLOW_DATABASE_SEED=true \
-  -e SEED_DEMO_PASSWORD=change-me-demo-only \
   api npm run seed:database:cli
 
 docker compose -f infrastructure/docker-compose-production.yml \
@@ -1750,7 +1763,6 @@ docker compose -f infrastructure/docker-compose-production.yml \
   run --rm \
   -e NODE_ENV=development \
   -e ALLOW_DATABASE_SEED=true \
-  -e SEED_DEMO_PASSWORD=change-me-demo-only \
   api npm run seed:database:cli
 ```
 

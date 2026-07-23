@@ -72,4 +72,33 @@ describe('SeedSafetyService', () => {
 
     expect(() => service.requireDemoPassword()).toThrow(/SEED_DEMO_PASSWORD/)
   })
+
+  it('requires SEED_TEACHER_ADMIN_PASSWORD', () => {
+    const service = new SeedSafetyService(
+      mockConfig({
+        NODE_ENV: 'development',
+        ALLOW_DATABASE_SEED: true,
+        SEED_DEMO_PASSWORD: 'demo',
+      }),
+    )
+
+    expect(() => service.requireTeacherAdminPassword()).toThrow(
+      /SEED_TEACHER_ADMIN_PASSWORD/,
+    )
+  })
+
+  it('requires SEED_PERSONAL_ADMIN_EMAIL', () => {
+    const service = new SeedSafetyService(
+      mockConfig({
+        NODE_ENV: 'development',
+        ALLOW_DATABASE_SEED: true,
+        SEED_DEMO_PASSWORD: 'demo',
+        SEED_TEACHER_ADMIN_PASSWORD: 'teacher',
+      }),
+    )
+
+    expect(() => service.requirePersonalAdminEmail()).toThrow(
+      /SEED_PERSONAL_ADMIN_EMAIL/,
+    )
+  })
 })

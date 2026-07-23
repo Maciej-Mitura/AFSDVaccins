@@ -81,4 +81,32 @@ export class SeedSafetyService {
 
     return password
   }
+
+  requireTeacherAdminPassword(): string {
+    const password = this.configService.get('SEED_TEACHER_ADMIN_PASSWORD', {
+      infer: true,
+    })
+
+    if (!password || password.trim().length === 0) {
+      throw new SeedSafetyError(
+        'Database seed refused: SEED_TEACHER_ADMIN_PASSWORD is required for docent@howest.be.',
+      )
+    }
+
+    return password
+  }
+
+  requirePersonalAdminEmail(): string {
+    const email = this.configService.get('SEED_PERSONAL_ADMIN_EMAIL', {
+      infer: true,
+    })
+
+    if (!email || email.trim().length === 0) {
+      throw new SeedSafetyError(
+        'Database seed refused: SEED_PERSONAL_ADMIN_EMAIL is required for the personal ADMIN account.',
+      )
+    }
+
+    return email.trim().toLowerCase()
+  }
 }

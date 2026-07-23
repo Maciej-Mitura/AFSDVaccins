@@ -3,7 +3,7 @@ import { ConfigService } from '@nestjs/config'
 
 import { FirebaseService } from '../authentication/firebase.service'
 import { EnvConfig } from '../config/env.validation'
-import { SeedAccountDefinition } from './seed.accounts'
+import { ResolvedSeedAccount } from './seed.accounts'
 import { redactUid } from './seed.constants'
 
 export type FirebaseProvisionResult = {
@@ -21,6 +21,10 @@ function getFirebaseErrorCode(error: unknown): string | undefined {
   return typeof code === 'string' ? code : undefined
 }
 
+function normalizeEmail(email: string | undefined): string {
+  return (email ?? '').trim().toLowerCase()
+}
+
 @Injectable()
 export class SeedFirebaseProvisioningService {
   private readonly logger = new Logger(SeedFirebaseProvisioningService.name)
@@ -32,24 +36,39 @@ export class SeedFirebaseProvisioningService {
 
   /**
    * Resolve a Firebase Auth user for a seed account.
-   * Override UID (when set) must already exist — never silently retarget another account.
+   * Override UID (when set) must already exist and its email must match —
+   * never silently retarget another account.
    * Otherwise lookup by email; create only when missing.
    */
   async ensureFirebaseUser(
-    account: SeedAccountDefinition,
-    password: string,
+    account: ResolvedSeedAccount,
   ): Promise<FirebaseProvisionResult> {
     const auth = this.firebaseService.getAuth()
     const overrideUid = this.readOptionalUidOverride(account.firebaseUidEnvKey)
+    const expectedEmail = normalizeEmail(account.email)
 
     if (overrideUid) {
       try {
         const existing = await auth.getUser(overrideUid)
+        const actualEmail = normalizeEmail(existing.email)
+
+        if (actualEmail !== expectedEmail) {
+          throw new Error(
+            `Seed Firebase UID override ${account.firebaseUidEnvKey} email mismatch: ` +
+              `expected ${account.email}, got ${existing.email ?? '(none)'}. ` +
+              `Refusing to link the wrong Firebase account.`,
+          )
+        }
+
         this.logger.log(
           `Firebase user reused via UID override for ${account.email} (${redactUid(existing.uid)})`,
         )
         return { uid: existing.uid, created: false, reused: true }
       } catch (error) {
+        if (error instanceof Error && error.message.includes('email mismatch')) {
+          throw error
+        }
+
         if (getFirebaseErrorCode(error) === 'auth/user-not-found') {
           throw new Error(
             `Seed Firebase UID override ${account.firebaseUidEnvKey} does not exist. ` +
@@ -75,7 +94,7 @@ export class SeedFirebaseProvisioningService {
 
     const created = await auth.createUser({
       email: account.email,
-      password,
+      password: account.password,
       emailVerified: true,
       displayName: `${account.firstName} ${account.lastName}`,
     })

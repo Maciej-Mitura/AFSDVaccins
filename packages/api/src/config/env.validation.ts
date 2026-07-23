@@ -28,14 +28,19 @@ export const envValidationSchema = Joi.object({
     .truthy('true')
     .falsy('false')
     .default(false),
-  /** Shared demo password for seeded Firebase accounts (evaluation only). */
-  SEED_DEMO_PASSWORD: Joi.string().min(1).optional(),
-  SEED_DOCENT_FIREBASE_UID: Joi.string().min(1).optional(),
-  SEED_APOTHEKER1_FIREBASE_UID: Joi.string().min(1).optional(),
-  SEED_APOTHEKER2_FIREBASE_UID: Joi.string().min(1).optional(),
-  SEED_APOTHEKER3_FIREBASE_UID: Joi.string().min(1).optional(),
-  SEED_BEZORGER1_FIREBASE_UID: Joi.string().min(1).optional(),
-  SEED_BEZORGER2_FIREBASE_UID: Joi.string().min(1).optional(),
+  /** Shared demo password for pharmacist/courier (and personal-admin create) accounts. */
+  SEED_DEMO_PASSWORD: Joi.string().min(1).allow('').optional(),
+  /** Teacher/evaluator ADMIN password (docent@howest.be). */
+  SEED_TEACHER_ADMIN_PASSWORD: Joi.string().min(1).allow('').optional(),
+  /** Personal evaluation-owner ADMIN email (never hardcoded in TypeScript). */
+  SEED_PERSONAL_ADMIN_EMAIL: Joi.string().email().allow('').optional(),
+  SEED_PERSONAL_ADMIN_FIREBASE_UID: Joi.string().min(1).allow('').optional(),
+  SEED_DOCENT_FIREBASE_UID: Joi.string().min(1).allow('').optional(),
+  SEED_APOTHEKER1_FIREBASE_UID: Joi.string().min(1).allow('').optional(),
+  SEED_APOTHEKER2_FIREBASE_UID: Joi.string().min(1).allow('').optional(),
+  SEED_APOTHEKER3_FIREBASE_UID: Joi.string().min(1).allow('').optional(),
+  SEED_BEZORGER1_FIREBASE_UID: Joi.string().min(1).allow('').optional(),
+  SEED_BEZORGER2_FIREBASE_UID: Joi.string().min(1).allow('').optional(),
 })
 
 export type EnvConfig = {
@@ -48,6 +53,9 @@ export type EnvConfig = {
   ALLOW_DATABASE_SEED: boolean
   ALLOW_E2E_AUTH_BYPASS: boolean
   SEED_DEMO_PASSWORD?: string
+  SEED_TEACHER_ADMIN_PASSWORD?: string
+  SEED_PERSONAL_ADMIN_EMAIL?: string
+  SEED_PERSONAL_ADMIN_FIREBASE_UID?: string
   SEED_DOCENT_FIREBASE_UID?: string
   SEED_APOTHEKER1_FIREBASE_UID?: string
   SEED_APOTHEKER2_FIREBASE_UID?: string

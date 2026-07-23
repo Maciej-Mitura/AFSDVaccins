@@ -111,6 +111,9 @@ describe('envValidationSchema', () => {
       DB_NAME: 'vaccin-delivery',
       ALLOW_DATABASE_SEED: 'true',
       SEED_DEMO_PASSWORD: 'demo-only',
+      SEED_TEACHER_ADMIN_PASSWORD: 'teacher-only',
+      SEED_PERSONAL_ADMIN_EMAIL: 'owner@example.com',
+      SEED_PERSONAL_ADMIN_FIREBASE_UID: 'optional-uid',
       SEED_DOCENT_FIREBASE_UID: 'optional-uid',
     })
 
