@@ -107,4 +107,27 @@ describe('production Docker safety', () => {
     assert.match(ignore, /firebase/)
     assert.match(ignore, /infrastructure\/\.env\.prod/)
   })
+
+  it('CI compose env uses placeholders and never enables Playwright bypass', () => {
+    const ciEnvPath = join(root, 'infrastructure', '.env.prod.ci')
+    const placeholderPath = join(
+      root,
+      'infrastructure',
+      'ci-compose-credential.placeholder.json',
+    )
+    assert.equal(existsSync(ciEnvPath), true, 'missing .env.prod.ci')
+    assert.equal(
+      existsSync(placeholderPath),
+      true,
+      'missing ci-compose-credential.placeholder.json',
+    )
+    const ciEnv = read(ciEnvPath)
+    assert.doesNotMatch(ciEnv, /VITE_E2E_AUTH_BYPASS\s*=\s*true/)
+    assert.doesNotMatch(ciEnv, /ALLOW_E2E_AUTH_BYPASS\s*=\s*true/)
+    assert.match(ciEnv, /FIREBASE_CREDENTIALS_HOST_PATH=/)
+    assert.match(ciEnv, /ci-placeholder/)
+    const placeholder = read(placeholderPath)
+    assert.match(placeholder, /CI_PLACEHOLDER_NOT_A_REAL_PRIVATE_KEY/)
+    assert.match(placeholder, /"project_id": "ci-placeholder"/)
+  })
 })

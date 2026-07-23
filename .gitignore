@@ -8,9 +8,12 @@ node_modules/
 !.env.example
 !**/.env.example
 !**/.env.prod.example
+!**/.env.prod.ci
+!infrastructure/.env.prod.ci
 
 # Local production Compose secrets / overrides
 infrastructure/.env.prod
+infrastructure/.env.prod.ci.runtime
 infrastructure/docker-compose.production.override.yml
 
 # Firebase Admin and local credentials

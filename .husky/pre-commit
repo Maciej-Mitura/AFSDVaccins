@@ -1,0 +1,3 @@
+#!/usr/bin/env sh
+# Lightweight pre-commit: staged-file format/lint only (Windows Git Bash compatible).
+npx lint-staged

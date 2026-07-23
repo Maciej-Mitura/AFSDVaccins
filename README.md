@@ -7,12 +7,12 @@ screens.
 
 ## Current status
 
-**Phase 19 complete — production Docker Compose stack.** Multi-stage API and
-PWA images, MongoDB with a dedicated production-demo volume, health checks,
-nginx SPA hosting, and a documented one-off seed path that preserves the
-Phase 15 safety gate (`NODE_ENV=production` API never auto-seeds).
+**Phase 20 complete — CI and local Git quality gates.** Five GitHub Actions
+workflows cover format/API/PWA/Playwright/Docker validation; Husky + lint-staged
+provide lightweight pre-commit and focused pre-push checks. CI remains
+authoritative for full E2E and Docker image builds.
 
-**Next phase:** Phase 20 — CI / Husky completion.
+**Next phase:** Phase 21 — documentation finalization.
 
 ## Planned stack
 
@@ -880,7 +880,7 @@ and E2E infrastructure safety checks.
 ### Known exclusions
 
 - Full WebSocket subscription E2E (HTTP GraphQL coverage is Phase 17 focus; unit filters remain)
-- CI `ci-api-e2e` / `ci-playwright` workflow hardening (Phase 20)
+- Optional Firebase Auth emulator in CI (backlog)
 
 ## Playwright browser E2E (Phase 18)
 
@@ -958,7 +958,7 @@ npm run test:e2e:pwa:report
   inactive in normal development/production.
 - Service worker checks require the production-like preview build (not `vite` dev).
 - Install-prompt UX is not automated (browser automation limitation).
-- Playwright CI workflow file lands in Phase 20.
+- Playwright CI: see `.github/workflows/ci-playwright.yml` (Phase 20).
 
 ## PWA commands
 
@@ -1819,7 +1819,59 @@ npm run test:docker:safety
 docker compose -f infrastructure/docker-compose-production.yml --env-file infrastructure/.env.prod config
 ```
 
-## CI
+CI dry-run (placeholders only — no real credentials):
 
-- `.github/workflows/ci-api.yml` — API lint, typecheck, test, build
-- `.github/workflows/ci-pwa.yml` — schema generation, type generation, PWA lint, typecheck, build
+```bash
+docker compose -f infrastructure/docker-compose-production.yml \
+  --env-file infrastructure/.env.prod.ci config
+```
+
+## CI (Phase 20)
+
+GitHub Actions runs on **pushes** and **pull requests** targeting `develop` and
+`main`, plus optional `workflow_dispatch`. Path filters avoid unrelated work;
+concurrency cancels obsolete runs for the same branch/PR.
+
+| Workflow        | File                                    | What it validates                                                                                                                                            |
+| --------------- | --------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| CI API          | `.github/workflows/ci-api.yml`          | `format:check`, lint, typecheck, unit tests, build                                                                                                           |
+| CI API E2E      | `.github/workflows/ci-api-e2e.yml`      | GraphQL Supertest E2E (MongoMemoryServer; Firebase mocked)                                                                                                   |
+| CI PWA          | `.github/workflows/ci-pwa.yml`          | `generate:graphql`, lint, typecheck, Vitest, production build (placeholder `VITE_*`; **no** `VITE_E2E_AUTH_BYPASS`)                                          |
+| CI Playwright   | `.github/workflows/ci-playwright.yml`   | Chromium install + `npm run test:e2e:pwa`; uploads `playwright-report/` and `test-results/` on failure (7-day retention)                                     |
+| CI Docker smoke | `.github/workflows/ci-docker-smoke.yml` | `test:docker:safety`, Compose `config` with `.env.prod.ci`, API + PWA image **builds** (no `compose up` — runtime still needs a real Admin credential mount) |
+
+**Node:** `.nvmrc` (`22.16.0`) via `actions/setup-node` with npm cache. Always `npm ci` from the root lockfile.
+
+**Required checks:** treat all five workflows as required on `develop`/`main` once GitHub branch protection is configured.
+
+**Secrets:** unit/E2E/Playwright jobs do not need personal Firebase Admin JSON or demo passwords. Do not print credentials in logs.
+
+### Troubleshooting failed CI
+
+1. Re-run the failed job locally with the same npm script from the workflow step.
+2. For Playwright failures, download the uploaded artifact (`playwright-report`, `test-results`) — traces/screenshots/videos are retained on failure.
+3. For Docker Compose config failures, confirm `.env.prod.ci` placeholders and that `ci-compose-credential.placeholder.json` exists (not a real key).
+4. Format failures: `npm run format:check` then `npm run format` for staged docs/config only.
+
+## Local Git quality gates (Husky)
+
+After `npm install`, the root `prepare` script installs Husky when the `husky`
+devDependency is present (hooks under `.husky/`, portable `#!/usr/bin/env sh` —
+works with Windows Git Bash). Production Docker `npm ci --omit=dev` skips Husky
+safely when the package is absent.
+
+| Hook       | Command                 | Scope                                                                       |
+| ---------- | ----------------------- | --------------------------------------------------------------------------- |
+| pre-commit | `npx lint-staged`       | Prettier on staged `json/md/yml/yaml`; ESLint on staged API/PWA TS/Vue only |
+| pre-push   | `npm run prepush:check` | `typecheck:api`, `typecheck:pwa`, `test:api`, `test:pwa`                    |
+
+Hooks do **not** run Playwright, Docker builds, or GraphQL E2E on every commit/push — CI is authoritative for those.
+
+Emergency bypass (not the normal workflow):
+
+```bash
+git commit --no-verify
+git push --no-verify
+```
+
+CI still runs on the remote and remains the source of truth.

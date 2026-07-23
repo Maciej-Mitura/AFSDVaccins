@@ -11,6 +11,7 @@
     "npm": ">=10.0.0"
   },
   "scripts": {
+    "prepare": "node --input-type=module -e \"try { const { default: husky } = await import('husky'); husky(); } catch { /* omit=dev / Docker stages without husky */ }\"",
     "format": "prettier --write \"**/*.{json,md,yml,yaml}\"",
     "format:check": "prettier --check \"**/*.{json,md,yml,yaml}\"",
     "workspaces": "npm query .workspace",
@@ -33,12 +34,20 @@
     "test:e2e:pwa": "playwright test",
     "test:e2e:pwa:ui": "playwright test --ui",
     "test:e2e:pwa:report": "playwright show-report",
+    "prepush:check": "npm run typecheck:api && npm run typecheck:pwa && npm run test:api && npm run test:pwa",
     "seed:database:all": "npm run seed:database:all --workspace=@vaccin-delivery/api",
     "test:docker:safety": "node --test infrastructure/docker-production.safety.test.mjs"
+  },
+  "lint-staged": {
+    "*.{json,md,yml,yaml}": "prettier --write",
+    "packages/api/**/*.{ts,mjs,cjs}": "eslint --no-warn-ignored",
+    "packages/pwa/**/*.{ts,vue}": "eslint --no-warn-ignored"
   },
   "devDependencies": {
     "@playwright/test": "^1.54.2",
     "concurrently": "^9.1.2",
+    "husky": "^9.1.7",
+    "lint-staged": "^15.5.2",
     "prettier": "^3.6.2"
   },
   "dependencies": {

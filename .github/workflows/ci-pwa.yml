@@ -7,7 +7,11 @@ on:
       - 'packages/pwa/**'
       - 'packages/types/**'
       - 'packages/api/src/**'
+      - 'packages/api/package.json'
+      - 'package.json'
       - 'package-lock.json'
+      - '.nvmrc'
+      - '.prettierrc.json'
       - '.github/workflows/ci-pwa.yml'
   pull_request:
     branches: [main, develop]
@@ -15,21 +19,36 @@ on:
       - 'packages/pwa/**'
       - 'packages/types/**'
       - 'packages/api/src/**'
+      - 'packages/api/package.json'
+      - 'package.json'
       - 'package-lock.json'
+      - '.nvmrc'
+      - '.prettierrc.json'
       - '.github/workflows/ci-pwa.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: ci-pwa-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
 
 jobs:
   pwa:
     runs-on: ubuntu-latest
+    timeout-minutes: 20
 
     env:
       VITE_BACKEND_URL: http://localhost:3000/graphql
+      VITE_BACKEND_WS_URL: ws://localhost:3000/graphql
       VITE_FIREBASE_API_KEY: ci-placeholder
       VITE_FIREBASE_AUTH_DOMAIN: ci-placeholder.firebaseapp.com
       VITE_FIREBASE_PROJECT_ID: ci-placeholder
       VITE_FIREBASE_STORAGE_BUCKET: ci-placeholder.appspot.com
       VITE_FIREBASE_MESSAGING_SENDER_ID: '000000000000'
       VITE_FIREBASE_APP_ID: 1:000000000000:web:placeholder
+      # Do not set VITE_E2E_AUTH_BYPASS for the production-like PWA build job.
 
     steps:
       - name: Checkout
@@ -44,17 +63,20 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Generate API schema
-        run: npm run generate:schema
+      - name: Format check
+        run: npm run format:check
 
-      - name: Generate GraphQL types
-        run: npm run generate:types
+      - name: Generate GraphQL schema and types
+        run: npm run generate:graphql
 
       - name: Lint PWA
         run: npm run lint:pwa
 
       - name: Typecheck PWA
         run: npm run typecheck --workspace=@vaccin-delivery/pwa
+
+      - name: Unit tests PWA
+        run: npm run test:pwa
 
       - name: Build PWA
         run: npm run build --workspace=@vaccin-delivery/pwa

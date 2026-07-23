@@ -1,4 +1,4 @@
-name: CI API
+name: CI API E2E
 
 on:
   push:
@@ -8,8 +8,7 @@ on:
       - 'package.json'
       - 'package-lock.json'
       - '.nvmrc'
-      - '.prettierrc.json'
-      - '.github/workflows/ci-api.yml'
+      - '.github/workflows/ci-api-e2e.yml'
   pull_request:
     branches: [main, develop]
     paths:
@@ -17,21 +16,20 @@ on:
       - 'package.json'
       - 'package-lock.json'
       - '.nvmrc'
-      - '.prettierrc.json'
-      - '.github/workflows/ci-api.yml'
+      - '.github/workflows/ci-api-e2e.yml'
   workflow_dispatch:
 
 concurrency:
-  group: ci-api-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  group: ci-api-e2e-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 permissions:
   contents: read
 
 jobs:
-  api:
+  api-e2e:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 25
 
     steps:
       - name: Checkout
@@ -46,17 +44,8 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Format check
-        run: npm run format:check
-
-      - name: Lint API
-        run: npm run lint:api
-
-      - name: Typecheck API
-        run: npm run typecheck:api
-
-      - name: Unit tests API
-        run: npm run test:api
-
-      - name: Build API
-        run: npm run build:api
+      - name: GraphQL API E2E
+        run: npm run test:e2e:api
+        env:
+          CI: true
+          NODE_ENV: test

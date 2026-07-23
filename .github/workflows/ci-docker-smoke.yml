@@ -1,0 +1,100 @@
+name: CI Docker smoke
+
+on:
+  push:
+    branches: [main, develop]
+    paths:
+      - 'packages/api/Dockerfile'
+      - 'packages/pwa/Dockerfile'
+      - 'packages/pwa/nginx.conf'
+      - 'packages/api/package.json'
+      - 'packages/pwa/package.json'
+      - 'packages/types/package.json'
+      - 'package.json'
+      - 'package-lock.json'
+      - 'infrastructure/**'
+      - '.dockerignore'
+      - '.nvmrc'
+      - '.github/workflows/ci-docker-smoke.yml'
+  pull_request:
+    branches: [main, develop]
+    paths:
+      - 'packages/api/Dockerfile'
+      - 'packages/pwa/Dockerfile'
+      - 'packages/pwa/nginx.conf'
+      - 'packages/api/package.json'
+      - 'packages/pwa/package.json'
+      - 'packages/types/package.json'
+      - 'package.json'
+      - 'package-lock.json'
+      - 'infrastructure/**'
+      - '.dockerignore'
+      - '.nvmrc'
+      - '.github/workflows/ci-docker-smoke.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: ci-docker-smoke-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  docker-smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: '.nvmrc'
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Docker safety tests
+        run: npm run test:docker:safety
+
+      - name: Prepare CI compose env
+        run: |
+          set -euo pipefail
+          placeholder="${GITHUB_WORKSPACE}/infrastructure/ci-compose-credential.placeholder.json"
+          test -f "$placeholder"
+          sed "s|^FIREBASE_CREDENTIALS_HOST_PATH=.*|FIREBASE_CREDENTIALS_HOST_PATH=${placeholder}|" \
+            infrastructure/.env.prod.ci > infrastructure/.env.prod.ci.runtime
+
+      - name: Compose config validation
+        run: >
+          docker compose
+          -f infrastructure/docker-compose-production.yml
+          --env-file infrastructure/.env.prod.ci.runtime
+          config
+
+      - name: Build API image
+        run: >
+          docker build
+          -f packages/api/Dockerfile
+          -t vaccin-delivery-api:ci
+          .
+
+      - name: Build PWA image
+        run: >
+          docker build
+          -f packages/pwa/Dockerfile
+          -t vaccin-delivery-pwa:ci
+          --build-arg VITE_BACKEND_URL=http://localhost:3000/graphql
+          --build-arg VITE_BACKEND_WS_URL=ws://localhost:3000/graphql
+          --build-arg VITE_FIREBASE_API_KEY=ci-placeholder
+          --build-arg VITE_FIREBASE_AUTH_DOMAIN=ci-placeholder.firebaseapp.com
+          --build-arg VITE_FIREBASE_PROJECT_ID=ci-placeholder
+          --build-arg VITE_FIREBASE_STORAGE_BUCKET=ci-placeholder.appspot.com
+          --build-arg VITE_FIREBASE_MESSAGING_SENDER_ID=000000000000
+          --build-arg VITE_FIREBASE_APP_ID=1:000000000000:web:placeholder
+          .
+        # VITE_E2E_AUTH_BYPASS intentionally unset for production image builds.

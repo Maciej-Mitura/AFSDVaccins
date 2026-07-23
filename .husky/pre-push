@@ -1,0 +1,3 @@
+#!/usr/bin/env sh
+# Focused pre-push: typecheck + fast unit tests. CI remains authoritative for E2E/Docker.
+npm run prepush:check
