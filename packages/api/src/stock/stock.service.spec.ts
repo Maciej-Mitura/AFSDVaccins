@@ -5,6 +5,7 @@ import { MongoRepository } from 'typeorm'
 
 import { NotificationType } from '../notifications/notification-type.enum'
 import { NotificationService } from '../notifications/notification.service'
+import { ApplicationCacheService } from '../common/cache/application-cache.service'
 import { UserRole } from '../user/user-role.enum'
 import { User } from '../user/user.entity'
 import { UserService } from '../user/user.service'
@@ -105,6 +106,11 @@ describe('StockService', () => {
       notifyAdminsIfEnteredLowStock: jest.fn().mockResolvedValue(undefined),
     }
 
+    const applicationCache = {
+      invalidateVaccines: jest.fn().mockResolvedValue(undefined),
+      invalidateSettings: jest.fn().mockResolvedValue(undefined),
+    }
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         StockService,
@@ -123,6 +129,10 @@ describe('StockService', () => {
         {
           provide: StockNotificationService,
           useValue: stockNotificationService,
+        },
+        {
+          provide: ApplicationCacheService,
+          useValue: applicationCache,
         },
       ],
     }).compile()
@@ -485,6 +495,12 @@ describe('StockService.applyDeliveryDecrement', () => {
         {
           provide: StockNotificationService,
           useValue: stockNotificationService,
+        },
+        {
+          provide: ApplicationCacheService,
+          useValue: {
+            invalidateVaccines: jest.fn().mockResolvedValue(undefined),
+          },
         },
       ],
     }).compile()

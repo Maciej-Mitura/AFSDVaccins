@@ -1166,6 +1166,19 @@ These values are **expected to ship in the PWA bundle**. Store in `VITE_*` env v
 
 Firebase security relies on Auth rules, API authorization, and Firebase console restrictions — not on hiding the web API key.
 
+### 16.6 API security foundation (Phase 22)
+
+| Control    | Behaviour                                                                                                                                                           |
+| ---------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Rate limit | Global `GraphqlThrottlerGuard` (usually IP); strict identity guard after auth on expensive mutations                                                                |
+| Cache      | Process-local `settings:current`, `vaccines:active`, `vaccines:all` with write invalidation                                                                         |
+| Headers    | Helmet before routes; env-aware CSP for GraphiQL in non-production                                                                                                  |
+| GraphQL    | Custom max-depth rule + complexity Apollo plugin (default max 500)                                                                                                  |
+| Body size  | `API_JSON_BODY_LIMIT` sets Express `json`/`urlencoded` `limit` (Nest `bodyParser: false`; one parser pair). Applies without Content-Length. Media uploads Phase 25. |
+| Errors     | `extensions.code = RATE_LIMITED` (no tracker/IP/UID leakage)                                                                                                        |
+
+Apollo HTTP batching is **disabled**. Shared bootstrap: `common/bootstrap/configure-api-app.ts`.
+
 ---
 
 ## 17. Requirement traceability

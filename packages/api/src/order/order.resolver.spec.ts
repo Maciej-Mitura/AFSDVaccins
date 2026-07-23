@@ -13,6 +13,7 @@ import { PubSub } from 'graphql-subscriptions'
 
 import { AuthorizationGuard } from '../authentication/authorization.guard'
 import { PUB_SUB } from '../common/pubsub/pubsub.constants'
+import { StrictIdentityThrottlerGuard } from '../common/throttling/strict-identity-throttler.guard'
 import { FirebaseAuthStrategy } from '../authentication/firebase-auth.strategy'
 import { FirebaseService } from '../authentication/firebase.service'
 import { SettingsService } from '../settings/settings.service'
@@ -161,7 +162,10 @@ describe('OrderResolver (GraphQL)', () => {
           useValue: new PubSub(),
         },
       ],
-    }).compile()
+    })
+      .overrideGuard(StrictIdentityThrottlerGuard)
+      .useValue({ canActivate: () => true })
+      .compile()
 
     app = moduleFixture.createNestApplication()
     await app.init()

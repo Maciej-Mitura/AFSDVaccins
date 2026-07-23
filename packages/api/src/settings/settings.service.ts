@@ -2,6 +2,8 @@ import { Injectable } from '@nestjs/common'
 import { InjectRepository } from '@nestjs/typeorm'
 import { MongoRepository } from 'typeorm'
 
+import { ApplicationCacheService } from '../common/cache/application-cache.service'
+import { CacheKeys } from '../common/cache/cache-keys'
 import { UpdateApplicationSettingsInput } from './dto/update-settings.input'
 import { SettingsInvalidException } from './exceptions/settings-invalid.exception'
 import { APPLICATION_SETTINGS_DEFAULTS } from './settings.constants'
@@ -13,6 +15,7 @@ export class SettingsService {
   constructor(
     @InjectRepository(ApplicationSettings)
     private readonly settingsRepository: MongoRepository<ApplicationSettings>,
+    private readonly applicationCache: ApplicationCacheService,
   ) {}
 
   private createDefaultSettings(): ApplicationSettings {
@@ -33,7 +36,7 @@ export class SettingsService {
     return this.settingsRepository.save(normalized)
   }
 
-  async getApplicationSettings(): Promise<ApplicationSettings> {
+  private async loadApplicationSettingsFromDb(): Promise<ApplicationSettings> {
     const existing = await this.settingsRepository.findOne({
       where: { singletonKey: APPLICATION_SETTINGS_DEFAULTS.singletonKey },
     })
@@ -59,6 +62,14 @@ export class SettingsService {
     }
   }
 
+  async getApplicationSettings(): Promise<ApplicationSettings> {
+    return this.applicationCache.getOrSet(
+      CacheKeys.settingsCurrent(),
+      () => this.loadApplicationSettingsFromDb(),
+      this.applicationCache.referenceTtlMs(),
+    )
+  }
+
   async updateApplicationSettings(
     input: UpdateApplicationSettingsInput,
   ): Promise<ApplicationSettings> {
@@ -71,7 +82,7 @@ export class SettingsService {
       throw new SettingsInvalidException('No settings fields were provided')
     }
 
-    const settings = await this.getApplicationSettings()
+    const settings = await this.loadApplicationSettingsFromDb()
 
     if (input.orderingClosingTime !== undefined) {
       settings.orderingClosingTime = input.orderingClosingTime
@@ -89,6 +100,8 @@ export class SettingsService {
       settings.dailyDoseCapPerType = input.dailyDoseCapPerType
     }
 
-    return this.settingsRepository.save(settings)
+    const saved = await this.settingsRepository.save(settings)
+    await this.applicationCache.invalidateSettings()
+    return saved
   }
 }

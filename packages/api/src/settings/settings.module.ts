@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common'
 import { TypeOrmModule } from '@nestjs/typeorm'
 
 import { AuthenticationModule } from '../authentication/authentication.module'
+import { ApplicationCacheModule } from '../common/cache/application-cache.module'
 import { UserModule } from '../user/user.module'
 import { ApplicationSettings } from './settings.entity'
 import { SettingsResolver } from './settings.resolver'
@@ -26,7 +27,12 @@ const persistenceImports = isSchemaGeneration
   : [TypeOrmModule.forFeature([ApplicationSettings])]
 
 @Module({
-  imports: [AuthenticationModule, UserModule, ...persistenceImports],
+  imports: [
+    AuthenticationModule,
+    UserModule,
+    ApplicationCacheModule,
+    ...persistenceImports,
+  ],
   providers: [settingsServiceProvider, SettingsResolver],
   exports: [SettingsService],
 })

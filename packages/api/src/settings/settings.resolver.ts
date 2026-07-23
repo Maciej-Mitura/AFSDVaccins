@@ -2,6 +2,8 @@ import { UseGuards } from '@nestjs/common'
 import { Args, Mutation, Query, Resolver } from '@nestjs/graphql'
 
 import { AuthorizationGuard } from '../authentication/authorization.guard'
+import { StrictThrottle } from '../common/throttling/strict-rate-limit.decorator'
+import { StrictIdentityThrottlerGuard } from '../common/throttling/strict-identity-throttler.guard'
 import { Roles } from '../user/decorators/roles.decorator'
 import { RolesGuard } from '../user/guards/roles.guard'
 import { UserRole } from '../user/user-role.enum'
@@ -24,7 +26,8 @@ export class SettingsResolver {
   @Mutation(() => ApplicationSettings, {
     description: 'Updates the singleton application settings record',
   })
-  @UseGuards(AuthorizationGuard, RolesGuard)
+  @UseGuards(AuthorizationGuard, RolesGuard, StrictIdentityThrottlerGuard)
+  @StrictThrottle()
   @Roles(UserRole.ADMIN)
   updateApplicationSettings(
     @Args('input') input: UpdateApplicationSettingsInput,

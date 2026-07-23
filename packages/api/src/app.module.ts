@@ -4,7 +4,12 @@ import { GraphQLModule } from '@nestjs/graphql'
 import { ApolloDriver, ApolloDriverConfig } from '@nestjs/apollo'
 import { TypeOrmModule } from '@nestjs/typeorm'
 import { join } from 'node:path'
-import { buildMongoUrl, envValidationSchema, safeMongoHostname } from './config/env.validation'
+import {
+  buildMongoUrl,
+  EnvConfig,
+  envValidationSchema,
+  safeMongoHostname,
+} from './config/env.validation'
 import { AuthenticationModule } from './authentication/authentication.module'
 import { GraphqlWsContextExtra } from './authentication/firebase.types'
 import {
@@ -16,7 +21,13 @@ import {
 import { GraphqlWsAuthModule } from './authentication/graphql-ws-auth.module'
 import { GraphqlWsAuthService } from './authentication/graphql-ws-auth.service'
 import { buildGraphqlRequestFromWsAuth } from './authentication/graphql-ws-auth.util'
+import { ApplicationCacheModule } from './common/cache/application-cache.module'
+import {
+  createComplexityApolloPlugin,
+  createMaxDepthRule,
+} from './common/graphql/query-protection'
 import { PubSubModule } from './common/pubsub/pubsub.module'
+import { ThrottlingModule } from './common/throttling/throttling.module'
 import { HealthModule } from './health/health.module'
 import { NotificationsModule } from './notifications/notifications.module'
 import { OrderModule } from './order/order.module'
@@ -50,16 +61,24 @@ const sharedImports = [
     imports: [ConfigModule, GraphqlWsAuthModule],
     inject: [ConfigService, GraphqlWsAuthService],
     useFactory: (
-      configService: ConfigService,
+      configService: ConfigService<EnvConfig, true>,
       graphqlWsAuthService: GraphqlWsAuthService,
     ) => {
-      const nodeEnv = configService.get<string>('NODE_ENV', 'development')
+      const nodeEnv = configService.get('NODE_ENV', { infer: true })
       const isProduction = nodeEnv === 'production'
+      const maxDepth = configService.get('GRAPHQL_MAX_DEPTH', { infer: true })
+      const maxComplexity = configService.get('GRAPHQL_MAX_COMPLEXITY', {
+        infer: true,
+      })
 
       return {
         autoSchemaFile: join(process.cwd(), 'dist/schema.gql'),
         sortSchema: true,
         graphiql: !isProduction,
+        // Apollo HTTP batching is NOT enabled (allowBatchedHttpRequests unset/false).
+        // Each POST /graphql carries a single operation document.
+        validationRules: [createMaxDepthRule(maxDepth)],
+        plugins: [createComplexityApolloPlugin(maxComplexity)],
         subscriptions: {
           'graphql-ws': {
             onConnect: async (context: {
@@ -135,6 +154,8 @@ const databaseImports = isSchemaGeneration
   imports: [
     ...sharedImports,
     ...databaseImports,
+    ApplicationCacheModule,
+    ThrottlingModule,
     PubSubModule,
     HealthModule,
     AuthenticationModule,

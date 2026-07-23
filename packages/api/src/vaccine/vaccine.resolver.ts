@@ -2,6 +2,8 @@ import { UseGuards } from '@nestjs/common'
 import { Args, ID, Mutation, Query, Resolver } from '@nestjs/graphql'
 
 import { AuthorizationGuard } from '../authentication/authorization.guard'
+import { StrictThrottle } from '../common/throttling/strict-rate-limit.decorator'
+import { StrictIdentityThrottlerGuard } from '../common/throttling/strict-identity-throttler.guard'
 import { CurrentUser } from '../user/decorators/current-user.decorator'
 import { Roles } from '../user/decorators/roles.decorator'
 import { RolesGuard } from '../user/guards/roles.guard'
@@ -43,7 +45,8 @@ export class VaccineResolver {
   @Mutation(() => Vaccine, {
     description: 'Creates a vaccine in the catalogue',
   })
-  @UseGuards(AuthorizationGuard, RolesGuard)
+  @UseGuards(AuthorizationGuard, RolesGuard, StrictIdentityThrottlerGuard)
+  @StrictThrottle()
   @Roles(UserRole.ADMIN)
   createVaccine(@Args('input') input: CreateVaccineInput): Promise<Vaccine> {
     return this.vaccineService.createVaccine(input)
@@ -52,7 +55,8 @@ export class VaccineResolver {
   @Mutation(() => Vaccine, {
     description: 'Updates an existing vaccine in the catalogue',
   })
-  @UseGuards(AuthorizationGuard, RolesGuard)
+  @UseGuards(AuthorizationGuard, RolesGuard, StrictIdentityThrottlerGuard)
+  @StrictThrottle()
   @Roles(UserRole.ADMIN)
   updateVaccine(
     @Args('id', { type: () => ID }) id: string,
@@ -64,7 +68,8 @@ export class VaccineResolver {
   @Mutation(() => Vaccine, {
     description: 'Activates or deactivates a vaccine',
   })
-  @UseGuards(AuthorizationGuard, RolesGuard)
+  @UseGuards(AuthorizationGuard, RolesGuard, StrictIdentityThrottlerGuard)
+  @StrictThrottle()
   @Roles(UserRole.ADMIN)
   setVaccineActive(
     @Args('id', { type: () => ID }) id: string,

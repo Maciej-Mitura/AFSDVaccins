@@ -10,6 +10,7 @@ import { Request, Response } from 'express'
 import type { Server } from 'node:http'
 
 import { AuthorizationGuard } from '../authentication/authorization.guard'
+import { StrictIdentityThrottlerGuard } from '../common/throttling/strict-identity-throttler.guard'
 import { FirebaseAuthStrategy } from '../authentication/firebase-auth.strategy'
 import { FirebaseService } from '../authentication/firebase.service'
 import { UserRole } from './user-role.enum'
@@ -101,7 +102,10 @@ describe('UserResolver (GraphQL)', () => {
           useValue: userServiceMock,
         },
       ],
-    }).compile()
+    })
+      .overrideGuard(StrictIdentityThrottlerGuard)
+      .useValue({ canActivate: () => true })
+      .compile()
 
     app = moduleFixture.createNestApplication()
     await app.init()

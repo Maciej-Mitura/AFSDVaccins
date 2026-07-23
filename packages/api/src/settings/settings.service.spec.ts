@@ -2,6 +2,7 @@ import { Test, TestingModule } from '@nestjs/testing'
 import { getRepositoryToken } from '@nestjs/typeorm'
 import { MongoRepository } from 'typeorm'
 
+import { ApplicationCacheService } from '../common/cache/application-cache.service'
 import { SettingsInvalidException } from './exceptions/settings-invalid.exception'
 import {
   APPLICATION_SETTINGS_DEFAULTS,
@@ -95,6 +96,16 @@ describe('SettingsService', () => {
         {
           provide: getRepositoryToken(ApplicationSettings),
           useValue: repository,
+        },
+        {
+          provide: ApplicationCacheService,
+          useValue: {
+            getOrSet: jest.fn(
+              async (_key: string, loader: () => Promise<unknown>) => loader(),
+            ),
+            invalidateSettings: jest.fn().mockResolvedValue(undefined),
+            referenceTtlMs: jest.fn().mockReturnValue(60_000),
+          },
         },
       ],
     }).compile()

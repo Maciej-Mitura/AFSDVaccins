@@ -15,6 +15,8 @@ import {
   BEZORGER_ROUTE_UPDATED_EVENT,
   PUB_SUB,
 } from '../common/pubsub/pubsub.constants'
+import { StrictThrottle } from '../common/throttling/strict-rate-limit.decorator'
+import { StrictIdentityThrottlerGuard } from '../common/throttling/strict-identity-throttler.guard'
 import { CurrentUser } from '../user/decorators/current-user.decorator'
 import { Roles } from '../user/decorators/roles.decorator'
 import { RolesGuard } from '../user/guards/roles.guard'
@@ -36,7 +38,8 @@ export class RoutesResolver {
     description:
       'Generates or regenerates a delivery route from an active template',
   })
-  @UseGuards(AuthorizationGuard, RolesGuard)
+  @UseGuards(AuthorizationGuard, RolesGuard, StrictIdentityThrottlerGuard)
+  @StrictThrottle()
   @Roles(UserRole.ADMIN)
   generateDeliveryRoute(
     @CurrentUser() user: User,

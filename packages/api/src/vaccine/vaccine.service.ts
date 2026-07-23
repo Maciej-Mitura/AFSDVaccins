@@ -2,6 +2,8 @@ import { Injectable } from '@nestjs/common'
 import { InjectRepository } from '@nestjs/typeorm'
 import { MongoRepository } from 'typeorm'
 
+import { ApplicationCacheService } from '../common/cache/application-cache.service'
+import { CacheKeys } from '../common/cache/cache-keys'
 import { tryParseGraphqlObjectId } from '../common/mongodb/graphql-object-id.util'
 import { UserRole } from '../user/user-role.enum'
 import { CreateVaccineInput, UpdateVaccineInput } from './dto/vaccine.inputs'
@@ -17,6 +19,7 @@ export class VaccineService {
   constructor(
     @InjectRepository(Vaccine)
     private readonly vaccineRepository: MongoRepository<Vaccine>,
+    private readonly applicationCache: ApplicationCacheService,
   ) {}
 
   private async findByNormalizedName(
@@ -56,6 +59,19 @@ export class VaccineService {
     }
   }
 
+  private async loadActiveVaccinesFromDb(): Promise<Vaccine[]> {
+    return this.vaccineRepository.find({
+      where: { active: true },
+      order: { name: 'ASC' },
+    })
+  }
+
+  private async loadAllVaccinesFromDb(): Promise<Vaccine[]> {
+    return this.vaccineRepository.find({
+      order: { name: 'ASC' },
+    })
+  }
+
   async createVaccine(input: CreateVaccineInput): Promise<Vaccine> {
     const normalizedName = normalizeVaccineName(input.name)
     await this.assertUniqueName(normalizedName)
@@ -71,12 +87,20 @@ export class VaccineService {
     })
 
     try {
-      return await this.vaccineRepository.save(vaccine)
+      const saved = await this.vaccineRepository.save(vaccine)
+      await this.applicationCache.invalidateVaccines()
+      return saved
     } catch {
       throw new VaccineAlreadyExistsException()
     }
   }
 
+  /**
+   * Catalogue reads:
+   * - non-ADMIN always use `vaccines:active` (inactive never shared to them)
+   * - ADMIN + includeInactive use `vaccines:all` (only after ADMIN authz)
+   * - ADMIN without includeInactive also use `vaccines:active`
+   */
   async findVaccines(
     includeInactive: boolean,
     role: UserRole,
@@ -84,15 +108,18 @@ export class VaccineService {
     const canIncludeInactive = role === UserRole.ADMIN && includeInactive
 
     if (canIncludeInactive) {
-      return this.vaccineRepository.find({
-        order: { name: 'ASC' },
-      })
+      return this.applicationCache.getOrSet(
+        CacheKeys.vaccinesAll(),
+        () => this.loadAllVaccinesFromDb(),
+        this.applicationCache.referenceTtlMs(),
+      )
     }
 
-    return this.vaccineRepository.find({
-      where: { active: true },
-      order: { name: 'ASC' },
-    })
+    return this.applicationCache.getOrSet(
+      CacheKeys.vaccinesActive(),
+      () => this.loadActiveVaccinesFromDb(),
+      this.applicationCache.referenceTtlMs(),
+    )
   }
 
   async findVaccineEntityById(id: string): Promise<Vaccine> {
@@ -139,7 +166,9 @@ export class VaccineService {
     }
 
     try {
-      return await this.vaccineRepository.save(vaccine)
+      const saved = await this.vaccineRepository.save(vaccine)
+      await this.applicationCache.invalidateVaccines()
+      return saved
     } catch {
       throw new VaccineAlreadyExistsException()
     }
@@ -148,6 +177,8 @@ export class VaccineService {
   async setVaccineActive(id: string, active: boolean): Promise<Vaccine> {
     const vaccine = await this.requireById(id)
     vaccine.active = active
-    return this.vaccineRepository.save(vaccine)
+    const saved = await this.vaccineRepository.save(vaccine)
+    await this.applicationCache.invalidateVaccines()
+    return saved
   }
 }

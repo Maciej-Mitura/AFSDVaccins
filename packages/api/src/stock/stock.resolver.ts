@@ -10,6 +10,8 @@ import {
 } from '@nestjs/graphql'
 
 import { AuthorizationGuard } from '../authentication/authorization.guard'
+import { StrictThrottle } from '../common/throttling/strict-rate-limit.decorator'
+import { StrictIdentityThrottlerGuard } from '../common/throttling/strict-identity-throttler.guard'
 import { CurrentUser } from '../user/decorators/current-user.decorator'
 import { Roles } from '../user/decorators/roles.decorator'
 import { RolesGuard } from '../user/guards/roles.guard'
@@ -30,7 +32,8 @@ export class StockResolver {
   @Mutation(() => StockAdjustment, {
     description: 'Adjusts vaccine stock and records an immutable audit entry',
   })
-  @UseGuards(AuthorizationGuard, RolesGuard)
+  @UseGuards(AuthorizationGuard, RolesGuard, StrictIdentityThrottlerGuard)
+  @StrictThrottle()
   @Roles(UserRole.ADMIN)
   adjustVaccineStock(
     @CurrentUser() user: User,

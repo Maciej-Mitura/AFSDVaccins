@@ -3,6 +3,7 @@ import { getRepositoryToken } from '@nestjs/typeorm'
 import { ObjectId } from 'mongodb'
 import { FindOptionsWhere, MongoRepository } from 'typeorm'
 
+import { ApplicationCacheService } from '../common/cache/application-cache.service'
 import { UserRole } from '../user/user-role.enum'
 import {
   VaccineAlreadyExistsException,
@@ -74,6 +75,16 @@ describe('VaccineService', () => {
         {
           provide: getRepositoryToken(Vaccine),
           useValue: repository,
+        },
+        {
+          provide: ApplicationCacheService,
+          useValue: {
+            getOrSet: jest.fn(
+              async (_key: string, loader: () => Promise<unknown>) => loader(),
+            ),
+            invalidateVaccines: jest.fn().mockResolvedValue(undefined),
+            referenceTtlMs: jest.fn().mockReturnValue(60_000),
+          },
         },
       ],
     }).compile()

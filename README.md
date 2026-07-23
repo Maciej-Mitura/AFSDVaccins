@@ -7,23 +7,23 @@ screens.
 
 ## Current status
 
-**Phase 21 complete — requirements audit and enhancement roadmap (documentation only).**
-Evidence-based matrix refresh, stack compliance, mandatory-gap ranking, and revised
-phases **22–33** live under `docs/` (`requirements-matrix.md`,
-`implementation-roadmap.md`, `enhancement-planning.md`,
-`enhancement-domain-model.md`). No application features were changed in Phase 21.
+**Phase 22 complete — backend security foundation** (rate limiting, process-local
+caching with invalidation, Helmet headers, GraphQL depth/complexity, body-size gate).
+Shared bootstrap (`configureApiApp`) is used by `main.ts` and E2E. No PWA changes;
+rate-limit errors use GraphQL `extensions.code = RATE_LIMITED`.
+
+**Phase 21** remains complete (requirements audit / enhancement roadmap docs).
 
 Authoritative requirement statuses in `docs/requirements-matrix.md` §0.1:
-**96** implemented, **23** partially implemented, **12** deferred, **11** not applicable,
+**97** implemented, **22** partially implemented, **12** deferred, **11** not applicable,
 **5** missing, **2** ambiguous (**149** total).
 
-Rate limiting, caching, runtime i18n, and public deployment are optional or extra in
-the original checklist; mandatory for this project’s chosen Tier A final scope.
+Runtime i18n and public deployment remain optional/extra in the original checklist;
+mandatory for this project’s chosen Tier A final scope (Phases 23–24).
 
 **Phases 0–20** remain complete (domain, PWA, Docker, CI green @ `f3e4d07`).
 
-**Next phase:** Phase 22 — backend security foundation (rate limiting, caching,
-headers, GraphQL complexity/depth). Do not start until explicitly requested.
+**Next phase:** Phase 23 — i18n foundation. Do not start until explicitly requested.
 
 ## Planned stack
 
@@ -1815,6 +1815,63 @@ the production Compose file.
 - `.dockerignore` excludes `.env*`, credentials, `node_modules`, reports
 - Playwright `VITE_E2E_AUTH_BYPASS` is refused at PWA image build time
 - CORS `URL_FRONTEND` defaults to `http://localhost:8080` (no wildcard)
+
+## API security foundation (Phase 22)
+
+### CSRF / XSS threat model (SPA + Bearer)
+
+This app is a **Vue SPA** calling GraphQL with an **`Authorization: Bearer`**
+Firebase ID token (and authenticated `graphql-ws` connections). Classic cookie
+session CSRF does not apply to Bearer-header APIs. Mitigations in force:
+
+- CORS restricted to `URL_FRONTEND` (no `*`)
+- Global `ValidationPipe` (whitelist / forbid non-whitelisted)
+- Helmet on the API (before routes); production keeps default CSP; non-production
+  CSP is narrowly relaxed for Apollo GraphiQL CDN assets only
+- nginx security headers on the PWA static host
+- GraphQL depth + complexity limits; JSON body size via Express parsers
+- Rate limiting (global + stricter identity-keyed mutation limits)
+
+Do **not** disable CSP globally solely to support GraphiQL.
+
+### Rate limiting
+
+| Layer  | Guard                                                                               | Tracker                                                           | Notes                                                 |
+| ------ | ----------------------------------------------------------------------------------- | ----------------------------------------------------------------- | ----------------------------------------------------- |
+| Global | `APP_GUARD` `GraphqlThrottlerGuard` (`default`)                                     | IP, or Firebase UID / app user **only if already on the request** | Does **not** re-verify Firebase. Skips `GET /health`. |
+| Strict | Method `StrictIdentityThrottlerGuard` **after** `AuthorizationGuard` / `RolesGuard` | Prefers `applicationUser._id` → Firebase UID → IP                 | Expensive mutations only                              |
+
+Apollo HTTP **batching is not enabled** (`allowBatchedHttpRequests` unset/false).
+Throttle errors: GraphQL `extensions.code = RATE_LIMITED` + safe `retryAfterSeconds`
+(no IP, UID, bucket key, or policy name).
+
+### Caching (process-local memory)
+
+Keys only: `settings:current`, `vaccines:active`, `vaccines:all`.
+Non-ADMIN catalogue reads always use `vaccines:active`; `vaccines:all` only after
+ADMIN authz with `includeInactive`. Invalidation on settings/vaccine/stock writes.
+**Not** multi-instance coherent (no Redis in Phase 22).
+
+### GraphQL query protection
+
+- Depth: custom auditable validation rule (introspection skipped)
+- Complexity: Apollo plugin (`graphql-query-complexity`); default max **500**
+  (representative delivery-routes-like query measured at **13** with cost 1/field)
+- `graphql-depth-limit` was evaluated and **not** used (ValidationRule shape /
+  maintenance concerns)
+
+### Body size
+
+`API_JSON_BODY_LIMIT` (default `1mb`) configures the **authoritative** Express
+`json` and `urlencoded` parser `limit`. Nest’s built-in body parser is disabled
+(`bodyParser: false`); the shared bootstrap registers exactly one parser pair.
+
+The limit applies whether or not `Content-Length` is present (including chunked
+Transfer-Encoding). Oversized bodies receive **HTTP 413** before GraphQL runs.
+Media / multipart upload limits are separate (Phase 25).
+
+Shared helper: `packages/api/src/common/bootstrap/configure-api-app.ts`
+(size parsing: `packages/api/src/config/body-limit.ts`).
 
 ### Troubleshooting
 

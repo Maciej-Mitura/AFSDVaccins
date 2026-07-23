@@ -2,6 +2,8 @@ import { UseGuards } from '@nestjs/common'
 import { Args, Mutation, Query, Resolver } from '@nestjs/graphql'
 
 import { AuthorizationGuard } from '../../authentication/authorization.guard'
+import { StrictThrottle } from '../../common/throttling/strict-rate-limit.decorator'
+import { StrictIdentityThrottlerGuard } from '../../common/throttling/strict-identity-throttler.guard'
 import { CurrentUser } from '../../user/decorators/current-user.decorator'
 import { Roles } from '../../user/decorators/roles.decorator'
 import { RolesGuard } from '../../user/guards/roles.guard'
@@ -45,7 +47,8 @@ export class ApothekerProfileResolver {
     description:
       'Creates the apotheker pharmacy profile for the authenticated APOTHEKER (idempotent)',
   })
-  @UseGuards(AuthorizationGuard, RolesGuard)
+  @UseGuards(AuthorizationGuard, RolesGuard, StrictIdentityThrottlerGuard)
+  @StrictThrottle()
   @Roles(UserRole.APOTHEKER)
   completeApothekerProfile(
     @CurrentUser() user: User,
@@ -57,7 +60,8 @@ export class ApothekerProfileResolver {
   @Mutation(() => ApothekerProfile, {
     description: 'Updates the authenticated apotheker pharmacy profile',
   })
-  @UseGuards(AuthorizationGuard, RolesGuard)
+  @UseGuards(AuthorizationGuard, RolesGuard, StrictIdentityThrottlerGuard)
+  @StrictThrottle()
   @Roles(UserRole.APOTHEKER)
   updateOwnApothekerProfile(
     @CurrentUser() user: User,

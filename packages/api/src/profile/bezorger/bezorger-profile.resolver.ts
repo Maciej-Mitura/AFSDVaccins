@@ -2,6 +2,8 @@ import { UseGuards } from '@nestjs/common'
 import { Args, Mutation, Query, Resolver } from '@nestjs/graphql'
 
 import { AuthorizationGuard } from '../../authentication/authorization.guard'
+import { StrictThrottle } from '../../common/throttling/strict-rate-limit.decorator'
+import { StrictIdentityThrottlerGuard } from '../../common/throttling/strict-identity-throttler.guard'
 import { CurrentUser } from '../../user/decorators/current-user.decorator'
 import { Roles } from '../../user/decorators/roles.decorator'
 import { RolesGuard } from '../../user/guards/roles.guard'
@@ -45,7 +47,8 @@ export class BezorgerProfileResolver {
     description:
       'Creates the bezorger courier profile for the authenticated BEZORGER (idempotent)',
   })
-  @UseGuards(AuthorizationGuard, RolesGuard)
+  @UseGuards(AuthorizationGuard, RolesGuard, StrictIdentityThrottlerGuard)
+  @StrictThrottle()
   @Roles(UserRole.BEZORGER)
   completeBezorgerProfile(
     @CurrentUser() user: User,
@@ -57,7 +60,8 @@ export class BezorgerProfileResolver {
   @Mutation(() => BezorgerProfile, {
     description: 'Updates the authenticated bezorger courier profile',
   })
-  @UseGuards(AuthorizationGuard, RolesGuard)
+  @UseGuards(AuthorizationGuard, RolesGuard, StrictIdentityThrottlerGuard)
+  @StrictThrottle()
   @Roles(UserRole.BEZORGER)
   updateOwnBezorgerProfile(
     @CurrentUser() user: User,

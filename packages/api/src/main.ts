@@ -1,11 +1,19 @@
 import { NestFactory } from '@nestjs/core'
-import { ConsoleLogger, Logger, ValidationPipe } from '@nestjs/common'
+import { Logger } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
 import { AppModule } from './app.module'
+import {
+  configureApiApp,
+  createApiNestFactoryOptions,
+} from './common/bootstrap/configure-api-app'
 import { EnvConfig } from './config/env.validation'
 
 async function generateSchemaOnly(): Promise<void> {
-  const app = await NestFactory.create(AppModule, { logger: false })
+  // Schema generation does not serve HTTP; still disable Nest body parsers for consistency.
+  const app = await NestFactory.create(AppModule, {
+    ...createApiNestFactoryOptions({ ...process.env, NODE_ENV: 'test' }),
+    logger: false,
+  })
   await app.init()
   await app.close()
   Logger.log('GraphQL schema generated at dist/schema.gql')
@@ -17,39 +25,21 @@ async function bootstrap(): Promise<void> {
     return
   }
 
-  const app = await NestFactory.create(AppModule, {
-    logger: new ConsoleLogger({
-      prefix: 'VaccinDelivery',
-      logLevels:
-        process.env.NODE_ENV === 'production'
-          ? ['error', 'warn', 'log']
-          : ['error', 'warn', 'debug', 'verbose', 'log'],
-    }),
-  })
+  const app = await NestFactory.create(
+    AppModule,
+    createApiNestFactoryOptions(process.env),
+  )
+
+  configureApiApp(app)
 
   const configService = app.get(ConfigService<EnvConfig, true>)
   const port = configService.get('PORT', { infer: true })
-  const frontendUrl = configService.get('URL_FRONTEND', { infer: true })
-
-  app.enableCors({
-    origin: frontendUrl,
-    credentials: true,
-  })
-
-  app.useGlobalPipes(
-    new ValidationPipe({
-      whitelist: true,
-      forbidNonWhitelisted: true,
-      transform: true,
-    }),
-  )
-
-  // Allow Nest to close HTTP/GraphQL cleanly on SIGTERM/SIGINT (Docker stop).
-  app.enableShutdownHooks()
 
   await app.listen(port)
   Logger.log(`Application is running on: ${await app.getUrl()}`)
-  Logger.log(`GraphiQL available at: ${await app.getUrl()}/graphql`)
+  if (configService.get('NODE_ENV', { infer: true }) !== 'production') {
+    Logger.log(`GraphiQL available at: ${await app.getUrl()}/graphql`)
+  }
 }
 
 bootstrap().catch((error: unknown) => {

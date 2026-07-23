@@ -3,6 +3,8 @@ import { Args, Mutation, Query, Resolver } from '@nestjs/graphql'
 
 import { AuthorizationGuard } from '../authentication/authorization.guard'
 import { CurrentFirebaseUser } from '../authentication/current-firebase-user.decorator'
+import { StrictThrottle } from '../common/throttling/strict-rate-limit.decorator'
+import { StrictIdentityThrottlerGuard } from '../common/throttling/strict-identity-throttler.guard'
 import { CurrentUser } from './decorators/current-user.decorator'
 import { Roles } from './decorators/roles.decorator'
 import { CreateOwnUserInput } from './dto/create-own-user.input'
@@ -20,7 +22,8 @@ export class UserResolver {
     description:
       'Creates the application user profile for the authenticated Firebase identity',
   })
-  @UseGuards(AuthorizationGuard)
+  @UseGuards(AuthorizationGuard, StrictIdentityThrottlerGuard)
+  @StrictThrottle()
   createOwnUser(
     @CurrentFirebaseUser() identity: { uid: string; email?: string },
     @Args('input') input: CreateOwnUserInput,
@@ -40,7 +43,8 @@ export class UserResolver {
   @Mutation(() => User, {
     description: 'Updates the authenticated user profile fields',
   })
-  @UseGuards(AuthorizationGuard, RolesGuard)
+  @UseGuards(AuthorizationGuard, RolesGuard, StrictIdentityThrottlerGuard)
+  @StrictThrottle()
   updateOwnUser(
     @CurrentFirebaseUser() identity: { uid: string },
     @Args('input') input: UpdateOwnUserInput,

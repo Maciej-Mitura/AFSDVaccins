@@ -1,10 +1,14 @@
-import { ValidationPipe, type INestApplication } from '@nestjs/common'
+import type { INestApplication } from '@nestjs/common'
 import { Test, type TestingModule } from '@nestjs/testing'
 import { getDataSourceToken } from '@nestjs/typeorm'
 import { DataSource } from 'typeorm'
 
 import { AppModule } from '../../src/app.module'
 import { FirebaseService } from '../../src/authentication/firebase.service'
+import {
+  configureApiApp,
+  createApiNestFactoryOptions,
+} from '../../src/common/bootstrap/configure-api-app'
 import { E2E_DEFAULT_DB_NAME } from './e2e-app.constants'
 import { assertSafeE2eDatabaseName } from './e2e-database.safety'
 import { clearE2eCollections } from './e2e-collections'
@@ -55,6 +59,8 @@ function resolveConnectedDatabaseName(
 /**
  * Boots the real Nest AppModule against the isolated E2E MongoDB from globalSetup.
  * Overrides only Firebase token verification — guards and Mongo lookups stay real.
+ * Uses the same security bootstrap helper as main.ts
+ * (`bodyParser: false` + configureApiApp Express parsers / Helmet / pipes).
  */
 export async function createE2eTestApp(): Promise<E2eTestApp> {
   const dbHost = process.env.DB_HOST
@@ -76,14 +82,8 @@ export async function createE2eTestApp(): Promise<E2eTestApp> {
     .useValue(createE2eFirebaseService())
     .compile()
 
-  const app = moduleRef.createNestApplication()
-  app.useGlobalPipes(
-    new ValidationPipe({
-      whitelist: true,
-      forbidNonWhitelisted: true,
-      transform: true,
-    }),
-  )
+  const app = moduleRef.createNestApplication(createApiNestFactoryOptions())
+  configureApiApp(app, { enableListenLogging: false })
 
   await app.init()
 

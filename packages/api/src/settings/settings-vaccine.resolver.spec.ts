@@ -10,6 +10,7 @@ import { Request, Response } from 'express'
 import type { Server } from 'node:http'
 
 import { AuthorizationGuard } from '../authentication/authorization.guard'
+import { StrictIdentityThrottlerGuard } from '../common/throttling/strict-identity-throttler.guard'
 import { FirebaseAuthStrategy } from '../authentication/firebase-auth.strategy'
 import { FirebaseService } from '../authentication/firebase.service'
 import { SettingsResolver } from '../settings/settings.resolver'
@@ -151,7 +152,10 @@ describe('Settings and Vaccine resolvers (GraphQL)', () => {
           useValue: vaccineServiceMock,
         },
       ],
-    }).compile()
+    })
+      .overrideGuard(StrictIdentityThrottlerGuard)
+      .useValue({ canActivate: () => true })
+      .compile()
 
     app = moduleFixture.createNestApplication()
     await app.init()

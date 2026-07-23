@@ -19,6 +19,8 @@ import {
   ORDER_UPDATED_EVENT,
   PUB_SUB,
 } from '../common/pubsub/pubsub.constants'
+import { StrictThrottle } from '../common/throttling/strict-rate-limit.decorator'
+import { StrictIdentityThrottlerGuard } from '../common/throttling/strict-identity-throttler.guard'
 import { CurrentUser } from '../user/decorators/current-user.decorator'
 import { Roles } from '../user/decorators/roles.decorator'
 import { RolesGuard } from '../user/guards/roles.guard'
@@ -50,7 +52,8 @@ export class OrderResolver {
   @Mutation(() => Order, {
     description: 'Creates a vaccine order for the authenticated apotheker',
   })
-  @UseGuards(AuthorizationGuard, RolesGuard)
+  @UseGuards(AuthorizationGuard, RolesGuard, StrictIdentityThrottlerGuard)
+  @StrictThrottle()
   @Roles(UserRole.APOTHEKER)
   createOrder(
     @CurrentUser() user: User,
@@ -100,7 +103,8 @@ export class OrderResolver {
   @Mutation(() => Order, {
     description: 'Cancels an eligible order owned by the authenticated apotheker',
   })
-  @UseGuards(AuthorizationGuard, RolesGuard)
+  @UseGuards(AuthorizationGuard, RolesGuard, StrictIdentityThrottlerGuard)
+  @StrictThrottle()
   @Roles(UserRole.APOTHEKER)
   cancelOwnOrder(
     @CurrentUser() user: User,

@@ -2535,10 +2535,10 @@ docs(phase-21): requirements audit and enhancement roadmap
 
 ### Manual acceptance
 
-- [ ] Throttle triggers under burst
-- [ ] Cache hit/miss + invalidation after mutation
-- [ ] Complexity/depth rejected safely
-- [ ] Headers present on API responses
+- [x] Throttle triggers under burst
+- [x] Cache hit/miss + invalidation after mutation
+- [x] Complexity/depth rejected safely
+- [x] Headers present on API responses
 
 ### Rollback
 
@@ -2546,7 +2546,9 @@ docs(phase-21): requirements audit and enhancement roadmap
 
 ### Completion evidence
 
-- Specs green; README security section updated
+- Unit: `security-foundation.spec.ts`, `application-cache.service.spec.ts`, `vaccine-cache-auth.spec.ts`
+- E2E: `test:e2e:security` (9) + main `test:e2e` via shared `configureApiApp`
+- README security section + matrix API-012 → implemented
 
 ### Recommended commit message
 
@@ -3037,9 +3039,10 @@ docs: finalize submission dossier and presentation rehearsal
 | -------------------------- | --------------------------------------------------------------------- |
 | Phases 0–20 complete?      | **Yes** on `develop` @ `f3e4d07`                                      |
 | Phase 21 complete when?    | Audit docs merged; validation commands green; no feature code changed |
-| Next implementation phase? | **Phase 22** — only when explicitly requested                         |
+| Phase 22 complete when?    | Security foundation merged; unit + E2E security suites green          |
+| Next implementation phase? | **Phase 23** — only when explicitly requested                         |
 | Tier C mandatory?          | **No** — defer if time-constrained                                    |
 
 ---
 
-_Document version: 2026-07-23 (Phase 21 audit). Aligns with `enhancement-planning.md` and updated `requirements-matrix.md`._
+_Document version: 2026-07-23 (Phase 22 security foundation). Aligns with `enhancement-planning.md` and updated `requirements-matrix.md`._

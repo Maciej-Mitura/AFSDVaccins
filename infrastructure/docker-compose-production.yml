@@ -50,6 +50,16 @@ services:
       DB_HOST: mongodb://mongo:27017
       DB_NAME: ${DB_NAME:-vaccin-delivery-production-demo}
       GOOGLE_APPLICATION_CREDENTIALS: /run/secrets/firebase-sa.json
+      # Phase 22 — optional overrides (defaults applied inside the API if unset)
+      THROTTLE_DEFAULT_TTL_MS: ${THROTTLE_DEFAULT_TTL_MS:-60000}
+      THROTTLE_DEFAULT_LIMIT: ${THROTTLE_DEFAULT_LIMIT:-120}
+      THROTTLE_STRICT_TTL_MS: ${THROTTLE_STRICT_TTL_MS:-60000}
+      THROTTLE_STRICT_LIMIT: ${THROTTLE_STRICT_LIMIT:-20}
+      CACHE_DEFAULT_TTL_MS: ${CACHE_DEFAULT_TTL_MS:-30000}
+      CACHE_REFERENCE_TTL_MS: ${CACHE_REFERENCE_TTL_MS:-60000}
+      GRAPHQL_MAX_DEPTH: ${GRAPHQL_MAX_DEPTH:-12}
+      GRAPHQL_MAX_COMPLEXITY: ${GRAPHQL_MAX_COMPLEXITY:-500}
+      API_JSON_BODY_LIMIT: ${API_JSON_BODY_LIMIT:-1mb}
       # Seed and Playwright bypass must stay off on the long-running API.
       ALLOW_DATABASE_SEED: 'false'
       ALLOW_E2E_AUTH_BYPASS: 'false'

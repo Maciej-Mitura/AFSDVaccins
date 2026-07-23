@@ -29,7 +29,7 @@
     "typecheck:api": "npm run typecheck --workspace=@vaccin-delivery/api",
     "typecheck:pwa": "npm run generate:graphql && npm run typecheck --workspace=@vaccin-delivery/pwa",
     "test:api": "npm run test --workspace=@vaccin-delivery/api",
-    "test:e2e:api": "npm run test:e2e --workspace=@vaccin-delivery/api",
+    "test:e2e:api": "npm run test:e2e --workspace=@vaccin-delivery/api && npm run test:e2e:security --workspace=@vaccin-delivery/api",
     "test:pwa": "npm run test --workspace=@vaccin-delivery/pwa",
     "test:e2e:pwa": "playwright test",
     "test:e2e:pwa:ui": "playwright test --ui",
@@ -40,7 +40,7 @@
   },
   "lint-staged": {
     "*.{json,md,yml,yaml}": "prettier --write",
-    "packages/api/**/*.{ts,mjs,cjs}": "eslint --config packages/api/eslint.config.mjs --no-warn-ignored",
+    "packages/api/**/*.ts": "eslint --config packages/api/eslint.config.mjs --no-warn-ignored",
     "packages/pwa/**/*.{ts,vue}": "eslint --config packages/pwa/eslint.config.ts --no-warn-ignored"
   },
   "devDependencies": {

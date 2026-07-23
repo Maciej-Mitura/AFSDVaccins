@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common'
 import { TypeOrmModule } from '@nestjs/typeorm'
 
 import { AuthenticationModule } from '../authentication/authentication.module'
+import { ApplicationCacheModule } from '../common/cache/application-cache.module'
 import { PubSubModule } from '../common/pubsub/pubsub.module'
 import { NotificationsModule } from '../notifications/notifications.module'
 import { UserModule } from '../user/user.module'
@@ -85,6 +86,7 @@ const persistenceImports = isSchemaGeneration
     UserModule,
     VaccineModule,
     NotificationsModule,
+    ApplicationCacheModule,
     ...persistenceImports,
   ],
   providers: [

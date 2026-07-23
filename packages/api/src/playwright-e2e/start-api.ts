@@ -1,13 +1,17 @@
 import { writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 
-import { Logger, ValidationPipe, type INestApplication } from '@nestjs/common'
+import { Logger, type INestApplication } from '@nestjs/common'
 import { NestFactory } from '@nestjs/core'
 import { getDataSourceToken } from '@nestjs/typeorm'
 import { MongoMemoryServer } from 'mongodb-memory-server'
 import type { Request, Response } from 'express'
 import { DataSource } from 'typeorm'
 
+import {
+  configureApiApp,
+  createApiNestFactoryOptions,
+} from '../common/bootstrap/configure-api-app'
 import type { PlaywrightSeedSummary } from './browser-fixtures'
 import {
   PLAYWRIGHT_API_PORT,
@@ -93,22 +97,11 @@ async function bootstrap(): Promise<void> {
   const { AppModule } = await import('../app.module.js')
   const { seedPlaywrightBrowserFixtures } = await import('./browser-fixtures.js')
 
-  const app = await NestFactory.create(AppModule, {
-    logger: ['error', 'warn', 'log'],
-  })
-
-  app.enableCors({
-    origin: process.env.URL_FRONTEND,
-    credentials: true,
-  })
-
-  app.useGlobalPipes(
-    new ValidationPipe({
-      whitelist: true,
-      forbidNonWhitelisted: true,
-      transform: true,
-    }),
+  const app = await NestFactory.create(
+    AppModule,
+    createApiNestFactoryOptions(process.env),
   )
+  configureApiApp(app, { enableListenLogging: false })
 
   const dataSource = app.get<DataSource>(getDataSourceToken())
   const seed = await seedPlaywrightBrowserFixtures(dataSource)

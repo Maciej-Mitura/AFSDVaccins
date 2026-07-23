@@ -1,5 +1,11 @@
 import Joi from 'joi'
 
+import {
+  API_JSON_BODY_LIMIT_MAX_BYTES,
+  assertBodyLimitWithinPolicy,
+  isValidBodyLimitSyntax,
+} from './body-limit'
+
 export const envValidationSchema = Joi.object({
   NODE_ENV: Joi.string()
     .valid('development', 'test', 'production')
@@ -41,6 +47,44 @@ export const envValidationSchema = Joi.object({
   SEED_APOTHEKER3_FIREBASE_UID: Joi.string().min(1).allow('').optional(),
   SEED_BEZORGER1_FIREBASE_UID: Joi.string().min(1).allow('').optional(),
   SEED_BEZORGER2_FIREBASE_UID: Joi.string().min(1).allow('').optional(),
+
+  // ---- Phase 22 security / performance (TTL values are milliseconds) ----
+  THROTTLE_DEFAULT_TTL_MS: Joi.number().integer().min(1000).default(60_000),
+  THROTTLE_DEFAULT_LIMIT: Joi.number().integer().min(1).default(120),
+  THROTTLE_STRICT_TTL_MS: Joi.number().integer().min(1000).default(60_000),
+  THROTTLE_STRICT_LIMIT: Joi.number().integer().min(1).default(20),
+  CACHE_DEFAULT_TTL_MS: Joi.number().integer().min(1000).default(30_000),
+  CACHE_REFERENCE_TTL_MS: Joi.number().integer().min(1000).default(60_000),
+  /**
+   * GraphQL selection-set nesting limit.
+   * Representative PWA documents peak around depth 4–5; minimum 2 for tests.
+   */
+  GRAPHQL_MAX_DEPTH: Joi.number().integer().min(2).default(12),
+  /**
+   * GraphQL query complexity (simpleEstimator defaultComplexity=1 per field).
+   * Measured largest representative ops are well under 200; default leaves headroom.
+   */
+  GRAPHQL_MAX_COMPLEXITY: Joi.number().integer().min(10).default(500),
+  /**
+   * Authoritative Express JSON / urlencoded `limit` (e.g. 100kb, 1mb).
+   * Units are case-insensitive; positive sizes only; max 32mb (media uploads: Phase 25).
+   */
+  API_JSON_BODY_LIMIT: Joi.string()
+    .default('1mb')
+    .custom((value: string, helpers) => {
+      if (!isValidBodyLimitSyntax(value)) {
+        return helpers.error('any.invalid')
+      }
+      try {
+        assertBodyLimitWithinPolicy(value)
+      } catch {
+        return helpers.error('any.invalid')
+      }
+      return value.trim()
+    })
+    .messages({
+      'any.invalid': `API_JSON_BODY_LIMIT must be a positive size like 100kb or 1mb (max ${API_JSON_BODY_LIMIT_MAX_BYTES} bytes)`,
+    }),
 })
 
 export type EnvConfig = {
@@ -62,6 +106,15 @@ export type EnvConfig = {
   SEED_APOTHEKER3_FIREBASE_UID?: string
   SEED_BEZORGER1_FIREBASE_UID?: string
   SEED_BEZORGER2_FIREBASE_UID?: string
+  THROTTLE_DEFAULT_TTL_MS: number
+  THROTTLE_DEFAULT_LIMIT: number
+  THROTTLE_STRICT_TTL_MS: number
+  THROTTLE_STRICT_LIMIT: number
+  CACHE_DEFAULT_TTL_MS: number
+  CACHE_REFERENCE_TTL_MS: number
+  GRAPHQL_MAX_DEPTH: number
+  GRAPHQL_MAX_COMPLEXITY: number
+  API_JSON_BODY_LIMIT: string
 }
 
 export const buildMongoUrl = (dbHost: string, dbName: string): string => {

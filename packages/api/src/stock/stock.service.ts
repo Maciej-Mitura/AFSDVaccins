@@ -3,6 +3,7 @@ import { InjectRepository } from '@nestjs/typeorm'
 import { ObjectId } from 'mongodb'
 import { MongoRepository } from 'typeorm'
 
+import { ApplicationCacheService } from '../common/cache/application-cache.service'
 import { tryParseGraphqlObjectId } from '../common/mongodb/graphql-object-id.util'
 import { User } from '../user/user.entity'
 import { Vaccine } from '../vaccine/vaccine.entity'
@@ -52,6 +53,7 @@ export class StockService {
     private readonly stockAdjustmentWriter: StockAdjustmentRepository,
     private readonly vaccineStockRepository: VaccineStockRepository,
     private readonly stockNotificationService: StockNotificationService,
+    private readonly applicationCache: ApplicationCacheService,
   ) {}
 
   private resolveAdjustmentDelta(
@@ -219,6 +221,9 @@ export class StockService {
       savedAdjustment._id.toString(),
     )
 
+    // Catalogue cache includes stockQuantity — invalidate after successful write.
+    await this.applicationCache.invalidateVaccines()
+
     return savedAdjustment
   }
 
@@ -367,6 +372,8 @@ export class StockService {
 
       throw error
     }
+
+    await this.applicationCache.invalidateVaccines()
 
     return {
       alreadyProcessed: false,
