@@ -40,8 +40,8 @@
   },
   "lint-staged": {
     "*.{json,md,yml,yaml}": "prettier --write",
-    "packages/api/**/*.{ts,mjs,cjs}": "eslint --no-warn-ignored",
-    "packages/pwa/**/*.{ts,vue}": "eslint --no-warn-ignored"
+    "packages/api/**/*.{ts,mjs,cjs}": "eslint --config packages/api/eslint.config.mjs --no-warn-ignored",
+    "packages/pwa/**/*.{ts,vue}": "eslint --config packages/pwa/eslint.config.ts --no-warn-ignored"
   },
   "devDependencies": {
     "@playwright/test": "^1.54.2",
