@@ -904,6 +904,9 @@ offline login UX, PWA manifest/SW smoke).
 - Isolated **MongoMemoryServer** database `vaccin_delivery_playwright_e2e`
 - `workers: 1` because suites share one API process and reset fixtures via
   `POST /__e2e__/reset` (only registered when the Playwright stack is running)
+- PWA webServer (`packages/pwa/scripts/run-e2e-preview.mjs`) runs
+  `npm run generate:graphql` from the **repository root** before `vite build`,
+  so a clean checkout (no `packages/types/dist`) still works
 - Artifacts: `playwright-report/`, `test-results/` (gitignored)
 
 ### Authentication approach
@@ -1860,10 +1863,10 @@ devDependency is present (hooks under `.husky/`, portable `#!/usr/bin/env sh` â€
 works with Windows Git Bash). Production Docker `npm ci --omit=dev` skips Husky
 safely when the package is absent.
 
-| Hook       | Command                 | Scope                                                                       |
-| ---------- | ----------------------- | --------------------------------------------------------------------------- |
-| pre-commit | `npx lint-staged`       | Prettier on staged `json/md/yml/yaml`; ESLint on staged API/PWA TS/Vue only |
-| pre-push   | `npm run prepush:check` | `typecheck:api`, `typecheck:pwa`, `test:api`, `test:pwa`                    |
+| Hook       | Command                 | Scope                                                                                                                                                            |
+| ---------- | ----------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| pre-commit | `npx lint-staged`       | Prettier on staged `json/md/yml/yaml`; ESLint on staged API/PWA TS/Vue via workspace configs (`packages/api/eslint.config.mjs`, `packages/pwa/eslint.config.ts`) |
+| pre-push   | `npm run prepush:check` | `typecheck:api`, `typecheck:pwa`, `test:api`, `test:pwa`                                                                                                         |
 
 Hooks do **not** run Playwright, Docker builds, or GraphQL E2E on every commit/push â€” CI is authoritative for those.
 

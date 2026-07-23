@@ -109,6 +109,33 @@ describe('PWA safety and configuration', () => {
     expect(viteConfig).not.toContain('IndexedDB')
   })
 
+  it('Playwright E2E preview generates GraphQL types before vite build', () => {
+    const previewScriptPath = join(pwaRoot, 'scripts', 'run-e2e-preview.mjs')
+    expect(existsSync(previewScriptPath)).toBe(true)
+    const script = readFileSync(previewScriptPath, 'utf8')
+
+    // Must invoke root generate:graphql from the monorepo root (not packages/pwa).
+    expect(script).toContain("['run', 'generate:graphql']")
+    expect(script).toContain('repoRoot')
+    expect(script).toMatch(/join\(pwaRoot,\s*'\.\.',\s*'\.\.'\)/)
+
+    // Stage order: generate → build:e2e → preview:e2e
+    const generateAt = script.indexOf("['run', 'generate:graphql']")
+    const buildAt = script.indexOf("['run', 'build:e2e']")
+    const previewAt = script.indexOf("['run', 'preview:e2e']")
+    expect(generateAt).toBeGreaterThan(-1)
+    expect(buildAt).toBeGreaterThan(generateAt)
+    expect(previewAt).toBeGreaterThan(buildAt)
+
+    expect(script).toContain('generating GraphQL schema/types')
+    expect(script).toContain('building PWA')
+    expect(script).toContain('starting Vite preview')
+
+    // Must not assume a pre-existing packages/types/dist artifact.
+    expect(script).not.toMatch(/existsSync\([^)]*types[/\\]dist/)
+    expect(script).not.toMatch(/types\/dist\/graphql/)
+  })
+
   it('production build emits index.html, offline.html, manifest and sw.js', () => {
     // Meaningful after `npm run build:pwa`. Skip assertions when dist is absent.
     if (!existsSync(distDir)) {

@@ -1,8 +1,14 @@
+/**
+ * Playwright PWA webServer entrypoint.
+ * Must be self-contained on a clean checkout (no pre-existing packages/types/dist).
+ */
 import { spawn } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
 import { dirname, join } from 'node:path'
 
-const root = join(dirname(fileURLToPath(import.meta.url)), '..')
+const pwaRoot = join(dirname(fileURLToPath(import.meta.url)), '..')
+/** Monorepo root (examMaciej/) — required for `npm run generate:graphql`. */
+const repoRoot = join(pwaRoot, '..', '..')
 
 const env = {
   ...process.env,
@@ -17,10 +23,14 @@ const env = {
   VITE_FIREBASE_APP_ID: '1:0:web:playwright',
 }
 
-function run(command, args) {
+function logStage(message) {
+  console.log(`[e2e-preview] ${message}`)
+}
+
+function run(command, args, cwd) {
   return new Promise((resolve, reject) => {
     const child = spawn(command, args, {
-      cwd: root,
+      cwd,
       env,
       stdio: 'inherit',
       shell: true,
@@ -30,11 +40,22 @@ function run(command, args) {
       if (code === 0) {
         resolve()
       } else {
-        reject(new Error(`${command} ${args.join(' ')} exited with ${code}`))
+        reject(
+          new Error(
+            `${command} ${args.join(' ')} (cwd=${cwd}) exited with ${code}`,
+          ),
+        )
       }
     })
   })
 }
 
-await run('npm', ['run', 'build:e2e'])
-await run('npm', ['run', 'preview:e2e'])
+logStage('generating GraphQL schema/types')
+// Root authoritative pipeline — regenerates schema + packages/types/dist.
+await run('npm', ['run', 'generate:graphql'], repoRoot)
+
+logStage('building PWA')
+await run('npm', ['run', 'build:e2e'], pwaRoot)
+
+logStage('starting Vite preview')
+await run('npm', ['run', 'preview:e2e'], pwaRoot)
