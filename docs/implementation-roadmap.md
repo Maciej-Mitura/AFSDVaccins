@@ -1,10 +1,10 @@
 # Implementation Roadmap — Vaccinatie-levering
 
-Incremental build sequence for the exam project in `examAfsdMaciejMitura/`. The [architecture document](./project-architecture.md) describes the **end state**; this roadmap delivers it in **small, reviewable phases** — each sized for one focused Cursor session, manual review, and an independent Codex review.
+Incremental build sequence for the exam project in `examMaciej/` (historical docs may say `examAfsdMaciejMitura/`). The [architecture document](./project-architecture.md) describes the **core end state** through Phase 20; [enhancement-planning.md](./enhancement-planning.md) and phases **21–33** describe the post-MVP enhancement path.
 
 **Reference:** `bearspray-2025-demo` @ `ad691e3` — **patterns only**, never copy source.
 
-**Target repository:** `examAfsdMaciejMitura/` (separate from workspace research docs).
+**Target repository:** `examMaciej/` (Git root).
 
 ---
 
@@ -14,7 +14,7 @@ Incremental build sequence for the exam project in `examAfsdMaciejMitura/`. The 
 2. Do **not** skip stop-condition checks at phase boundaries.
 3. Run listed commands locally before marking a phase complete.
 4. Commit after each phase with the recommended message.
-5. Optional backlog items stay **out** of mandatory phases until Phase 22 is complete.
+5. After Phase 21, follow enhancement phases **22–33** in [enhancement-planning.md](./enhancement-planning.md). Do not start a later enhancement phase until its prerequisites are met. Tier C items may be deferred if time-constrained.
 
 ---
 
@@ -61,8 +61,19 @@ flowchart TB
   P18[Phase 18 Playwright]
   P19[Phase 19 Docker stack]
   P20[Phase 20 CI completion]
-  P21[Phase 21 Documentation]
-  P22[Phase 22 Presentation prep]
+  P21[Phase 21 Requirements audit]
+  P22[Phase 22 Security rate-limit cache]
+  P23[Phase 23 i18n]
+  P24[Phase 24 Public deployment]
+  P25[Phase 25 Image upload]
+  P26[Phase 26 Azure AI images]
+  P27[Phase 27 QR delivery export]
+  P28[Phase 28 Geolocation]
+  P29[Phase 29 Cold-chain]
+  P30[Phase 30 Push]
+  P31[Phase 31 Charts trust]
+  P32[Phase 32 UX a11y]
+  P33[Phase 33 Final docs presentation]
 
   P0 --> P1
   P0 --> P2
@@ -103,25 +114,52 @@ flowchart TB
   P19 --> P21
   P20 --> P21
   P21 --> P22
+  P22 --> P23
+  P22 --> P24
+  P22 --> P27
+  P22 --> P29
+  P23 --> P25
+  P23 --> P32
+  P24 --> P25
+  P24 --> P27
+  P24 --> P28
+  P24 --> P29
+  P24 --> P30
+  P24 --> P32
+  P25 --> P26
+  P25 --> P32
+  P26 --> P32
+  P27 --> P31
+  P27 --> P32
+  P28 --> P31
+  P28 --> P32
+  P29 --> P31
+  P29 --> P32
+  P30 --> P31
+  P30 --> P32
+  P31 --> P32
+  P32 --> P33
 ```
+
+Full enhancement dependency narrative: [enhancement-planning.md §3](./enhancement-planning.md).
 
 ---
 
 ## Critical path
 
-### Minimum technical pass (presentation-viable)
+### Tier A (mandatory final bar for this project)
 
-`0 → 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8 → 9 → 10 → 11 → 12 → 13 → 15 → 16 → 19 → 21 → 22`
+`… → 20 → 21 → 22 → 23 → 24 → 32 → 33`
 
-Skips Phase 14 (route execution lifecycle) and consolidated E2E/CI phases only if time-critical — **not recommended** for rubric bands 7+.
+Phases **0–20** are complete on `develop` @ `f3e4d07`. Phase 21 is documentation/audit only. Rate limiting, caching, i18n, and public deployment are optional or extra in the original checklist; mandatory for this project’s chosen Tier A final scope.
 
-### Strong project (target)
+### Tier B (high-value enhancements — deferrable)
 
-All phases **0–22**, with Phase 17–18 E2E coverage and Phase 20 CI stable before Phase 21 documentation freeze.
+`23+24 → 25 → 26`, and `22+24 → 27`, plus charts portion of `31` — after Tier A foundations; Phase 24 strongly preferred before cloud media and public demos. Tier B is not required for Phase 33.
 
-### Distinction-level additions (optional backlog)
+### Tier C (distinction — deferrable)
 
-i18n, Firebase emulator in CI, authenticated route cache, external hosting, Sentry — only after mandatory phases complete.
+`24 → 28|29|30 → 31` (trust inputs), hardware MQTT — only if time remains. Phase 33 does **not** require deferred Tier C features.
 
 ---
 
@@ -2373,260 +2411,635 @@ ci: complete progressive pipeline through docker smoke
 
 ---
 
-# Phase 21 — Documentation and submission readiness
+# Phase 21 — Requirements audit and enhancement roadmap
 
 ## Phase metadata
 
-| Field                     | Value                                                           |
-| ------------------------- | --------------------------------------------------------------- |
-| **Phase**                 | 21 — Documentation and submission readiness                     |
-| **Objective**             | Clone-to-run README, env docs, checklists, submission procedure |
-| **Architecture sections** | §16, §17, §18, §20                                              |
-| **Requirement IDs**       | DOC-001–DOC-007, SUBMIT-001–002, QUALITY-007                    |
-| **Prerequisites**         | Phases 19–20 stable                                             |
+| Field                     | Value                                                                                               |
+| ------------------------- | --------------------------------------------------------------------------------------------------- |
+| **Phase**                 | 21 — Requirements audit and enhancement roadmap                                                     |
+| **Objective**             | Evidence-based requirements audit; replace outdated finalization plan with enhancement phases 22–33 |
+| **Architecture sections** | All (read-only)                                                                                     |
+| **Requirement IDs**       | Full matrix refresh; DOC-009; QUALITY-010                                                           |
+| **Prerequisites**         | Phases 0–20 complete; CI green                                                                      |
 
 ### Explicit scope
 
-- Complete `README.md`: prerequisites, clone, env copy, Firebase project setup, codegen, dev, test, seed, Docker
-- Demo account table with **evaluation-only** disclaimer
-- Architecture summary + **concurrent order limit disclosure**
-- Backend + frontend checklist completion notes
-- Toggle time-report placeholders
-- GitHub push + Leho ZIP procedure
-- Clone-to-run verification from fresh directory (self or peer)
+- Audit stack compliance and original requirements with repository evidence
+- Rank mandatory gaps (P0/P1/P2)
+- Document enhancement phases 22–33, dependencies, domain/GraphQL proposals, external services, deployment options, i18n manual steps, Tier A/B/C, testing and security roadmaps
+- Update `docs/requirements-matrix.md`, this roadmap, `docs/enhancement-planning.md`, `docs/enhancement-domain-model.md`, sync `AGENTS.md` / README pointers
+
+### Explicit out-of-scope
+
+- Any application feature implementation (rate limiting, caching, i18n code, deployment, images, AI, QR, tracking, temperature, push, charts, trust, UI redesign)
+- Commits (unless student requests later)
+- Secrets / Firebase credential inspection
+
+### Backend / GraphQL / database / frontend changes
+
+- None (documentation only)
+
+### Authorization / realtime / security implications
+
+- Document current controls and gaps only
+
+### External services / environment variables
+
+- Inventory only; no new secrets
+
+### Test requirements
+
+- `npm run format:check`
+- `npm run test:docker:safety`
+- No broad application test suite unless sources change (they must not)
+
+### CI implications
+
+- None
+
+### Manual acceptance checklist
+
+- [x] Every original requirement has evidence-based status
+- [x] Stack compliance table exists
+- [x] Mandatory gaps ranked
+- [x] Phases 22–33 documented
+- [x] Dependencies explicit
+- [x] Domain + GraphQL proposals listed
+- [x] External services inventoried
+- [x] Deployment approaches compared
+- [x] i18n external steps identified
+- [x] Per-phase testing expectations present
+- [x] No feature code changed; no secrets introduced
+
+### Rollback / failure behavior
+
+- Docs-only; revert markdown commits if needed
+
+### Completion evidence
+
+- Updated matrix + roadmap + enhancement planning docs; validation commands green
+
+### Recommended Git commit message
+
+```
+docs(phase-21): requirements audit and enhancement roadmap
+```
+
+---
+
+# Phase 22 — Backend security foundation
+
+## Phase metadata
+
+| Field               | Value                                                                                                                  |
+| ------------------- | ---------------------------------------------------------------------------------------------------------------------- |
+| **Objective**       | Rate limiting, caching with invalidation, security headers, GraphQL complexity/depth protection, upload/request limits |
+| **Requirement IDs** | API-012, description cache/rate-limit extras (Tier A), security hardening                                              |
+| **Prerequisites**   | Phase 21                                                                                                               |
+
+### Exact scope
+
+- `@nestjs/throttler` (or equivalent) on HTTP/GraphQL mutations with sensible defaults
+- In-memory or Redis cache for selected read models; explicit invalidation on writes
+- API security headers (Helmet/CSP-appropriate for GraphQL)
+- Query depth/complexity limits
+- Body/upload size limits where relevant (prep for Phase 25)
+
+### Explicit out-of-scope
+
+- i18n, deployment, domain features 25–31, UI redesign
+
+### Backend / GraphQL / DB / frontend
+
+- Backend: throttler module, cache module, Helmet, complexity plugin
+- GraphQL: complexity/depth validation; optional cache hints
+- DB: none required (prefer cache without Mongo cache entities)
+- Frontend: surface 429 errors cleanly if needed
+
+### Authorization / realtime / security
+
+- Do not weaken authz; rate-limit by IP + authenticated user where possible
+- PubSub unchanged
+- Document SPA + Bearer CSRF/XSS threat model in README snippet
+
+### External services / env
+
+- Optional `REDIS_URL` if Redis chosen; else memory cache documented as single-instance
+
+### Tests / CI
+
+- Unit: key generation, invalidation
+- E2E: throttled operation
+- CI: existing API jobs must pass
+
+### Manual acceptance
+
+- [ ] Throttle triggers under burst
+- [ ] Cache hit/miss + invalidation after mutation
+- [ ] Complexity/depth rejected safely
+- [ ] Headers present on API responses
+
+### Rollback
+
+- Feature-flag or remove throttler/cache modules; memory-only fallback
+
+### Completion evidence
+
+- Specs green; README security section updated
+
+### Recommended commit message
+
+```
+feat(api): add rate limiting, caching, and GraphQL depth guards
+```
+
+---
+
+# Phase 23 — i18n foundation
+
+## Phase metadata
+
+| Field               | Value                                                                                                |
+| ------------------- | ---------------------------------------------------------------------------------------------------- |
+| **Objective**       | Teacher-aligned translation workflow; runtime NL/EN switching; migrate UI strings; translation tests |
+| **Requirement IDs** | FRONT-018, ARCH-004                                                                                  |
+| **Prerequisites**   | Phase 22 (preferred before large UI string churn)                                                    |
+
+### Exact scope
+
+- `vue-i18n` runtime; locale switcher
+- Dutch + English message catalogs
+- Optional `packages/i18n` Sheets exporter (student-owned, not copied)
+- Migrate existing user-visible strings
+- Missing-key policy + tests
+
+### Explicit out-of-scope
+
+- zh/es unless time; deployment; domain features
+
+### Backend / GraphQL / DB
+
+- None required (UI-only); optional `User.locale` persistence if already modelled
+
+### Frontend
+
+- `useLanguage` (or equivalent), locale JSON under `assets/locales/`
+- Persist locale preference (localStorage and/or user profile)
+
+### External / manual steps
+
+- Google OAuth desktop client + Sheet setup (see enhancement-planning §7)
+
+### Env
+
+- No runtime Google credentials in PWA; exporter credentials gitignored
+
+### Tests / CI
+
+- Missing-key safety; locale switch unit; Playwright language switch
+- CI uses committed JSON (no live Sheets)
+
+### Manual acceptance
+
+- [ ] Switch NL↔EN updates shell + one flow per role
+- [ ] Exporter documented; credentials not committed
+
+### Rollback
+
+- Ship last committed JSON; disable switcher behind flag if broken
+
+### Recommended commit message
+
+```
+feat(pwa): add runtime i18n with Dutch and English
+```
+
+---
+
+# Phase 24 — Public deployment
+
+## Phase metadata
+
+| Field               | Value                                                                                                                  |
+| ------------------- | ---------------------------------------------------------------------------------------------------------------------- |
+| **Objective**       | Public frontend, API, MongoDB, WebSocket subscriptions, Firebase authorized domains, secrets, deploy CI, health checks |
+| **Requirement IDs** | DEVOPS-007 (Tier A), DEVOPS-010, API-011/015/017, DOC-003                                                              |
+| **Prerequisites**   | Phase 22; Phase 23 preferred                                                                                           |
+
+### Exact scope
+
+- Choose primary hosting (mixed managed recommended) + fallback VPS
+- Deploy API + PWA + Mongo (Atlas or equiv.)
+- Configure CORS, WS URL, Firebase authorized domains
+- Secrets in platform store; example files updated
+- CI deploy workflow (manual approval OK)
+- Public health checks
+
+### Explicit out-of-scope
+
+- Feature work 25–31; K8s unless already chosen
+
+### Backend / frontend / infra
+
+- Production env validation; possibly Redis PubSub if multi-instance
+- PWA production `VITE_*` URLs
+- Compose retained for local presentation
+
+### Authorization / realtime / security
+
+- Re-verify WS auth through public proxy
+- No seed in production boot; document operator seed path if needed for demo env
+
+### Env vars
+
+- Public URLs, DB URI, Firebase SA, optional Redis
+
+### Tests
+
+- Public health; WS smoke; Firebase login smoke; PWA installability
+
+### Manual acceptance
+
+- [ ] Third party can open public URL and login with demo account (demo env)
+- [ ] Subscriptions work without refresh
+- [ ] Rollback path documented
+
+### Rollback
+
+- Redeploy previous image/revision; DNS back to prior host
+
+### Recommended commit message
+
+```
+ci(deploy): add public environment deployment pipeline
+```
+
+---
+
+# Phase 25 — Vaccine image upload and storage
+
+## Phase metadata
+
+| Field               | Value                                                                                                                               |
+| ------------------- | ----------------------------------------------------------------------------------------------------------------------------------- |
+| **Objective**       | Upload, validate, preview, replace/delete vaccine images; catalogue display                                                         |
+| **Requirement IDs** | API-014 (pattern), DOMAIN enhancements, FUNC-002                                                                                    |
+| **Prerequisites**   | Phase 22 (upload/request limits); Phase 23 (i18n before new UI strings); Phase 24 (cloud blob / deployed config strongly preferred) |
+
+### Exact scope
+
+- `VaccineMedia` metadata + Azure Blob (or Azurite local)
+- ADMIN upload/replace/delete; catalogue display
+- MIME/size validation
+
+### Explicit out-of-scope
+
+- AI analysis (26); QR; tracking
+
+### Backend / GraphQL / DB / frontend
+
+- Entities + mutations/queries per enhancement-domain-model
+- Admin upload UI + vaccine catalogue thumbnails
+
+### Authorization / security
+
+- ADMIN-only writes; signed URLs; request size limits
+
+### Env
+
+- Blob connection string / container name (example placeholders)
+
+### Tests
+
+- Upload validation; authz; replace/delete; failure handling
+
+### Manual acceptance
+
+- [ ] Upload shows in catalogue; replace works; delete soft-hides
+
+### Rollback
+
+- Disable upload mutations; keep catalogue without images
+
+### Recommended commit message
+
+```
+feat(vaccines): add image upload and blob storage
+```
+
+---
+
+# Phase 26 — Azure AI-assisted image validation
+
+## Phase metadata
+
+| Field             | Value                                                                                                              |
+| ----------------- | ------------------------------------------------------------------------------------------------------------------ |
+| **Objective**     | Structured classification/OCR, manual review, override + audit, retry/timeout/circuit breaker, cache by image hash |
+| **Prerequisites** | Phase 25                                                                                                           |
+
+### Exact scope
+
+- `VaccineImageAnalysis` + provider client
+- Queue/request/retry; OVERRIDE with reason → `AuditEvent`
+- Result cache by `sha256`
+
+### Explicit out-of-scope
+
+- Training custom models; non-image AI
+
+### GraphQL
+
+- `vaccineImageAnalysisStatus`; request/retry/override mutations; optional subscription
+
+### Security
+
+- Server-only AI secrets; sanitize stored raw payloads
+
+### Tests
+
+- Mocked Azure; retry/failure; override audit; authz
+
+### Fallback
+
+- Manual review only if provider outage
+
+### Recommended commit message
+
+```
+feat(ai): validate vaccine images via Azure with audited overrides
+```
+
+---
+
+# Phase 27 — QR proof of delivery and manifest export
+
+## Phase metadata
+
+| Field             | Value                                                                                                     |
+| ----------------- | --------------------------------------------------------------------------------------------------------- |
+| **Objective**     | Signed/opaque QR tokens, expiry/nonce, idempotent confirm, delivery-proof audit, PDF/CSV manifest export  |
+| **Prerequisites** | Phase 22 (security limits); Phase 24 (public HTTPS preferred for demo QR); core delivery mutations stable |
+
+### Exact scope
+
+- `DeliveryProof`; issue/verify mutations
+- Manifest CSV + PDF export
+- Keep existing mark-delivered as fallback path or bridge via QR verify
+
+### Explicit out-of-scope
+
+- Trust score (31); geolocation (28)
+
+### Authorization
+
+- Issuer/verifier role + order/route ownership; replay prevention
+
+### Tests
+
+- Signature, expiry, replay, wrong party, idempotency, export authz
+
+### Recommended commit message
+
+```
+feat(delivery): add QR proof of delivery and manifest export
+```
+
+---
+
+# Phase 28 — Courier geolocation tracking
+
+## Phase metadata
+
+| Field             | Value                                                                                                                        |
+| ----------------- | ---------------------------------------------------------------------------------------------------------------------------- |
+| **Objective**     | Active-route foreground tracking; ADMIN all couriers; APOTHEKER relevant approaching only; retention; location subscriptions |
+| **Prerequisites** | Phase 24 (public HTTPS); map provider decision                                                                               |
+
+### Exact scope
+
+- `CourierLocationSnapshot` + TTL
+- Submit location mutation; role-scoped queries/subscriptions
+- Simple map UI (prefer MapLibre/OSM over Mapbox unless justified)
+
+### Explicit out-of-scope
+
+- Background tracking when app killed; historical stalking trails
+
+### Privacy / security
+
+- Retention job; role filters; no raw long-term history
+
+### Tests
+
+- Role visibility; stale location; route linkage; retention
+
+### Recommended commit message
+
+```
+feat(tracking): add role-scoped courier location updates
+```
+
+---
+
+# Phase 29 — Cold-chain temperature monitoring
+
+## Phase metadata
+
+| Field             | Value                                                                                                                      |
+| ----------------- | -------------------------------------------------------------------------------------------------------------------------- |
+| **Objective**     | Per-vaccine thresholds; SIMULATED/MANUAL first; optional BLE/MQTT; incident lifecycle; realtime alerts; route/order impact |
+| **Prerequisites** | Phase 22 (API hardening); Phase 24 preferred for production alerts; routes stable                                          |
+
+### Exact scope
+
+- Threshold fields on Vaccine; `TemperatureReading`; `ColdChainIncident`
+- Sources: `SIMULATED` | `MANUAL` | `BLE_SENSOR` | `MQTT_DEVICE`
+- **Do not** treat phone ambient sensor as vaccine cargo temperature
+- Optional MQTT broker integration
+
+### Explicit out-of-scope
+
+- Claiming PWA phone thermometer accuracy for vaccines
+
+### Realtime
+
+- `coldChainIncidentCreated` subscription
+
+### Tests
+
+- Thresholds, excursion duration, incident ack, multi-vaccine route, source enum
+
+### Recommended commit message
+
+```
+feat(cold-chain): add temperature readings and incident lifecycle
+```
+
+---
+
+# Phase 30 — PWA push notifications
+
+## Phase metadata
+
+| Field             | Value                                                                                                       |
+| ----------------- | ----------------------------------------------------------------------------------------------------------- |
+| **Objective**     | Device subscriptions, permission UX, preferences, invalid-subscription cleanup, safe role-specific payloads |
+| **Prerequisites** | Phase 24; meaningful events (orders/routes/incidents)                                                       |
+
+### Exact scope
+
+- VAPID keys; `PushSubscription`; preferences (embed or collection)
+- Bridge from existing notification events
+
+### Explicit out-of-scope
+
+- SMS/email providers; marketing push
+
+### Security / privacy
+
+- Store endpoints carefully; cleanup 410; no sensitive order details in payload body beyond need
+
+### Tests
+
+- Lifecycle; invalid endpoint cleanup; payload safety
+
+### Recommended commit message
+
+```
+feat(pwa): add web push subscriptions and preferences
+```
+
+---
+
+# Phase 31 — ADMIN analytics and courier trust scoring
+
+## Phase metadata
+
+| Field             | Value                                                                                                                                                                                                      |
+| ----------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Objective**     | Reliable aggregates, charts, courier reliability score with transparent formula, min sample size, auditable components                                                                                     |
+| **Prerequisites** | Prefer inputs from QR (27) and/or tracking (28) and/or incidents (29) and/or push engagement (30) when those phases ship; stable order/stock data for charts. Charts may ship without Tier C trust inputs. |
+
+### Exact scope
+
+- `adminDashboardMetrics` + chart UI
+- `CourierReliabilitySnapshot` + formula versioning
+- Document formula in README
+
+### Explicit out-of-scope
+
+- Opaque ML scoring; public leaderboards
+
+### Tests
+
+- Aggregate correctness; deterministic formula; min sample size; snapshots
+
+### Fallback
+
+- Charts without trust if Tier C inputs missing
+
+### Recommended commit message
+
+```
+feat(admin): add analytics dashboard and courier reliability score
+```
+
+---
+
+# Phase 32 — Frontend UX and accessibility polish
+
+## Phase metadata
+
+| Field               | Value                                                                                                                                                                     |
+| ------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Objective**       | Complete UX, a11y, responsive behavior, loading/skeleton/error/empty states, final visual system, role dashboards                                                         |
+| **Requirement IDs** | FRONT-019/026/027, FUNC-002                                                                                                                                               |
+| **Prerequisites**   | Phase 23 i18n; Phase 24 public deployment; screens from any Tier B/C phases that shipped (25–31). Optional feature polish is non-blocking when those phases did not ship. |
+
+### Exact scope
+
+- Systematic state coverage; keyboard/aria/`prefers-reduced-motion`
+- Role dashboard polish; mobile bezorger pass
+- No unrelated redesign of architecture
+
+### Explicit out-of-scope
+
+- New domain features
+
+### Tests
+
+- a11y smoke; Playwright responsive checks; visual acceptance checklist
+
+### Recommended commit message
+
+```
+feat(pwa): polish UX, accessibility, and role dashboards
+```
+
+---
+
+# Phase 33 — Final documentation and presentation prep
+
+## Phase metadata
+
+| Field               | Value                                                                                                                                      |
+| ------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
+| **Objective**       | Final docs, full matrix freeze, public deploy instructions, AI/hardware/privacy notes, presentation + oral prep                            |
+| **Requirement IDs** | DOC-_, SUBMIT-_, PRESENT-*, QUALITY-007/008                                                                                                |
+| **Prerequisites**   | Tier A path complete: Phase 24 via Phase 32 (`21 → 22 → 23 → 24 → 32 → 33`). Chosen Tier B/C frozen if started; **Tier B/C not required**. |
+
+### Exact scope
+
+- README + dossier finalization; checklists with explanations; Toggle report
+- Presentation rehearsal script; flagship tests selected
+- Document known limitations (order race, PubSub, deferred Tier C)
 
 ### Explicit out-of-scope
 
 - New features
 
-### Expected files or modules
+### Tests
 
-- `README.md`, optional `docs/ARCHITECTURE.md` excerpt, checklist markdown attachments
+- Fresh clone / public smoke rehearsal (manual)
 
-### Dependencies that may be added
+### Manual acceptance
 
-- None
+- [ ] Clone-to-run and/or public URL demo rehearsed under time budget
+- [ ] Checklists + Toggle ready for Leho
+- [ ] Oral answers prepared for limits, authz, realtime, seed, PWA
 
-### Configuration or environment changes
-
-- Documentation only
-
-### Database/schema changes
-
-- None
-
-### GraphQL changes
-
-- None
-
-### Frontend changes
-
-- None
-
-### Authorization implications
-
-- Document which secrets must never be committed
-
-### Realtime implications
-
-- Document WS URL env vars for Docker vs local
-
-### Tests required
-
-- Peer/fresh clone follows README successfully
-
-### Commands to run
-
-```bash
-# From fresh clone directory:
-npm install
-npm run generate:graphql
-cp packages/api/.env.example packages/api/.env
-cp packages/pwa/.env.example packages/pwa/.env
-# ... follow README
-docker compose -f infrastructure/docker-compose-production.yml up -d
-```
-
-### Manual acceptance checklist
-
-- [ ] README alone sufficient for another developer
-- [ ] All `.env.example` files documented
-- [ ] Seed order and commands explicit
-- [ ] Known limitations listed (limit race, preview vs route)
-- [ ] Checklists attached for Leho submission
-- [ ] Fresh clone verification completed
-
-### Common failure modes
-
-- Undocumented Firebase console steps
-- Missing WS URL in Docker section
-
-### Completion evidence
-
-- Successful fresh-clone run notes; complete README merged
-
-### Recommended Git commit message
+### Recommended commit message
 
 ```
-docs: complete README and submission readiness guide
+docs: finalize submission dossier and presentation rehearsal
 ```
-
-### Oral-exam concepts to understand
-
-- Entire setup path; where configurable policies live
-
-### Runnable state
-
-**Runnable:** documented clone-to-run path verified.
 
 ---
 
-# Phase 22 — Presentation and oral-exam preparation
+# Deferred / optional (outside phased enhancements)
 
-## Phase metadata
-
-| Field                     | Value                                              |
-| ------------------------- | -------------------------------------------------- |
-| **Phase**                 | 22 — Presentation and oral-exam preparation        |
-| **Objective**             | Rehearsal and conceptual mastery — no new features |
-| **Architecture sections** | All                                                |
-| **Requirement IDs**       | PRESENT-001–008, QUALITY-007, QUALITY-008          |
-| **Prerequisites**         | Phase 21 complete                                  |
-
-### Explicit scope
-
-- Timed script: Docker up → seed → demo three roles
-- Realtime demo: apotheker order + admin feed + bezorger route event
-- PWA install demo on mobile or emulator
-- Select **one backend test** and **one frontend test** to explain with confidence
-- Prepare answers: limits, closing time, stock idempotency, RoutePreview, authz
-- Prepare 2–3 likely live code modification scenarios
-- Review all AI-generated code for explainability
-
-### Explicit out-of-scope
-
-- New features, refactoring, optional backlog
-
-### Expected files or modules
-
-- Optional `docs/PRESENTATION.md` rehearsal checklist (if student chooses)
-
-### Dependencies that may be added
-
-- None
-
-### Configuration or environment changes
-
-- None
-
-### Database/schema changes
-
-- None
-
-### GraphQL changes
-
-- None
-
-### Frontend changes
-
-- None
-
-### Authorization implications
-
-- Be ready to explain guard chain live
-
-### Realtime implications
-
-- Be ready to demo subscription filter in playground or browser devtools
-
-### Tests required
-
-- None new — rehearse explaining existing flagship tests
-
-### Commands to run
-
-```bash
-# Full presentation rehearsal — timed
-docker compose -f infrastructure/docker-compose-production.yml up -d
-docker compose exec api npm run seed:database:all
-npm run test --workspace=@vaccin-delivery/api -- --testNamePattern="limit"
-npm run test:playwright
-```
-
-### Manual acceptance checklist
-
-- [ ] Docker + seed demo completes within presentation time budget
-- [ ] All three roles demonstrated with seed accounts
-- [ ] Realtime update visible without manual refresh
-- [ ] PWA installability shown
-- [ ] Backend flagship test explained conceptually
-- [ ] Frontend flagship test explained conceptually
-- [ ] Edge cases demo: limit block, skipped pharmacy, low stock
-- [ ] Can answer "why not copy Bear Spray" clearly
-
-### Common failure modes
-
-- Unrehearsed Docker failure during exam
-- Cannot explain generated code or AI-written guards
-
-### Completion evidence
-
-- Completed rehearsal checklist; timed run notes
-
-### Recommended Git commit message
-
-```
-docs: add presentation rehearsal checklist
-```
-
-### Oral-exam concepts to understand
-
-- Everything in architecture §1–§20 at conceptual level — this phase **is** oral prep
-
-### Runnable state
-
-**Runnable:** presentation-ready system; no code changes expected.
+| Item                                                  | Notes                                               |
+| ----------------------------------------------------- | --------------------------------------------------- |
+| Kubernetes                                            | Still optional; not in Phases 22–33                 |
+| Docker Hub/Harbor publish                             | Optional                                            |
+| Sentry/LogRocket                                      | Optional monitoring                                 |
+| Firebase Auth emulator in CI                          | Optional stability improvement                      |
+| Authenticated SW route cache / offline mutation queue | Still forbidden unless architecture change approved |
+| Lerna                                                 | Not required                                        |
 
 ---
 
-# Optional backlog
+# Final roadmap decision (Phase 21)
 
-Items are **not** required for mandatory completion. Do **not** start before Phase 22 unless core phases are done and time remains.
-
-| Item                                  | Value                                   | Cost   | Risk                                  | Prerequisites    | Priority | Before mandatory completion?   |
-| ------------------------------------- | --------------------------------------- | ------ | ------------------------------------- | ---------------- | -------- | ------------------------------ |
-| **i18n (vue-i18n)**                   | Rubric bonus; NL/EN UI                  | Medium | Scope creep                           | Phase 2          | Low      | **No**                         |
-| **Firebase emulator in CI**           | Stable Playwright without real Firebase | Medium | Config complexity                     | Phase 18         | Medium   | **No**                         |
-| **Vitest frontend unit tests**        | Extra checklist points                  | Low    | Duplicates Playwright                 | Phase 2          | Low      | **No**                         |
-| **Authenticated courier route cache** | Offline bezorger UX                     | High   | Privacy, account switch, invalidation | Phase 16 PWA     | Low      | **No**                         |
-| **External hosting**                  | Bonus demo                              | Medium | Secrets, CORS                         | Phase 19         | Low      | **No**                         |
-| **Sentry / LogRocket**                | Error visibility                        | Low    | PII in logs                           | Phase 21         | Low      | **No**                         |
-| **Kubernetes**                        | DevOps bonus                            | High   | Time                                  | Phase 19         | Very low | **No**                         |
-| **Native push notifications**         | Mobile alert                            | High   | Platform scope                        | Phase 8 realtime | Very low | **No**                         |
-| **Background sync / offline queue**   | Offline submits                         | High   | Conflict resolution                   | Phase 16         | Very low | **No**                         |
-| **Dark mode**                         | UX polish                               | Low    | Theming effort                        | Phase 2          | Low      | **No**                         |
-| **Advanced concurrency hardening**    | Closes limit race                       | High   | Mongo replica set                     | Phase 7          | Medium   | **No** — document race instead |
-| **Lerna**                             | Versioning                              | Low    | Unnecessary for exam                  | Phase 0          | Very low | **No**                         |
-| **OUT_FOR_DELIVERY order status**     | Finer tracking                          | Medium | FSM complexity                        | Phase 10         | Low      | **No**                         |
+| Question                   | Answer                                                                |
+| -------------------------- | --------------------------------------------------------------------- |
+| Phases 0–20 complete?      | **Yes** on `develop` @ `f3e4d07`                                      |
+| Phase 21 complete when?    | Audit docs merged; validation commands green; no feature code changed |
+| Next implementation phase? | **Phase 22** — only when explicitly requested                         |
+| Tier C mandatory?          | **No** — defer if time-constrained                                    |
 
 ---
 
-# Final roadmap decision
-
-| Question                                           | Answer                                                                                                                             |
-| -------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
-| **Ready for agent-rules creation (`AGENTS.md`)?**  | **Yes** — create exam-specific `AGENTS.md` before Phase 1 implementation (conventions, naming, no teacher copy, spec edit policy). |
-| **Ready for repository initialization (Phase 0)?** | **Yes** — after agent rules are approved by the student.                                                                           |
-| **Ready for feature implementation?**              | **Not until Phase 0–1 foundations complete** — do not jump to Phase 7 ordering without auth and types.                             |
-
-### Recommended immediate next steps
-
-1. Approve this roadmap.
-2. Author `examAfsdMaciejMitura/AGENTS.md` from architecture + roadmap conventions.
-3. Execute **Phase 0** in a dedicated session.
-4. Execute **Phases 1–2** in separate sessions (API foundation, then PWA foundation).
-5. Request Codex review at each phase boundary.
-
----
-
-_Document version: 2026-07-14. Aligns with `project-architecture.md` rev 2. Target: `examAfsdMaciejMitura/`._
+_Document version: 2026-07-23 (Phase 21 audit). Aligns with `enhancement-planning.md` and updated `requirements-matrix.md`._

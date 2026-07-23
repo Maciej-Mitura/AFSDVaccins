@@ -1,8 +1,9 @@
 # Agent Rules — Vaccinatie-levering
 
-**Version:** 2026-07-14  
+**Version:** 2026-07-23  
 **Architecture:** `docs/project-architecture.md`  
-**Roadmap:** `docs/implementation-roadmap.md`
+**Roadmap:** `docs/implementation-roadmap.md`  
+**Enhancement planning:** `docs/enhancement-planning.md`
 
 Agents working on this project must read this file at the start of every session. Acknowledge by stating: _Using Vaccinatie-levering agent rules._
 
@@ -18,7 +19,7 @@ Agents working on this project must read this file at the start of every session
 | **Build approach**            | **Greenfield from scratch** — no starter scaffold, no copy-paste from teacher demo                                                   |
 | **Teacher repository**        | `bearspray-2025-demo/` — **read-only** reference for patterns at `develop` @ `ad691e3`                                               |
 | **Teacher domain**            | Bear Spray (machines, canisters, reservations, Mapbox, weather) — **must never appear** in exam code, entities, routes, or seed data |
-| **Authoritative design docs** | Approved `project-architecture.md` and `implementation-roadmap.md` (copied into exam repo `docs/` when initialized)                  |
+| **Authoritative design docs** | Approved `project-architecture.md`, `implementation-roadmap.md`, and Phase 21+ `enhancement-planning.md`                             |
 
 This is an individual AFSD exam submission. Agents optimize for **correctness, security, traceability, and oral-exam explainability** — not for speed through multiple roadmap phases at once.
 
@@ -34,10 +35,11 @@ When making decisions, apply sources in this order (higher wins):
 | 2    | Official assignment and rubric               | `docs/description.md`                             |
 | 3    | Approved project architecture                | `docs/project-architecture.md`                    |
 | 4    | Approved implementation roadmap              | `docs/implementation-roadmap.md`                  |
-| 5    | Requirements matrix                          | `docs/requirements-matrix.md`                     |
-| 6    | Course implementation map                    | `docs/course-implementation-map.md`               |
-| 7    | Teacher reference patterns                   | `bearspray-2025-demo/` (read-only, patterns only) |
-| 8    | General engineering recommendations          | Industry best practice, agent defaults            |
+| 5    | Enhancement planning (Phase 21+)             | `docs/enhancement-planning.md`                    |
+| 6    | Requirements matrix                          | `docs/requirements-matrix.md`                     |
+| 7    | Course implementation map                    | `docs/course-implementation-map.md`               |
+| 8    | Teacher reference patterns                   | `bearspray-2025-demo/` (read-only, patterns only) |
+| 9    | General engineering recommendations          | Industry best practice, agent defaults            |
 
 ### Conflict rules
 
@@ -50,14 +52,14 @@ When making decisions, apply sources in this order (higher wins):
 
 ## 3. Phase discipline
 
-Implementation follows **`docs/implementation-roadmap.md`** phases **0–22** only.
+Implementation follows **`docs/implementation-roadmap.md`** phases **0–33**.
 
 ### Mandatory rules
 
-1. **Every task must name exactly one roadmap phase or subphase** (e.g. “Phase 7 — Apotheker ordering vertical slice” or “Phase 5B — RolesGuard and route redirects”).
+1. **Every task must name exactly one roadmap phase or subphase** (e.g. “Phase 7 — Apotheker ordering vertical slice” or “Phase 22 — Backend security foundation”).
 2. **Implement only that phase.** Do not add files, modules, or features belonging to later phases.
 3. **Stop after the requested phase.** Do not continue into the next phase unless the user explicitly requests it in a new message.
-4. **Optional backlog items are forbidden** until mandatory Phase 22 is complete (see roadmap Optional backlog). Optional backlog work is prohibited unless the user explicitly approves it or the active mandatory roadmap phase explicitly lists it as an allowed implementation strategy.
+4. **Tier C / optional extras** (tracking, cold-chain hardware, push, trust, Sentry, K8s, etc.) are forbidden unless the active roadmap phase lists them or the user explicitly approves that phase.
 5. **Unrelated refactors are forbidden** during a phase (no drive-by renames, no “while I’m here” dependency upgrades across the repo).
 6. **Architectural changes** (new entities, new modules, stack changes, FSM changes) require **documentation update and user approval** before coding.
 
@@ -181,20 +183,20 @@ Obey roadmap global stop conditions: failing typecheck/tests, unresolved authz, 
 
 Agents must use **only** this stack unless an **approved roadmap phase** or **explicit user instruction** adds a justified exception:
 
-| Layer      | Technology                                                                                      |
-| ---------- | ----------------------------------------------------------------------------------------------- |
-| Monorepo   | npm workspaces (`@vaccin-delivery/api`, `@vaccin-delivery/pwa`, `@vaccin-delivery/types`)       |
-| API        | NestJS, code-first GraphQL, class-validator                                                     |
-| Database   | MongoDB via TypeORM                                                                             |
-| Frontend   | Vue 3, Vite, TypeScript, Composition API (`<script setup>`)                                     |
-| Routing    | Vue Router (groups: `/auth`, `/apotheker`, `/admin`, `/bezorger`)                               |
-| UI         | Nuxt UI (preferred over hand-written Tailwind)                                                  |
-| Client API | Apollo Client (HTTP + `graphql-ws` for subscriptions)                                           |
-| Auth       | Firebase client SDK + Firebase Admin SDK (email/password; **no PKCE** unless OAuth added later) |
-| Types      | GraphQL Code Generator → `@vaccin-delivery/types`                                               |
-| Realtime   | GraphQL subscriptions via `graphql-ws`                                                          |
-| Testing    | Jest, Supertest, Playwright                                                                     |
-| Ops        | Docker Compose, GitHub Actions                                                                  |
+| Layer      | Technology                                                                                                                                                                      |
+| ---------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Monorepo   | npm workspaces (`@vaccin-delivery/api`, `@vaccin-delivery/pwa`, `@vaccin-delivery/types`)                                                                                       |
+| API        | NestJS, code-first GraphQL, class-validator                                                                                                                                     |
+| Database   | MongoDB via TypeORM                                                                                                                                                             |
+| Frontend   | Vue 3, Vite, TypeScript, Composition API (`<script setup>`)                                                                                                                     |
+| Routing    | Vue Router (groups: `/auth`, `/apotheker`, `/admin`, `/bezorger`)                                                                                                               |
+| UI         | Nuxt UI (preferred over hand-written Tailwind)                                                                                                                                  |
+| Client API | Apollo Client (HTTP + `graphql-ws` for subscriptions)                                                                                                                           |
+| Auth       | Firebase client SDK + Firebase Admin SDK (email/password; PKCE applicability unresolved — do not implement unless OAuth authorization-code is added or the teacher requires it) |
+| Types      | GraphQL Code Generator → `@vaccin-delivery/types`                                                                                                                               |
+| Realtime   | GraphQL subscriptions via `graphql-ws`                                                                                                                                          |
+| Testing    | Jest, Supertest, Playwright                                                                                                                                                     |
+| Ops        | Docker Compose, GitHub Actions                                                                                                                                                  |
 
 ### Forbidden without explicit approval
 
@@ -203,9 +205,10 @@ Agents must use **only** this stack unless an **approved roadmap phase** or **ex
 - Pinia, Vuex, or Options API as primary Vue pattern
 - Alternative auth providers (Auth0, custom JWT) replacing Firebase
 - Lerna (workspaces-only scripts are sufficient)
-- Kubernetes, i18n/vue-i18n, Sentry/LogRocket
+- Kubernetes, Sentry/LogRocket (unless the active roadmap phase explicitly adds them)
 - Offline mutation queues, authenticated GraphQL response caching in service worker
 - Mapbox, weather APIs, or other Bear Spray-specific integrations
+- Runtime i18n / rate limiting / caching / public deploy / images / AI / QR / tracking / cold-chain / push / trust **before** their numbered roadmap phases (22–31)
 
 ### Small utility dependencies
 
@@ -503,7 +506,7 @@ After schema or operation changes, agents must run **`npm run generate:graphql`*
 
 Update applicable documentation in the **same phase** when behaviour, env vars, seed, or commands change:
 
-- `README.md` (incrementally from Phase 0 placeholder through Phase 21)
+- `README.md` (incrementally from Phase 0 placeholder through Phase 33)
 - Phase completion notes if student maintains a project dossier
 
 ### Traceability requirement
@@ -602,7 +605,7 @@ Agents must **never**:
 7. **Claim** commands or tests passed without executing them.
 8. **Commit secrets**, service accounts, or `.env` files.
 9. **Weaken authorization** (remove guards, trust client IDs) for convenience.
-10. Add **optional backlog** features (i18n, Lerna, route cache, Sentry, K8s) before Phase 22.
+10. Add **out-of-phase Tier C / optional extras** (i18n before Phase 23, rate limiting before Phase 22, Sentry, K8s, etc.) unless the active roadmap phase explicitly includes them.
 11. Perform **unrelated refactors** outside the current phase scope.
 12. Proceed past a **global stop condition** (failing CI, broken authz, teacher code in repo).
 13. **Disable PWA** or service worker after Phase 16 without user approval.

@@ -7,12 +7,23 @@ screens.
 
 ## Current status
 
-**Phase 20 complete — CI and local Git quality gates.** Five GitHub Actions
-workflows cover format/API/PWA/Playwright/Docker validation; Husky + lint-staged
-provide lightweight pre-commit and focused pre-push checks. CI remains
-authoritative for full E2E and Docker image builds.
+**Phase 21 complete — requirements audit and enhancement roadmap (documentation only).**
+Evidence-based matrix refresh, stack compliance, mandatory-gap ranking, and revised
+phases **22–33** live under `docs/` (`requirements-matrix.md`,
+`implementation-roadmap.md`, `enhancement-planning.md`,
+`enhancement-domain-model.md`). No application features were changed in Phase 21.
 
-**Next phase:** Phase 21 — documentation finalization.
+Authoritative requirement statuses in `docs/requirements-matrix.md` §0.1:
+**96** implemented, **23** partially implemented, **12** deferred, **11** not applicable,
+**5** missing, **2** ambiguous (**149** total).
+
+Rate limiting, caching, runtime i18n, and public deployment are optional or extra in
+the original checklist; mandatory for this project’s chosen Tier A final scope.
+
+**Phases 0–20** remain complete (domain, PWA, Docker, CI green @ `f3e4d07`).
+
+**Next phase:** Phase 22 — backend security foundation (rate limiting, caching,
+headers, GraphQL complexity/depth). Do not start until explicitly requested.
 
 ## Planned stack
 
@@ -78,8 +89,10 @@ Approved project documentation lives in `docs/`:
 
 - `project-fiche.md` — business rules and roles
 - `project-architecture.md` — technical architecture
-- `implementation-roadmap.md` — phased build sequence
-- `requirements-matrix.md` — requirement traceability
+- `implementation-roadmap.md` — phased build sequence (0–33)
+- `enhancement-planning.md` — Phase 21+ stack audit, gaps, tiers, deps
+- `enhancement-domain-model.md` — proposed entities for phases 25–31
+- `requirements-matrix.md` — requirement traceability + Phase 21 status audit
 - `description.md` — official assignment and rubric
 
 Agent rules: `AGENTS.md` at the repository root.
