@@ -49,6 +49,10 @@ const persistenceImports = isSchemaGeneration
       useClass: SystemClock,
     },
   ],
-  exports: [NotificationService, OrderNotificationService, TypeOrmModule],
+  exports: [
+    NotificationService,
+    OrderNotificationService,
+    ...persistenceImports,
+  ],
 })
 export class NotificationsCoreModule {}

@@ -39,6 +39,10 @@ const persistenceImports = isSchemaGeneration
 @Module({
   imports: [...persistenceImports],
   providers: [userServiceProvider, RolesGuard],
-  exports: [UserService, RolesGuard, TypeOrmModule],
+  exports: [
+    UserService,
+    RolesGuard,
+    ...persistenceImports,
+  ],
 })
 export class UserCoreModule {}

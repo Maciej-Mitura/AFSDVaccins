@@ -26,6 +26,6 @@ const persistenceImports = isSchemaGeneration
 @Module({
   imports: [ApplicationCacheModule, ...persistenceImports],
   providers: [settingsServiceProvider],
-  exports: [SettingsService, TypeOrmModule],
+  exports: [SettingsService, ...persistenceImports],
 })
 export class SettingsCoreModule {}

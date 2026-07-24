@@ -96,7 +96,7 @@ const persistenceImports = isSchemaGeneration
     StockAdjustmentRepository,
     VaccineStockRepository,
     StockAdjustmentPersistenceService,
-    TypeOrmModule,
+    ...persistenceImports,
   ],
 })
 export class StockCoreModule {}

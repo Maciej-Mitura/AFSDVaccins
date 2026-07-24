@@ -30,6 +30,6 @@ const persistenceImports = isSchemaGeneration
 @Module({
   imports: [ProfileCoreModule, ...persistenceImports],
   providers: [routeTemplatesServiceProvider],
-  exports: [RouteTemplatesService, TypeOrmModule],
+  exports: [RouteTemplatesService, ...persistenceImports],
 })
 export class RouteTemplatesCoreModule {}

@@ -71,6 +71,6 @@ const persistenceImports = isSchemaGeneration
       useClass: SystemClock,
     },
   ],
-  exports: [OrderService, TypeOrmModule],
+  exports: [OrderService, ...persistenceImports],
 })
 export class OrderCoreModule {}

@@ -50,7 +50,7 @@ const persistenceImports = isSchemaGeneration
     OrderCoreModule,
     RouteTemplatesCoreModule,
     SettingsCoreModule,
-    TypeOrmModule,
+    ...persistenceImports,
   ],
 })
 export class RoutesCoreModule {}

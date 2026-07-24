@@ -69,6 +69,10 @@ const persistenceImports = isSchemaGeneration
 @Module({
   imports: [...persistenceImports],
   providers: [apothekerServiceProvider, bezorgerServiceProvider],
-  exports: [ApothekerProfileService, BezorgerProfileService, TypeOrmModule],
+  exports: [
+    ApothekerProfileService,
+    BezorgerProfileService,
+    ...persistenceImports,
+  ],
 })
 export class ProfileCoreModule {}

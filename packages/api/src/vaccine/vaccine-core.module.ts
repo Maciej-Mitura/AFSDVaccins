@@ -30,6 +30,6 @@ const persistenceImports = isSchemaGeneration
 @Module({
   imports: [ApplicationCacheModule, ...persistenceImports],
   providers: [vaccineServiceProvider],
-  exports: [VaccineService, TypeOrmModule],
+  exports: [VaccineService, ...persistenceImports],
 })
 export class VaccineCoreModule {}
