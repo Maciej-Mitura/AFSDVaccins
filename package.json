@@ -25,6 +25,7 @@
     "build:api": "npm run build --workspace=@vaccin-delivery/api",
     "build:pwa": "npm run generate:graphql && npm run build --workspace=@vaccin-delivery/pwa",
     "export:i18n": "npm run export --workspace=@vaccin-delivery/i18n-export",
+    "sync:i18n:keys": "npm exec --workspace=@vaccin-delivery/i18n-export -- tsx src/sync-keys.ts",
     "lint:api": "npm run lint --workspace=@vaccin-delivery/api",
     "lint:pwa": "npm run lint --workspace=@vaccin-delivery/pwa",
     "lint:i18n": "npm run lint --workspace=@vaccin-delivery/i18n-export",

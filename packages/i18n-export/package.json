@@ -9,6 +9,7 @@
   },
   "scripts": {
     "export": "tsx src/index.ts",
+    "sync:keys": "tsx src/sync-keys.ts",
     "build": "npm run export",
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "test": "vitest run",

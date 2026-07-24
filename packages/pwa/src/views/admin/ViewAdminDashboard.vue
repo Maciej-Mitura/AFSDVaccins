@@ -15,7 +15,12 @@ import { registerReconnectHandler } from '@/composables/useGraphQL'
 import { useAdminOperationsFeed } from '@/composables/useAdminOperationsFeed'
 import { useCurrentUser } from '@/composables/useCurrentUser'
 import { useOrders } from '@/composables/useOrders'
-import { orderStatusLabel, userRoleLabel } from '@/i18n'
+import {
+  apiHealthStatusLabel,
+  operationsFeedEventTypeLabel,
+  orderStatusLabel,
+  userRoleLabel,
+} from '@/i18n'
 
 const { t } = useI18n()
 const { currentUser, loading: userLoading } = useCurrentUser()
@@ -174,7 +179,9 @@ onUnmounted(() => {
       />
       <ul v-else class="space-y-2 text-sm">
         <li v-for="(event, index) in feedEvents.slice(0, 10)" :key="index">
-          <span class="font-medium">{{ event.eventType }}</span>
+          <span class="font-medium">{{
+            operationsFeedEventTypeLabel(event.eventType)
+          }}</span>
           — {{ event.message }}
         </li>
       </ul>
@@ -211,7 +218,7 @@ onUnmounted(() => {
       <div v-else-if="health" class="space-y-2 text-sm">
         <p>
           <span class="font-medium">{{ t('admin.dashboard.status') }}:</span>
-          {{ health.status }}
+          {{ apiHealthStatusLabel(health.status) }}
         </p>
       </div>
     </UCard>
@@ -229,7 +236,15 @@ onUnmounted(() => {
         :title="t('admin.dashboard.roleProof.failed')"
         :description="errorMessage"
       />
-      <p v-else-if="roleProof" class="text-sm">{{ roleProof }}</p>
+      <p v-else-if="roleProof" class="text-sm">
+        {{
+          t('admin.dashboard.roleProof.accessible', {
+            name: currentUser
+              ? `${currentUser.firstName} ${currentUser.lastName}`.trim()
+              : '',
+          })
+        }}
+      </p>
       <CommonEmptyState
         v-else
         :title="t('admin.dashboard.roleProof.empty.title')"

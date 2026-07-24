@@ -897,3 +897,154 @@ describe('sheet reader orchestration', () => {
     expect(readLocaleTab).toHaveBeenCalledTimes(2)
   })
 })
+
+describe('key sync planning', () => {
+  it('plans append for missing keys and skips matching existing Defaults', async () => {
+    const { planKeySync } = await import('../src/sync-keys-logic.js')
+
+    const result = planKeySync({
+      locales: ['nl', 'en', 'zh', 'es'],
+      sheets: [
+        {
+          locale: 'nl',
+          values: [
+            ['Key', 'Default', 'nl'],
+            ['common.save', 'Save', 'Opslaan'],
+          ],
+        },
+        {
+          locale: 'en',
+          values: [
+            ['Key', 'Default', 'en'],
+            ['common.save', 'Save', 'Save'],
+          ],
+        },
+        {
+          locale: 'zh',
+          values: [
+            ['Key', 'Default', 'zh'],
+            ['common.save', 'Save', ''],
+          ],
+        },
+        {
+          locale: 'es',
+          values: [
+            ['Key', 'Default', 'es'],
+            ['common.save', 'Save', ''],
+          ],
+        },
+      ],
+      specs: [
+        { key: 'common.save', defaultValue: 'Save' },
+        {
+          key: 'status.api.ok',
+          defaultValue: 'OK',
+          localeValues: { nl: 'OK', en: 'OK' },
+        },
+      ],
+    })
+
+    expect(result.skipped).toBe(4) // common.save × 4 locales
+    expect(result.created).toBe(4) // status.api.ok × 4 locales
+    expect(result.conflicts).toBe(0)
+    expect(result.filled).toBe(0)
+    expect(result.appendsByLocale.get('nl')).toEqual([
+      ['status.api.ok', 'OK', 'OK'],
+    ])
+    expect(result.appendsByLocale.get('zh')).toEqual([
+      ['status.api.ok', 'OK', ''],
+    ])
+  })
+
+  it('fills blank locale cells when an explicit value is supplied', async () => {
+    const { planKeySync } = await import('../src/sync-keys-logic.js')
+
+    const result = planKeySync({
+      locales: ['nl', 'zh'],
+      sheets: [
+        {
+          locale: 'nl',
+          values: [
+            ['Key', 'Default', 'nl'],
+            ['status.api.ok', 'OK', ''],
+          ],
+        },
+        {
+          locale: 'zh',
+          values: [
+            ['Key', 'Default', 'zh'],
+            ['status.api.ok', 'OK', ''],
+          ],
+        },
+      ],
+      specs: [
+        {
+          key: 'status.api.ok',
+          defaultValue: 'OK',
+          localeValues: { nl: 'OK' },
+        },
+      ],
+    })
+
+    expect(result.filled).toBe(1)
+    expect(result.skipped).toBe(1)
+    expect(result.fillsByLocale.get('nl')).toEqual([
+      { rowNumber: 2, localeValue: 'OK' },
+    ])
+    expect(result.fillsByLocale.get('zh')).toEqual([])
+  })
+
+  it('reports Default conflicts without planning overwrites', async () => {
+    const { planKeySync } = await import('../src/sync-keys-logic.js')
+
+    const result = planKeySync({
+      locales: ['nl', 'en'],
+      sheets: [
+        {
+          locale: 'nl',
+          values: [
+            ['Key', 'Default', 'nl'],
+            ['common.save', 'Save', 'Opslaan'],
+          ],
+        },
+        {
+          locale: 'en',
+          values: [
+            ['Key', 'Default', 'en'],
+            ['common.save', 'Save', 'Save'],
+          ],
+        },
+      ],
+      specs: [{ key: 'common.save', defaultValue: 'Different' }],
+    })
+
+    expect(result.created).toBe(0)
+    expect(result.conflicts).toBe(2)
+    expect(result.appendsByLocale.get('nl')).toEqual([])
+  })
+})
+
+describe('sync keys CLI parsing', () => {
+  it('parses --entry and locale overrides', async () => {
+    const { parseSyncKeysArgs } = await import('../src/sync-keys.js')
+
+    const parsed = parseSyncKeysArgs([
+      '--dry-run',
+      '--entry',
+      'status.api.ok=OK',
+      '--nl',
+      'OK',
+      '--en',
+      'OK',
+    ])
+
+    expect(parsed.dryRun).toBe(true)
+    expect(parsed.specs).toEqual([
+      {
+        key: 'status.api.ok',
+        defaultValue: 'OK',
+        localeValues: { nl: 'OK', en: 'OK' },
+      },
+    ])
+  })
+})

@@ -69,6 +69,8 @@ export {
   orderStatusLabel,
   routeStatusLabel,
   userRoleLabel,
+  apiHealthStatusLabel,
+  operationsFeedEventTypeLabel,
   activeInactiveLabel,
   notificationReadLabel,
 } from './status-labels'

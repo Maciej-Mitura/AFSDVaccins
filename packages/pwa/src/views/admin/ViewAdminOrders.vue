@@ -16,6 +16,7 @@ import { useStock } from '@/composables/useStock'
 import {
   formatDate,
   formatDateTime,
+  operationsFeedEventTypeLabel,
   orderStatusLabel,
   translatePlural,
 } from '@/i18n'
@@ -81,7 +82,7 @@ const statusFilterItems = computed(() => [
   { label: t('orders.filter.allStatuses'), value: undefined },
   { label: orderStatusLabel(OrderStatus.Pending), value: OrderStatus.Pending },
   {
-    label: t('status.order.planned'),
+    label: orderStatusLabel(OrderStatus.Planned),
     value: OrderStatus.Planned,
   },
   {
@@ -316,7 +317,9 @@ function historyEntryLabel(entry: {
       </template>
       <ul class="space-y-2 text-sm">
         <li v-for="(event, index) in feedEvents.slice(0, 5)" :key="index">
-          <span class="font-medium">{{ event.eventType }}</span>
+          <span class="font-medium">{{
+            operationsFeedEventTypeLabel(event.eventType)
+          }}</span>
           — {{ event.message }}
         </li>
       </ul>

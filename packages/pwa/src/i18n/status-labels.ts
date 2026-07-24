@@ -1,15 +1,18 @@
 import { translate } from './translate'
 
 /**
- * Central presentation labels for domain enums.
+ * Central presentation labels for domain enums / API status codes.
  * Backend enum values remain unchanged — only display text is translated.
  * Comparisons use serialized string values to avoid unsafe enum/string mixing.
  */
 
 export function orderStatusLabel(status: string): string {
   const value = String(status)
-  if (value === 'PENDING' || value === 'PLANNED') {
+  if (value === 'PENDING') {
     return translate('status.order.pending')
+  }
+  if (value === 'PLANNED') {
+    return translate('status.order.planned')
   }
   if (value === 'DELIVERED') {
     return translate('status.order.delivered')
@@ -47,6 +50,28 @@ export function userRoleLabel(role: string): string {
   }
   if (value === 'BEZORGER') {
     return translate('status.role.bezorger')
+  }
+  return translate('common.unknown')
+}
+
+export function apiHealthStatusLabel(status: string): string {
+  const value = String(status).trim().toLowerCase()
+  if (value === 'ok') {
+    return translate('status.api.ok')
+  }
+  return translate('common.unknown')
+}
+
+export function operationsFeedEventTypeLabel(eventType: string): string {
+  const value = String(eventType)
+  if (value === 'NEW_ORDER') {
+    return translate('status.operations.newOrder')
+  }
+  if (value === 'ORDER_STATUS_CHANGED') {
+    return translate('status.operations.orderStatusChanged')
+  }
+  if (value === 'LOW_STOCK') {
+    return translate('status.operations.lowStock')
   }
   return translate('common.unknown')
 }

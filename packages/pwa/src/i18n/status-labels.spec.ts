@@ -6,6 +6,8 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import {
   __resetAppI18nForTests,
   activeInactiveLabel,
+  apiHealthStatusLabel,
+  operationsFeedEventTypeLabel,
   orderStatusLabel,
   routeStatusLabel,
   userRoleLabel,
@@ -37,14 +39,33 @@ describe('status labels', () => {
 
       const samples = [
         { key: 'status.order.pending', value: orderStatusLabel('PENDING') },
+        { key: 'status.order.planned', value: orderStatusLabel('PLANNED') },
         { key: 'status.order.delivered', value: orderStatusLabel('DELIVERED') },
+        { key: 'status.order.cancelled', value: orderStatusLabel('CANCELLED') },
         { key: 'status.route.assigned', value: routeStatusLabel('ASSIGNED') },
         {
           key: 'status.route.inProgress',
           value: routeStatusLabel('IN_PROGRESS'),
         },
+        { key: 'status.route.completed', value: routeStatusLabel('COMPLETED') },
+        { key: 'status.route.cancelled', value: routeStatusLabel('CANCELLED') },
         { key: 'status.role.admin', value: userRoleLabel('ADMIN') },
         { key: 'status.role.apotheker', value: userRoleLabel('APOTHEKER') },
+        { key: 'status.role.bezorger', value: userRoleLabel('BEZORGER') },
+        { key: 'status.api.ok', value: apiHealthStatusLabel('ok') },
+        { key: 'status.api.ok', value: apiHealthStatusLabel('OK') },
+        {
+          key: 'status.operations.newOrder',
+          value: operationsFeedEventTypeLabel('NEW_ORDER'),
+        },
+        {
+          key: 'status.operations.orderStatusChanged',
+          value: operationsFeedEventTypeLabel('ORDER_STATUS_CHANGED'),
+        },
+        {
+          key: 'status.operations.lowStock',
+          value: operationsFeedEventTypeLabel('LOW_STOCK'),
+        },
         { key: 'status.active', value: activeInactiveLabel(true) },
         { key: 'status.inactive', value: activeInactiveLabel(false) },
       ]
@@ -54,5 +75,19 @@ describe('status labels', () => {
         expect(sample.value, `${locale}:${sample.key}`).not.toBe(sample.key)
       }
     }
+  })
+
+  it('does not render raw API health / feed enum tokens', async () => {
+    const { setLocale } = useLanguage()
+    await setLocale('zh')
+
+    expect(apiHealthStatusLabel('ok')).not.toBe('ok')
+    expect(operationsFeedEventTypeLabel('NEW_ORDER')).not.toBe('NEW_ORDER')
+    expect(operationsFeedEventTypeLabel('ORDER_STATUS_CHANGED')).not.toBe(
+      'ORDER_STATUS_CHANGED',
+    )
+    expect(operationsFeedEventTypeLabel('LOW_STOCK')).not.toBe('LOW_STOCK')
+    expect(orderStatusLabel('PLANNED')).not.toBe('PLANNED')
+    expect(userRoleLabel('ADMIN')).not.toBe('ADMIN')
   })
 })

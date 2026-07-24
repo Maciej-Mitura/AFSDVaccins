@@ -1847,7 +1847,7 @@ local/dev-only: it never runs from app startup, PWA/API build, CI, Docker, or
 unit/e2e tests. Normal export is **strictly read-only** against the Sheets API
 (even if a local token happens to carry a broader scope from earlier consent).
 
-**Catalog size (after Phase 23C):** **481 keys**, identical key sets across
+**Catalog size (after Phase 23C + admin dashboard follow-up):** **486 keys**, identical key sets across
 `nl` / `en` / `zh` / `es`.
 
 **Known quality caveat (`es` / `zh`):** a large majority of newer keys still
@@ -2040,12 +2040,52 @@ editable translation source.
 
 ### Commands
 
-| Command                  | Purpose                                              |
-| ------------------------ | ---------------------------------------------------- |
-| `npm run export:i18n`    | Authenticate (readonly), validate, write locale JSON |
-| `npm run lint:i18n`      | ESLint for the exporter package                      |
-| `npm run typecheck:i18n` | TypeScript check                                     |
-| `npm run test:i18n`      | Offline unit tests (mocked Sheets; no Google)        |
+| Command                  | Purpose                                                                                         |
+| ------------------------ | ----------------------------------------------------------------------------------------------- |
+| `npm run export:i18n`    | Authenticate (readonly), validate, write locale JSON                                            |
+| `npm run sync:i18n:keys` | Explicit write: append missing Key/Default rows (`--preview` dry-run; npm swallows `--dry-run`) |
+| `npm run lint:i18n`      | ESLint for the exporter package                                                                 |
+| `npm run typecheck:i18n` | TypeScript check                                                                                |
+| `npm run test:i18n`      | Offline unit tests (mocked Sheets; no Google)                                                   |
+
+### `sync:i18n:keys` (explicit Sheet write — never automatic)
+
+Dev-only helper to **append missing translation-key rows** on the `nl` / `en` /
+`zh` / `es` tabs so all four sheets stay key-aligned before humans translate
+column C. It is **not** part of build, `dev`, CI, Docker, unit/e2e tests, or
+`export:i18n`.
+
+**Safety guarantees:**
+
+- Explicit invocation only (`npm run sync:i18n:keys`); nothing else calls it.
+- OAuth **write** scope (`spreadsheets`) is requested **only** for this command
+  (and only when not `--preview`). Normal export stays readonly (`values.get`).
+- Idempotent: existing keys with matching Default are skipped.
+- Never overwrites nonblank locale translations (column C).
+- May fill a **blank** column C only when an explicit `--nl` / `--en` / `--zh` /
+  `--es` value is supplied on that run.
+- Different Default on an existing key → **conflict**, no write for that tab.
+- Reports `created` / `skipped` / `filled` / `conflicts`; refuses write when
+  conflicts are present (non-preview).
+- No offline JSON merge and no second translation source of truth.
+
+**Dry-run / preview:** use `--preview` when invoking via `npm run` (npm treats
+`--dry-run` as its own no-op flag and drops it). Direct `tsx` / package
+`sync:keys` still accepts `--dry-run`. Preview authenticates readonly and
+writes nothing.
+
+```bash
+# Preview (no Sheet writes)
+npm run sync:i18n:keys -- --preview "status.api.ok=OK"
+
+# Append missing rows (blank locale cells unless --nl/--en/--zh/--es given)
+npm run sync:i18n:keys -- "status.api.ok=OK" --nl "OK" --en "OK"
+
+# Then regenerate catalogs
+npm run export:i18n
+```
+
+Prefer positional `key=Default` arguments; npm may swallow `--entry`.
 
 ### Security notes
 
@@ -2054,6 +2094,7 @@ editable translation source.
 - Google packages live only in `@vaccin-delivery/i18n-export` — not in the PWA or API.
 - Failed validation writes **no** locale files (no partial locale updates).
 - Normal export never writes to Google Sheets. CI/Docker/tests never call Google.
+- `sync:i18n:keys` is the only intentional Sheets write path; keep it local/dev-only.
 
 ### Phase 23 status
 
@@ -2063,7 +2104,8 @@ editable translation source.
 | Runtime `vue-i18n`           | Implemented (23B)                                                      |
 | `useLanguage` / switcher     | Implemented (23B)                                                      |
 | Sheet → catalog sync         | Established (edit Sheet, then export)                                  |
-| Full UI string migration     | Implemented (23C) — 481 keys across nl/en/zh/es                        |
+| Full UI string migration     | Implemented (23C) — **486** keys across nl/en/zh/es                    |
+| Explicit key-row sync CLI    | `sync:i18n:keys` (write; preview via `--preview`)                      |
 | Central helpers + formatting | Implemented (status-labels, error-mapper, Zod factories, BCP47 format) |
 | `offline.html` multilingual  | Implemented (static; reads storage once)                               |
 | FRONT-018                    | **Implemented** (with es/zh Default-fallback quality caveat)           |
