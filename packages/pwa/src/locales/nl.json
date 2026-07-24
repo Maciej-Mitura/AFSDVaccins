@@ -1,0 +1,33 @@
+{
+  "nl": {
+    "account.log.out": "Uitloggen",
+    "account.realtime": "Realtime",
+    "account.settings": "Instellingen",
+    "account.stats": "Statistieken",
+    "account.welcome": "Hallo daar, {user}",
+    "label.email.short": "E-mail",
+    "label.first.name": "Voornaam",
+    "label.forgot.login.details": "Inloggegevens vergeten?",
+    "label.has.account": "Heb je al een account?",
+    "label.language": "Taal",
+    "label.last.name": "Achternaam",
+    "label.login": "Login",
+    "label.password": "Wachtwoord",
+    "label.password.recovery": "Wachtwoord herstellen",
+    "label.password.remembered": "Wacht, ik weet mijn wachtwoord nog.",
+    "label.picture": "Afbeelding",
+    "label.register": "Register",
+    "label.required": "Vereist",
+    "label.save.profile": "Profiel opslaan",
+    "navigation.home": "Home",
+    "navigation.reservations": "Reserveringen",
+    "title.dashboard": "Dashboard",
+    "title.information": "Informatie",
+    "title.login": "Login",
+    "title.logout": "Uitloggen",
+    "title.notloggedin": "Niet ingelogd",
+    "title.profile": "Profiel",
+    "title.profile.settings": "Profielinstellingen",
+    "title.register": "Register"
+  }
+}

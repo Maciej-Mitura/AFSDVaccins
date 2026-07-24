@@ -1,0 +1,33 @@
+{
+  "en": {
+    "account.log.out": "Log out",
+    "account.realtime": "Realtime",
+    "account.settings": "Settings",
+    "account.stats": "Stats",
+    "account.welcome": "Hi, {user}",
+    "label.email.short": "Email",
+    "label.first.name": "First name",
+    "label.forgot.login.details": "Forgot login details?",
+    "label.has.account": "Already have an account?",
+    "label.language": "Language",
+    "label.last.name": "Last name",
+    "label.login": "Login",
+    "label.password": "Password",
+    "label.password.recovery": "Recover password",
+    "label.password.remembered": "Wait, I remember my password",
+    "label.picture": "Picture",
+    "label.register": "Register",
+    "label.required": "Required",
+    "label.save.profile": "Save profile",
+    "navigation.home": "Home",
+    "navigation.reservations": "Reservations",
+    "title.dashboard": "Dashboard",
+    "title.information": "Information",
+    "title.login": "Login",
+    "title.logout": "Log out",
+    "title.notloggedin": "Not logged in",
+    "title.profile": "Profile",
+    "title.profile.settings": "Profile settings",
+    "title.register": "Register"
+  }
+}

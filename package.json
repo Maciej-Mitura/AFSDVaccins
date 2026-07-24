@@ -24,13 +24,17 @@
     "dev:pwa": "npm run dev --workspace=@vaccin-delivery/pwa",
     "build:api": "npm run build --workspace=@vaccin-delivery/api",
     "build:pwa": "npm run generate:graphql && npm run build --workspace=@vaccin-delivery/pwa",
+    "export:i18n": "npm run export --workspace=@vaccin-delivery/i18n-export",
     "lint:api": "npm run lint --workspace=@vaccin-delivery/api",
     "lint:pwa": "npm run lint --workspace=@vaccin-delivery/pwa",
+    "lint:i18n": "npm run lint --workspace=@vaccin-delivery/i18n-export",
     "typecheck:api": "npm run typecheck --workspace=@vaccin-delivery/api",
     "typecheck:pwa": "npm run generate:graphql && npm run typecheck --workspace=@vaccin-delivery/pwa",
+    "typecheck:i18n": "npm run typecheck --workspace=@vaccin-delivery/i18n-export",
     "test:api": "npm run test --workspace=@vaccin-delivery/api",
     "test:e2e:api": "npm run test:e2e --workspace=@vaccin-delivery/api && npm run test:e2e:security --workspace=@vaccin-delivery/api",
     "test:pwa": "npm run test --workspace=@vaccin-delivery/pwa",
+    "test:i18n": "npm run test --workspace=@vaccin-delivery/i18n-export",
     "test:e2e:pwa": "playwright test",
     "test:e2e:pwa:ui": "playwright test --ui",
     "test:e2e:pwa:report": "playwright show-report",
@@ -41,7 +45,8 @@
   "lint-staged": {
     "*.{json,md,yml,yaml}": "prettier --write",
     "packages/api/**/*.ts": "eslint --config packages/api/eslint.config.mjs --no-warn-ignored",
-    "packages/pwa/**/*.{ts,vue}": "eslint --config packages/pwa/eslint.config.ts --no-warn-ignored"
+    "packages/pwa/**/*.{ts,vue}": "eslint --config packages/pwa/eslint.config.ts --no-warn-ignored",
+    "packages/i18n-export/**/*.ts": "eslint --config packages/i18n-export/eslint.config.mjs --no-warn-ignored"
   },
   "devDependencies": {
     "@playwright/test": "^1.54.2",

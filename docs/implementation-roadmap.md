@@ -2568,13 +2568,22 @@ feat(api): add rate limiting, caching, and GraphQL depth guards
 | **Requirement IDs** | FRONT-018, ARCH-004                                                                                  |
 | **Prerequisites**   | Phase 22 (preferred before large UI string churn)                                                    |
 
+### Implementation progress
+
+| Sub-scope                                           | Status                                                                      |
+| --------------------------------------------------- | --------------------------------------------------------------------------- |
+| **23A** Sheets exporter (`packages/i18n-export`)    | **Implemented** — OAuth Desktop auth, nl/en validation, offline tests, docs |
+| **23B+** Runtime `vue-i18n`, switcher, UI migration | **Not started** — do not begin until explicitly requested                   |
+
+Phase 23 as a whole is **not** complete until runtime i18n and string migration land.
+
 ### Exact scope
 
-- `vue-i18n` runtime; locale switcher
-- Dutch + English message catalogs
-- Optional `packages/i18n` Sheets exporter (student-owned, not copied)
-- Migrate existing user-visible strings
-- Missing-key policy + tests
+- `vue-i18n` runtime; locale switcher _(pending 23B)_
+- Dutch + English message catalogs _(JSON produced by exporter after manual first export)_
+- `packages/i18n-export` Sheets exporter (student-owned, not copied) _(23A done)_
+- Migrate existing user-visible strings _(pending 23B)_
+- Missing-key policy + tests _(pending 23B)_
 
 ### Explicit out-of-scope
 
@@ -2586,12 +2595,12 @@ feat(api): add rate limiting, caching, and GraphQL depth guards
 
 ### Frontend
 
-- `useLanguage` (or equivalent), locale JSON under `assets/locales/`
+- `useLanguage` (or equivalent), locale JSON under `packages/pwa/src/locales/`
 - Persist locale preference (localStorage and/or user profile)
 
 ### External / manual steps
 
-- Google OAuth desktop client + Sheet setup (see enhancement-planning §7)
+- Google OAuth desktop client + Sheet setup (see README — i18n exporter; enhancement-planning §7)
 
 ### Env
 
@@ -2599,13 +2608,14 @@ feat(api): add rate limiting, caching, and GraphQL depth guards
 
 ### Tests / CI
 
-- Missing-key safety; locale switch unit; Playwright language switch
+- Exporter unit tests offline (23A); missing-key safety; locale switch unit; Playwright language switch (23B+)
 - CI uses committed JSON (no live Sheets)
 
 ### Manual acceptance
 
-- [ ] Switch NL↔EN updates shell + one flow per role
-- [ ] Exporter documented; credentials not committed
+- [x] Exporter documented; credentials not committed
+- [ ] First successful local `npm run export:i18n` produces committed `packages/pwa/src/locales/{nl,en}.json`
+- [ ] Switch NL↔EN updates shell + one flow per role _(23B)_
 
 ### Rollback
 
@@ -2614,7 +2624,7 @@ feat(api): add rate limiting, caching, and GraphQL depth guards
 ### Recommended commit message
 
 ```
-feat(pwa): add runtime i18n with Dutch and English
+feat(i18n-export): add Google Sheets translation exporter foundation
 ```
 
 ---

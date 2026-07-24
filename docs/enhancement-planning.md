@@ -268,15 +268,15 @@ Do **not** deploy in Phase 21.
 
 ### Planned exam approach (Phase 23)
 
-| Item            | Plan                                                                                                    |
-| --------------- | ------------------------------------------------------------------------------------------------------- |
-| Locales         | **Dutch + English** mandatory (demo zh/es optional later)                                               |
-| Runtime         | `vue-i18n` with locale switcher                                                                         |
-| Source of truth | Google Sheet (teacher workflow) **or** committed JSON if Sheets blocked — prefer Sheets to match course |
-| Generated files | `packages/pwa/src/assets/locales/{nl,en}.json` (committed after export for CI reproducibility)          |
-| Exporter        | Optional `packages/i18n` workspace mirroring teacher workflow (student-owned code, not copied)          |
-| Missing keys    | Fallback to Dutch key string + dev warning; tests assert no silent empty                                |
-| Tests           | Missing-key safety, locale switch unit, Playwright language-switch                                      |
+| Item            | Plan                                                                                                        |
+| --------------- | ----------------------------------------------------------------------------------------------------------- |
+| Locales         | **Dutch + English** mandatory (demo zh/es optional later)                                                   |
+| Runtime         | `vue-i18n` with locale switcher                                                                             |
+| Source of truth | Google Sheet (teacher workflow) **or** committed JSON if Sheets blocked — prefer Sheets to match course     |
+| Generated files | `packages/pwa/src/locales/{nl,en}.json` (committed after a successful local export for CI reproducibility)  |
+| Exporter        | `packages/i18n-export` workspace (student-owned; Phase 23A implemented)                                     |
+| Missing keys    | Fallback to Dutch key string + dev warning; tests assert no silent empty _(runtime — Phase 23B)_            |
+| Tests           | Exporter offline unit tests (23A); missing-key safety, locale switch unit, Playwright language-switch (23B) |
 
 ### External / manual student steps (not done by agent in Phase 23 alone)
 
