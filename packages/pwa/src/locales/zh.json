@@ -1,0 +1,33 @@
+{
+  "zh": {
+    "account.log.out": "退出登录",
+    "account.realtime": "即时的",
+    "account.settings": "设置",
+    "account.stats": "统计数据",
+    "account.welcome": "你好，{user}",
+    "label.email.short": "电子邮件",
+    "label.first.name": "名",
+    "label.forgot.login.details": "忘记登录信息？",
+    "label.has.account": "已有账号？",
+    "label.language": "语言",
+    "label.last.name": "姓",
+    "label.login": "Login",
+    "label.password": "密码",
+    "label.password.recovery": "找回密码",
+    "label.password.remembered": "等等，我记得我的密码",
+    "label.picture": "图片",
+    "label.register": "登记",
+    "label.required": "必需的",
+    "label.save.profile": "保存个人资料",
+    "navigation.home": "家",
+    "navigation.reservations": "预订",
+    "title.dashboard": "仪表板",
+    "title.information": "信息",
+    "title.login": "登录",
+    "title.logout": "退出登录",
+    "title.notloggedin": "未登录",
+    "title.profile": "轮廓",
+    "title.profile.settings": "配置文件设置",
+    "title.register": "登记"
+  }
+}

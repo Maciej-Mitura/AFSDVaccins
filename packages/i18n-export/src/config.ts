@@ -9,7 +9,7 @@ import {
   resolveFromPackageRoot,
 } from './paths.js'
 
-export const SUPPORTED_LOCALES = ['nl', 'en'] as const
+export const SUPPORTED_LOCALES = ['nl', 'en', 'zh', 'es'] as const
 
 export type SupportedLocale = (typeof SUPPORTED_LOCALES)[number]
 

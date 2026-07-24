@@ -1,0 +1,33 @@
+{
+  "es": {
+    "account.log.out": "Finalizar la sesión",
+    "account.realtime": "Tiempo real",
+    "account.settings": "Ajustes",
+    "account.stats": "Estadísticas",
+    "account.welcome": "Hola, {user}",
+    "label.email.short": "Correo electrónico",
+    "label.first.name": "Nombre de pila",
+    "label.forgot.login.details": "¿Olvidaste tus datos de acceso?",
+    "label.has.account": "¿Ya tienes una cuenta?",
+    "label.language": "Idioma",
+    "label.last.name": "Apellido",
+    "label.login": "Login",
+    "label.password": "Contraseña",
+    "label.password.recovery": "Recuperar contraseña",
+    "label.password.remembered": "Espera, recuerdo mi contraseña.",
+    "label.picture": "Imagen",
+    "label.register": "Registro",
+    "label.required": "Requerido",
+    "label.save.profile": "Guardar perfil",
+    "navigation.home": "Hogar",
+    "navigation.reservations": "Reservas",
+    "title.dashboard": "Panel",
+    "title.information": "Información",
+    "title.login": "Acceso",
+    "title.logout": "Finalizar la sesión",
+    "title.notloggedin": "No has iniciado sesión",
+    "title.profile": "Perfil",
+    "title.profile.settings": "Configuración del perfil",
+    "title.register": "Registro"
+  }
+}
