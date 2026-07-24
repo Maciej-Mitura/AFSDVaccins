@@ -206,11 +206,14 @@ Root convenience: `npm run bootstrap:database:demo`.
 The CLI:
 
 - connects using **`DB_NAME`** (same builder as the API — not `test`);
-- enables TypeORM `synchronize` **only for this process** (creates/reconciles indexes);
+- uses persistence/core modules only (no GraphQL resolvers or HTTP throttling guards);
+- enables TypeORM `synchronize` **only for this process** (creates/reconciles indexes during application construction);
 - creates required collections through its data operations;
 - seeds demo/reference data idempotently;
 - reconciles Firebase Auth + application users;
 - prints **created/updated/skipped counts only** (no passwords).
+
+**Partial-run safety:** Nest application construction (DB connect + CLI synchronize / stock index init) happens before intentional Firebase/Mongo seed writes. If construction fails, no demo users/orders were written by the seed; a later rerun remains safe because Firebase users and Mongo documents are created-or-reused idempotently. After a successful or interrupted seed, existing Auth users and documents are reconciled rather than duplicated.
 
 Re-running is safe (idempotent). It never runs from API startup or the normal Railway deploy `CMD`.
 

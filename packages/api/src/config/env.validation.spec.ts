@@ -1,4 +1,8 @@
-import { buildMongoUrl, envValidationSchema, safeMongoHostname } from './env.validation'
+import {
+  buildMongoUrl,
+  envValidationSchema,
+  safeMongoHostname,
+} from './env.validation'
 
 describe('envValidationSchema', () => {
   it('accepts valid development configuration', () => {
@@ -68,7 +72,8 @@ describe('envValidationSchema', () => {
       (result.value as { ALLOW_DATABASE_SEED: boolean }).ALLOW_DATABASE_SEED,
     ).toBe(false)
     expect(
-      (result.value as { ALLOW_E2E_AUTH_BYPASS: boolean }).ALLOW_E2E_AUTH_BYPASS,
+      (result.value as { ALLOW_E2E_AUTH_BYPASS: boolean })
+        .ALLOW_E2E_AUTH_BYPASS,
     ).toBe(false)
   })
 
@@ -84,7 +89,8 @@ describe('envValidationSchema', () => {
 
     expect(result.error).toBeUndefined()
     expect(
-      (result.value as { ALLOW_E2E_AUTH_BYPASS: boolean }).ALLOW_E2E_AUTH_BYPASS,
+      (result.value as { ALLOW_E2E_AUTH_BYPASS: boolean })
+        .ALLOW_E2E_AUTH_BYPASS,
     ).toBe(true)
   })
 
@@ -98,7 +104,8 @@ describe('envValidationSchema', () => {
 
     expect(result.error).toBeUndefined()
     expect(
-      (result.value as { ALLOW_E2E_AUTH_BYPASS: boolean }).ALLOW_E2E_AUTH_BYPASS,
+      (result.value as { ALLOW_E2E_AUTH_BYPASS: boolean })
+        .ALLOW_E2E_AUTH_BYPASS,
     ).toBe(false)
   })
 
@@ -170,15 +177,15 @@ describe('envValidationSchema', () => {
 
 describe('buildMongoUrl', () => {
   it('combines host and database name', () => {
-    expect(
-      buildMongoUrl('mongodb://localhost:27017', 'vaccin-delivery'),
-    ).toBe('mongodb://localhost:27017/vaccin-delivery')
+    expect(buildMongoUrl('mongodb://localhost:27017', 'vaccin-delivery')).toBe(
+      'mongodb://localhost:27017/vaccin-delivery',
+    )
   })
 
   it('handles trailing slash on host', () => {
-    expect(
-      buildMongoUrl('mongodb://localhost:27017/', 'vaccin-delivery'),
-    ).toBe('mongodb://localhost:27017/vaccin-delivery')
+    expect(buildMongoUrl('mongodb://localhost:27017/', 'vaccin-delivery')).toBe(
+      'mongodb://localhost:27017/vaccin-delivery',
+    )
   })
 
   it('combines mongodb+srv host and database name', () => {

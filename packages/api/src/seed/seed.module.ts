@@ -2,37 +2,35 @@ import { Module } from '@nestjs/common'
 import { TypeOrmModule } from '@nestjs/typeorm'
 
 import { AuthenticationModule } from '../authentication/authentication.module'
+import { ApplicationCacheModule } from '../common/cache/application-cache.module'
+import { PubSubModule } from '../common/pubsub/pubsub.module'
 import { Order } from '../order/order.entity'
-import { OrderModule } from '../order/order.module'
 import { ApothekerProfile } from '../profile/apotheker/apotheker-profile.entity'
 import { BezorgerProfile } from '../profile/bezorger/bezorger-profile.entity'
-import { ProfileModule } from '../profile/profile.module'
 import { RouteTemplate } from '../route-templates/route-template.entity'
-import { RouteTemplatesModule } from '../route-templates/route-templates.module'
-import { RoutesModule } from '../routes/routes.module'
+import { RoutesCoreModule } from '../routes/routes-core.module'
 import { ApplicationSettings } from '../settings/settings.entity'
-import { SettingsModule } from '../settings/settings.module'
-import { StockModule } from '../stock/stock.module'
+import { SettingsCoreModule } from '../settings/settings-core.module'
+import { StockCoreModule } from '../stock/stock-core.module'
 import { User } from '../user/user.entity'
-import { UserModule } from '../user/user.module'
 import { Vaccine } from '../vaccine/vaccine.entity'
-import { VaccineModule } from '../vaccine/vaccine.module'
 import { SeedFirebaseProvisioningService } from './seed-firebase-provisioning.service'
 import { BootstrapSafetyService } from './bootstrap.safety'
 import { SeedSafetyService } from './seed.safety'
 import { SeedService } from './seed.service'
 
+/**
+ * CLI seed/bootstrap graph: persistence cores only — no GraphQL resolvers,
+ * StrictIdentityThrottlerGuard, or other HTTP-only providers.
+ */
 @Module({
   imports: [
     AuthenticationModule,
-    UserModule,
-    ProfileModule,
-    SettingsModule,
-    VaccineModule,
-    StockModule,
-    OrderModule,
-    RouteTemplatesModule,
-    RoutesModule,
+    ApplicationCacheModule,
+    PubSubModule,
+    SettingsCoreModule,
+    StockCoreModule,
+    RoutesCoreModule,
     TypeOrmModule.forFeature([
       User,
       ApothekerProfile,

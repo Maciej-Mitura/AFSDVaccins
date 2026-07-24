@@ -26,30 +26,30 @@ describe('SeedService', () => {
       assertSeedAllowed: jest.fn(),
       logSeedTargetConfirmation: jest.fn(),
       requireDemoPassword: jest.fn().mockReturnValue('demo-password'),
-      requireTeacherAdminPassword: jest.fn().mockReturnValue('teacher-password'),
-      requirePersonalAdminEmail: jest
+      requireTeacherAdminPassword: jest
         .fn()
-        .mockReturnValue('owner@example.com'),
+        .mockReturnValue('teacher-password'),
+      requirePersonalAdminEmail: jest.fn().mockReturnValue('owner@example.com'),
     } as unknown as SeedSafetyService
 
     const bootstrapSafetyService = {
       assertBootstrapAllowed: jest.fn(),
       logBootstrapTargetConfirmation: jest.fn(),
       requireDemoPassword: jest.fn().mockReturnValue('demo-password'),
-      requireTeacherAdminPassword: jest.fn().mockReturnValue('teacher-password'),
-      requirePersonalAdminEmail: jest
+      requireTeacherAdminPassword: jest
         .fn()
-        .mockReturnValue('owner@example.com'),
+        .mockReturnValue('teacher-password'),
+      requirePersonalAdminEmail: jest.fn().mockReturnValue('owner@example.com'),
     } as unknown as BootstrapSafetyService
 
     const firebaseProvisioning = {
-      ensureFirebaseUser: jest.fn().mockImplementation(async (account: {
-        email: string
-      }) => ({
-        uid: `uid-for-${account.email}`,
-        created: false,
-        reused: true,
-      })),
+      ensureFirebaseUser: jest
+        .fn()
+        .mockImplementation(async (account: { email: string }) => ({
+          uid: `uid-for-${account.email}`,
+          created: false,
+          reused: true,
+        })),
     } as unknown as SeedFirebaseProvisioningService
 
     const settingsService = {
@@ -86,25 +86,32 @@ describe('SeedService', () => {
     } as unknown as StockAdjustmentRepository
 
     const vaccineStockRepository = {
-      adjustStockQuantity: jest.fn().mockImplementation(
-        async (_id: ObjectId, delta: number) => {
+      adjustStockQuantity: jest
+        .fn()
+        .mockImplementation(async (_id: ObjectId, delta: number) => {
           const before = Math.max(0, 0)
           return {
             quantityBefore: before,
             quantityAfter: before + delta,
           }
-        },
-      ),
+        }),
     } as unknown as VaccineStockRepository
 
-    const users = new Map<string, { _id: string; firebaseUid: string; role: UserRole }>()
+    const users = new Map<
+      string,
+      { _id: string; firebaseUid: string; role: UserRole }
+    >()
     const userRepository = {
-      findOne: jest.fn().mockImplementation(async ({ where }: { where: { firebaseUid?: string } }) => {
-        if (!where.firebaseUid) {
-          return null
-        }
-        return users.get(where.firebaseUid) ?? null
-      }),
+      findOne: jest
+        .fn()
+        .mockImplementation(
+          async ({ where }: { where: { firebaseUid?: string } }) => {
+            if (!where.firebaseUid) {
+              return null
+            }
+            return users.get(where.firebaseUid) ?? null
+          },
+        ),
       create: jest.fn().mockImplementation(payload => payload),
       save: jest.fn().mockImplementation(async payload => {
         const id = payload._id ?? new ObjectId().toString()
@@ -116,42 +123,64 @@ describe('SeedService', () => {
 
     const profiles = new Map<string, unknown>()
     const apothekerProfileRepository = {
-      findOne: jest.fn().mockImplementation(async ({ where }: { where: { userId: string } }) => {
-        return profiles.get(`a:${where.userId}`) ?? null
-      }),
+      findOne: jest
+        .fn()
+        .mockImplementation(
+          async ({ where }: { where: { userId: string } }) => {
+            return profiles.get(`a:${where.userId}`) ?? null
+          },
+        ),
       create: jest.fn().mockImplementation(payload => payload),
       save: jest.fn().mockImplementation(async payload => {
-        const saved = { ...payload, _id: payload._id ?? new ObjectId().toString() }
+        const saved = {
+          ...payload,
+          _id: payload._id ?? new ObjectId().toString(),
+        }
         profiles.set(`a:${saved.userId}`, saved)
         return saved
       }),
-      remove: jest.fn().mockImplementation(async (entity: { userId: string }) => {
-        profiles.delete(`a:${entity.userId}`)
-        return entity
-      }),
+      remove: jest
+        .fn()
+        .mockImplementation(async (entity: { userId: string }) => {
+          profiles.delete(`a:${entity.userId}`)
+          return entity
+        }),
     }
 
     const bezorgerProfileRepository = {
-      findOne: jest.fn().mockImplementation(async ({ where }: { where: { userId: string } }) => {
-        return profiles.get(`b:${where.userId}`) ?? null
-      }),
+      findOne: jest
+        .fn()
+        .mockImplementation(
+          async ({ where }: { where: { userId: string } }) => {
+            return profiles.get(`b:${where.userId}`) ?? null
+          },
+        ),
       create: jest.fn().mockImplementation(payload => payload),
       save: jest.fn().mockImplementation(async payload => {
-        const saved = { ...payload, _id: payload._id ?? new ObjectId().toString() }
+        const saved = {
+          ...payload,
+          _id: payload._id ?? new ObjectId().toString(),
+        }
         profiles.set(`b:${saved.userId}`, saved)
         return saved
       }),
-      remove: jest.fn().mockImplementation(async (entity: { userId: string }) => {
-        profiles.delete(`b:${entity.userId}`)
-        return entity
-      }),
+      remove: jest
+        .fn()
+        .mockImplementation(async (entity: { userId: string }) => {
+          profiles.delete(`b:${entity.userId}`)
+          return entity
+        }),
     }
 
     const settingsDocs = new Map<string, unknown>()
     const settingsRepository = {
-      findOne: jest.fn().mockImplementation(async ({ where }: { where: { singletonKey: string } }) => {
-        return settingsDocs.get(where.singletonKey) ?? null
-      }),
+      findOne: jest
+        .fn()
+        .mockImplementation(
+          async ({ where }: { where: { singletonKey: string } }) => {
+            return settingsDocs.get(where.singletonKey) ?? null
+          },
+        ),
       create: jest.fn().mockImplementation(payload => payload),
       save: jest.fn().mockImplementation(async payload => {
         settingsDocs.set(payload.singletonKey, payload)
@@ -159,11 +188,24 @@ describe('SeedService', () => {
       }),
     }
 
-    const vaccines = new Map<string, { _id: ObjectId; normalizedName: string; stockQuantity: number; name: string; manufacturer: string }>()
+    const vaccines = new Map<
+      string,
+      {
+        _id: ObjectId
+        normalizedName: string
+        stockQuantity: number
+        name: string
+        manufacturer: string
+      }
+    >()
     const vaccineRepository = {
-      findOne: jest.fn().mockImplementation(async ({ where }: { where: { normalizedName: string } }) => {
-        return vaccines.get(where.normalizedName) ?? null
-      }),
+      findOne: jest
+        .fn()
+        .mockImplementation(
+          async ({ where }: { where: { normalizedName: string } }) => {
+            return vaccines.get(where.normalizedName) ?? null
+          },
+        ),
       create: jest.fn().mockImplementation(payload => payload),
       save: jest.fn().mockImplementation(async payload => {
         const saved = {
@@ -176,11 +218,16 @@ describe('SeedService', () => {
       }),
     }
 
-    const orders = new Map<string, { status: OrderStatus; statusHistory: unknown[] }>()
+    const orders = new Map<
+      string,
+      { status: OrderStatus; statusHistory: unknown[] }
+    >()
     const orderRepository = {
-      findOne: jest.fn().mockImplementation(async ({ where }: { where: { _id: ObjectId } }) => {
-        return orders.get(where._id.toString()) ?? null
-      }),
+      findOne: jest
+        .fn()
+        .mockImplementation(async ({ where }: { where: { _id: ObjectId } }) => {
+          return orders.get(where._id.toString()) ?? null
+        }),
       create: jest.fn().mockImplementation(payload => payload),
       insertOne: jest.fn().mockImplementation(async payload => {
         const id = payload._id.toString()
@@ -195,11 +242,18 @@ describe('SeedService', () => {
       }),
     }
 
-    const templates = new Map<string, { _id: string; normalizedName: string; bezorgerProfileId: string }>()
+    const templates = new Map<
+      string,
+      { _id: string; normalizedName: string; bezorgerProfileId: string }
+    >()
     const routeTemplateRepository = {
-      findOne: jest.fn().mockImplementation(async ({ where }: { where: { normalizedName: string } }) => {
-        return templates.get(where.normalizedName) ?? null
-      }),
+      findOne: jest
+        .fn()
+        .mockImplementation(
+          async ({ where }: { where: { normalizedName: string } }) => {
+            return templates.get(where.normalizedName) ?? null
+          },
+        ),
       create: jest.fn().mockImplementation(payload => payload),
       save: jest.fn().mockImplementation(async payload => {
         const saved = {
@@ -231,6 +285,7 @@ describe('SeedService', () => {
     return {
       service,
       seedSafetyService,
+      bootstrapSafetyService,
       firebaseProvisioning,
       routeGenerationService,
       stockAdjustmentWriter,
@@ -254,6 +309,39 @@ describe('SeedService', () => {
 
     await expect(service.run()).rejects.toThrow('refused')
     expect(firebaseProvisioning.ensureFirebaseUser).not.toHaveBeenCalled()
+  })
+
+  it('runBootstrap aborts before Firebase/Mongo writes when gates fail', async () => {
+    const { service, bootstrapSafetyService, firebaseProvisioning } =
+      createMocks()
+    ;(
+      bootstrapSafetyService.assertBootstrapAllowed as jest.Mock
+    ).mockImplementation(() => {
+      throw new Error('bootstrap refused')
+    })
+
+    await expect(service.runBootstrap()).rejects.toThrow('bootstrap refused')
+    expect(firebaseProvisioning.ensureFirebaseUser).not.toHaveBeenCalled()
+  })
+
+  it('runBootstrap reuses existing Firebase users and Mongo documents idempotently', async () => {
+    const mocks = createMocks()
+    const { service, firebaseProvisioning, userRepository } = mocks
+
+    const first = await service.runBootstrap()
+    expect(first.usersCreated).toBe(7)
+    expect(first.firebaseReused).toBe(7)
+
+    const second = await service.runBootstrap()
+    expect(second.usersCreated).toBe(0)
+    expect(second.usersReused).toBe(7)
+    expect(second.firebaseReused).toBe(7)
+    expect(
+      (firebaseProvisioning.ensureFirebaseUser as jest.Mock).mock.calls.length,
+    ).toBe(14)
+    expect((userRepository.findOne as jest.Mock).mock.calls.length).toBeGreaterThan(
+      7,
+    )
   })
 
   it('creates two ADMIN users without role profiles and links pharmacist/courier profiles to User.id', async () => {
@@ -361,9 +449,9 @@ describe('SeedService', () => {
 
     await service.run()
 
-    const insertedOrders = (orderRepository.insertOne as jest.Mock).mock.calls.map(
-      call => call[0],
-    )
+    const insertedOrders = (
+      orderRepository.insertOne as jest.Mock
+    ).mock.calls.map(call => call[0])
     const ids = insertedOrders.map((order: { _id: ObjectId }) =>
       order._id.toString(),
     )
@@ -421,15 +509,15 @@ describe('SeedService', () => {
       stockAdjustmentWriter.insertIdempotentAdjustment as jest.Mock
     ).mock.calls.length
 
-    ;(stockAdjustmentWriter.findByIdempotencyKey as jest.Mock).mockResolvedValue(
-      { idempotencyKey: 'seed:stock:influenza' },
-    )
-    ;(vaccineStockRepository.adjustStockQuantity as jest.Mock).mockResolvedValue(
-      {
-        quantityBefore: 500,
-        quantityAfter: 500,
-      },
-    )
+    ;(
+      stockAdjustmentWriter.findByIdempotencyKey as jest.Mock
+    ).mockResolvedValue({ idempotencyKey: 'seed:stock:influenza' })
+    ;(
+      vaccineStockRepository.adjustStockQuantity as jest.Mock
+    ).mockResolvedValue({
+      quantityBefore: 500,
+      quantityAfter: 500,
+    })
 
     // Force vaccines to already have target stock on second conceptual path:
     // After first run vaccines are in memory map with updated quantities from adjust.
@@ -447,9 +535,9 @@ describe('SeedService', () => {
     await service.run()
 
     expect(routeGenerationService.generateDeliveryRoute).toHaveBeenCalled()
-    const insertedOrders = (orderRepository.insertOne as jest.Mock).mock.calls.map(
-      call => call[0],
-    )
+    const insertedOrders = (
+      orderRepository.insertOne as jest.Mock
+    ).mock.calls.map(call => call[0])
     expect(
       insertedOrders.every(
         (order: { status: OrderStatus }) =>

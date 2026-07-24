@@ -78,7 +78,8 @@ export class StockAdjustmentPersistenceService implements OnModuleInit {
     let indexes: MongoCollectionIndex[]
 
     try {
-      indexes = (await this.stockAdjustmentRepository.collectionIndexes()) as MongoCollectionIndex[]
+      indexes =
+        (await this.stockAdjustmentRepository.collectionIndexes()) as MongoCollectionIndex[]
     } catch (error) {
       // Empty Atlas DB: collection does not exist yet — listIndexes → NamespaceNotFound.
       // Other Mongo errors (auth, network, malformed indexes) remain fatal.
@@ -96,7 +97,9 @@ export class StockAdjustmentPersistenceService implements OnModuleInit {
         continue
       }
 
-      if (!Object.prototype.hasOwnProperty.call(index.key ?? {}, 'idempotencyKey')) {
+      if (
+        !Object.prototype.hasOwnProperty.call(index.key ?? {}, 'idempotencyKey')
+      ) {
         continue
       }
 

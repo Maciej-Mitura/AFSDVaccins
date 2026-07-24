@@ -118,14 +118,16 @@ describe('isMongoNamespaceNotFound', () => {
   })
 
   it('does not treat auth, duplicate-key, or unrelated errors as missing NS', () => {
-    expect(isMongoNamespaceNotFound({ code: 13, codeName: 'Unauthorized' })).toBe(
-      false,
-    )
+    expect(
+      isMongoNamespaceNotFound({ code: 13, codeName: 'Unauthorized' }),
+    ).toBe(false)
     expect(
       isMongoNamespaceNotFound({ code: 11000, codeName: 'DuplicateKey' }),
     ).toBe(false)
     expect(
-      isMongoNamespaceNotFound(new Error('ns does not exist: test.stock_adjustments')),
+      isMongoNamespaceNotFound(
+        new Error('ns does not exist: test.stock_adjustments'),
+      ),
     ).toBe(false)
     expect(isMongoNamespaceNotFound(null)).toBe(false)
   })

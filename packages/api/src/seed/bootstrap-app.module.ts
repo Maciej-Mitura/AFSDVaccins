@@ -43,7 +43,7 @@ import { SeedModule } from './seed.module'
         Logger.log(`MongoDB selected database: ${options.database}`)
         Logger.log(`MongoDB host scheme: ${safeMongoScheme(dbHost ?? '')}`)
         Logger.log(
-          'Bootstrap TypeORM synchronize=true (CLI only — creates/reconciles indexes)',
+          'Bootstrap phase: database/index initialization (TypeORM synchronize=true, CLI only)',
         )
 
         return options

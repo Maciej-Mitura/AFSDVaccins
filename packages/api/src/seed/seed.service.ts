@@ -118,12 +118,18 @@ export class SeedService {
    * require NODE_ENV=development. Never called from API startup.
    */
   async runBootstrap(): Promise<SeedCounters> {
+    this.logger.log('Bootstrap phase: validating gates and credentials')
     this.bootstrapSafetyService.assertBootstrapAllowed()
     this.bootstrapSafetyService.logBootstrapTargetConfirmation()
+    this.logger.log(
+      'Bootstrap phase: gates passed — starting Firebase and Mongo seed processing',
+    )
     return this.executeSeeding({
       demoPassword: this.bootstrapSafetyService.requireDemoPassword(),
-      teacherPassword: this.bootstrapSafetyService.requireTeacherAdminPassword(),
-      personalAdminEmail: this.bootstrapSafetyService.requirePersonalAdminEmail(),
+      teacherPassword:
+        this.bootstrapSafetyService.requireTeacherAdminPassword(),
+      personalAdminEmail:
+        this.bootstrapSafetyService.requirePersonalAdminEmail(),
     })
   }
 
@@ -141,11 +147,13 @@ export class SeedService {
       teacherPassword,
     })
 
+    this.logger.log('Bootstrap phase: Firebase user processing')
     const users = await this.seedUsers(accounts, counters)
     await this.clearAccidentalAdminRoleProfiles(
       [users.personalAdmin, users.docent],
       counters,
     )
+    this.logger.log('Bootstrap phase: MongoDB seed processing')
     const apothekerProfiles = await this.seedApothekerProfiles(users, counters)
     const bezorgerProfiles = await this.seedBezorgerProfiles(users, counters)
     await this.seedSettings(counters)
@@ -221,7 +229,8 @@ export class SeedService {
     const users = {} as SeededUsers
 
     for (const account of accounts) {
-      const firebase = await this.firebaseProvisioning.ensureFirebaseUser(account)
+      const firebase =
+        await this.firebaseProvisioning.ensureFirebaseUser(account)
 
       if (firebase.created) {
         counters.firebaseCreated += 1
@@ -447,15 +456,14 @@ export class SeedService {
       }
 
       const delta = target - current
-      const updateResult = await this.vaccineStockRepository.adjustStockQuantity(
-        vaccineObjectId,
-        delta,
-      )
+      const updateResult =
+        await this.vaccineStockRepository.adjustStockQuantity(
+          vaccineObjectId,
+          delta,
+        )
 
       if (!updateResult) {
-        throw new Error(
-          `Failed to reconcile seed stock for ${definition.name}`,
-        )
+        throw new Error(`Failed to reconcile seed stock for ${definition.name}`)
       }
 
       vaccine.stockQuantity = updateResult.quantityAfter
@@ -802,8 +810,6 @@ export class SeedService {
     this.logger.log(
       `- Dates (Europe/Brussels): today=${today}, tomorrow=${tomorrow} (preview only)`,
     )
-    this.logger.log(
-      `- Order IDs: ${Object.values(SEED_ORDER_IDS).join(', ')}`,
-    )
+    this.logger.log(`- Order IDs: ${Object.values(SEED_ORDER_IDS).join(', ')}`)
   }
 }
