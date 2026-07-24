@@ -12,12 +12,10 @@ import {
   type StockAdjustmentsQuery,
   type VaccineStockHistoryQuery,
 } from '@/assets/graphql/stock.query'
-import {
-  VACCINES_QUERY,
-  type VaccinesQuery,
-} from '@/assets/graphql/vaccine'
+import { VACCINES_QUERY, type VaccinesQuery } from '@/assets/graphql/vaccine'
 import { mapGraphQLError } from '@/composables/useCurrentUser'
 import useGraphQL from '@/composables/useGraphQL'
+import { translate } from '@/i18n'
 
 export type StockOverviewItem = VaccinesQuery['vaccines'][number]
 export type StockAdjustmentItem =
@@ -42,8 +40,7 @@ function extractGraphQLErrorCode(error: unknown): string | null {
 
   const graphQLError = error.graphQLErrors[0]
   const originalError = graphQLError?.extensions?.originalError as
-    | { error?: string }
-    | undefined
+    { error?: string } | undefined
 
   return originalError?.error ?? null
 }
@@ -91,7 +88,7 @@ export function useStock() {
       })
 
       if (!result.data?.adjustVaccineStock) {
-        throw new Error('Kon de voorraad niet aanpassen.')
+        throw new Error(translate('errors.stock.adjustFailed'))
       }
 
       const adjustment = result.data.adjustVaccineStock
@@ -101,7 +98,10 @@ export function useStock() {
           : vaccine,
       )
 
-      successMessage.value = `Voorraad bijgewerkt: ${adjustment.quantityBefore} → ${adjustment.quantityAfter}.`
+      successMessage.value = translate('success.stock.updated', {
+        before: adjustment.quantityBefore,
+        after: adjustment.quantityAfter,
+      })
       return adjustment
     } catch (error: unknown) {
       errorMessage.value = mapGraphQLError(error)

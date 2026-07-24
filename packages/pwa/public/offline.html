@@ -5,6 +5,11 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="theme-color" content="#0d9488" />
     <title>Offline — Vaccinatie-levering</title>
+    <!--
+      Static offline fallback (not Vue / vue-i18n).
+      Reads localStorage key `vaccin-delivery:locale` once on load (nl|en|zh|es; default nl).
+      Does NOT reactively follow SPA locale changes after this page has loaded.
+    -->
     <style>
       :root {
         color-scheme: light;
@@ -73,23 +78,71 @@
   </head>
   <body>
     <main>
-      <h1>Vaccinatie-levering</h1>
-      <p>
-        Je bent offline. Live gegevens en acties zijn tijdelijk niet
-        beschikbaar. Probeer opnieuw wanneer je verbinding hebt.
-      </p>
-      <button type="button" id="retry">Opnieuw proberen</button>
+      <h1 id="brand">Vaccinatie-levering</h1>
+      <p id="body"></p>
+      <button type="button" id="retry"></button>
     </main>
     <script>
       ;(function () {
+        var COPIES = {
+          nl: {
+            title: 'Offline — Vaccinatie-levering',
+            body:
+              'Je bent offline. Live gegevens en acties zijn tijdelijk niet beschikbaar. Probeer opnieuw wanneer je verbinding hebt.',
+            retry: 'Opnieuw proberen',
+          },
+          en: {
+            title: 'Offline — Vaccinatie-levering',
+            body:
+              'You are offline. Live data and actions are temporarily unavailable. Try again when you have a connection.',
+            retry: 'Try again',
+          },
+          es: {
+            title: 'Sin conexión — Vaccinatie-levering',
+            body:
+              'Estás sin conexión. Los datos en vivo y las acciones no están disponibles temporalmente. Inténtalo de nuevo cuando tengas conexión.',
+            retry: 'Reintentar',
+          },
+          zh: {
+            title: '离线 — Vaccinatie-levering',
+            body:
+              '您当前处于离线状态。实时数据与操作暂时不可用。恢复网络连接后请重试。',
+            retry: '重试',
+          },
+        }
+
+        var stored = null
+        try {
+          stored = window.localStorage.getItem('vaccin-delivery:locale')
+        } catch (_) {
+          stored = null
+        }
+
+        var locale =
+          stored === 'en' || stored === 'zh' || stored === 'es' || stored === 'nl'
+            ? stored
+            : 'nl'
+        var copy = COPIES[locale] || COPIES.nl
+
+        document.documentElement.lang = locale
+        document.title = copy.title
+
+        var bodyEl = document.getElementById('body')
+        var retryEl = document.getElementById('retry')
+        if (bodyEl) {
+          bodyEl.textContent = copy.body
+        }
+        if (retryEl) {
+          retryEl.textContent = copy.retry
+        }
+
         function goHome() {
           // Always return to the SPA entry — never reload /offline.html.
           window.location.replace('/')
         }
 
-        var retry = document.getElementById('retry')
-        if (retry) {
-          retry.addEventListener('click', goHome)
+        if (retryEl) {
+          retryEl.addEventListener('click', goHome)
         }
 
         window.addEventListener('online', goHome)

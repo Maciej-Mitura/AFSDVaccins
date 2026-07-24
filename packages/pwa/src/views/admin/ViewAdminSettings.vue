@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { reactive, ref } from 'vue'
+import { computed, reactive, ref } from 'vue'
+import { useI18n } from 'vue-i18n'
 
 import type { FormSubmitEvent } from '@nuxt/ui'
 import * as z from 'zod'
@@ -9,6 +10,7 @@ import CommonLoadingSkeleton from '@/components/common/CommonLoadingSkeleton.vue
 import { useApplicationSettings } from '@/composables/useApplicationSettings'
 import { useOnlineStatus } from '@/composables/useOnlineStatus'
 
+const { t } = useI18n()
 const { isOnline } = useOnlineStatus()
 
 const {
@@ -24,28 +26,35 @@ const saving = ref(false)
 const formError = ref<string | null>(null)
 const successMessage = ref<string | null>(null)
 
-const schema = z.object({
-  orderingClosingTime: z
-    .string()
-    .regex(/^([01]\d|2[0-3]):[0-5]\d$/, 'Gebruik HH:mm formaat.'),
-  weeklyWarningPercentage: z
-    .number()
-    .int('Moet een geheel getal zijn.')
-    .min(1, 'Minimaal 1%.')
-    .max(100, 'Maximaal 100%.'),
-  weeklyDoseCap: z
-    .number()
-    .int('Moet een geheel getal zijn.')
-    .min(1, 'Minimaal 1.')
-    .max(10000, 'Maximaal 10000.'),
-  dailyDoseCapPerType: z
-    .number()
-    .int('Moet een geheel getal zijn.')
-    .min(1, 'Minimaal 1.')
-    .max(10000, 'Maximaal 10000.'),
-})
+const schema = computed(() =>
+  z.object({
+    orderingClosingTime: z
+      .string()
+      .regex(/^([01]\d|2[0-3]):[0-5]\d$/, t('validation.time.format')),
+    weeklyWarningPercentage: z
+      .number()
+      .int(t('validation.integer'))
+      .min(1, t('validation.percentage.min'))
+      .max(100, t('validation.percentage.max')),
+    weeklyDoseCap: z
+      .number()
+      .int(t('validation.integer'))
+      .min(1, t('validation.doseCap.min'))
+      .max(10000, t('validation.doseCap.max')),
+    dailyDoseCapPerType: z
+      .number()
+      .int(t('validation.integer'))
+      .min(1, t('validation.doseCap.min'))
+      .max(10000, t('validation.doseCap.max')),
+  }),
+)
 
-type SettingsForm = z.output<typeof schema>
+type SettingsForm = {
+  orderingClosingTime: string
+  weeklyWarningPercentage: number
+  weeklyDoseCap: number
+  dailyDoseCapPerType: number
+}
 
 const state = reactive<Partial<SettingsForm>>({
   orderingClosingTime: undefined,
@@ -77,7 +86,7 @@ async function onSubmit(event: FormSubmitEvent<SettingsForm>) {
       weeklyDoseCap: event.data.weeklyDoseCap,
       dailyDoseCapPerType: event.data.dailyDoseCapPerType,
     })
-    successMessage.value = 'Instellingen succesvol opgeslagen.'
+    successMessage.value = t('success.settings.saved')
   } catch (error: unknown) {
     formError.value = mapGraphQLError(error)
   } finally {
@@ -90,25 +99,25 @@ async function onSubmit(event: FormSubmitEvent<SettingsForm>) {
   <div class="space-y-6">
     <UCard>
       <template #header>
-        <h2 class="text-lg font-semibold">Applicatie-instellingen</h2>
+        <h2 class="text-lg font-semibold">{{ t('settings.title') }}</h2>
       </template>
 
       <CommonLoadingSkeleton v-if="loading && !settings" />
 
       <CommonErrorState
         v-else-if="errorMessage && !settings"
-        title="Instellingen laden mislukt"
+        :title="t('settings.loadFailed')"
         :description="errorMessage"
       />
 
       <div v-else-if="settings" class="space-y-6">
         <div class="space-y-2 text-sm">
           <p>
-            <span class="font-medium">Tijdzone:</span>
+            <span class="font-medium">{{ t('settings.timezone') }}:</span>
             {{ settings.timezone }}
           </p>
           <p class="text-muted">
-            De tijdzone is vastgelegd op Europe/Brussels voor deze fase.
+            {{ t('settings.timezone.note') }}
           </p>
         </div>
 
@@ -119,7 +128,7 @@ async function onSubmit(event: FormSubmitEvent<SettingsForm>) {
           @submit="onSubmit"
         >
           <UFormField
-            label="Sluitingstijd bestellingen"
+            :label="t('settings.orderingClosingTime')"
             name="orderingClosingTime"
           >
             <UInput
@@ -130,7 +139,7 @@ async function onSubmit(event: FormSubmitEvent<SettingsForm>) {
           </UFormField>
 
           <UFormField
-            label="Wekelijkse waarschuwingsdrempel (%)"
+            :label="t('settings.weeklyWarningPercentage')"
             name="weeklyWarningPercentage"
           >
             <UInput
@@ -141,7 +150,7 @@ async function onSubmit(event: FormSubmitEvent<SettingsForm>) {
             />
           </UFormField>
 
-          <UFormField label="Weekmaximum (dosissen)" name="weeklyDoseCap">
+          <UFormField :label="t('settings.weeklyDoseCap')" name="weeklyDoseCap">
             <UInput
               v-model.number="state.weeklyDoseCap"
               type="number"
@@ -151,7 +160,7 @@ async function onSubmit(event: FormSubmitEvent<SettingsForm>) {
           </UFormField>
 
           <UFormField
-            label="Dagmaximum per vaccintype (dosissen)"
+            :label="t('settings.dailyDoseCap')"
             name="dailyDoseCapPerType"
           >
             <UInput
@@ -177,7 +186,7 @@ async function onSubmit(event: FormSubmitEvent<SettingsForm>) {
           />
 
           <UButton type="submit" :loading="saving" :disabled="!isOnline">
-            Opslaan
+            {{ t('common.save') }}
           </UButton>
         </UForm>
       </div>

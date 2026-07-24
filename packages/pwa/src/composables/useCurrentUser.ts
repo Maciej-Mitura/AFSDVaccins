@@ -27,11 +27,15 @@ import {
   type UpdateOwnBezorgerProfileMutationVariables,
 } from '@/assets/graphql/profile.mutation'
 import useGraphQL from '@/composables/useGraphQL'
+import { mapGraphQLError, mapUserFacingGraphQLError, translate } from '@/i18n'
 
 export type ApplicationUser = NonNullable<CurrentUserQuery['currentUser']>
 export type ApplicationRole = ApplicationUser['role']
 export type ApothekerProfile = NonNullable<ApplicationUser['apothekerProfile']>
 export type BezorgerProfile = NonNullable<ApplicationUser['bezorgerProfile']>
+
+/** Re-export i18n GraphQL error mappers for existing call sites. */
+export { mapGraphQLError, mapUserFacingGraphQLError }
 
 const currentUser = ref<ApplicationUser | null>(null)
 const loading = ref(false)
@@ -48,8 +52,7 @@ function isUserNotRegisteredError(error: unknown): boolean {
 
   return error.graphQLErrors.some(graphQLError => {
     const originalError = graphQLError.extensions?.originalError as
-      | { error?: string }
-      | undefined
+      { error?: string } | undefined
 
     return (
       graphQLError.extensions?.code === 'USER_NOT_REGISTERED' ||
@@ -57,21 +60,6 @@ function isUserNotRegisteredError(error: unknown): boolean {
       graphQLError.message.includes('Application user not registered')
     )
   })
-}
-
-export function mapGraphQLError(error: unknown): string {
-  if (error instanceof ApolloError) {
-    const message = error.graphQLErrors[0]?.message
-    if (message) {
-      return message
-    }
-  }
-
-  if (error instanceof Error) {
-    return error.message
-  }
-
-  return 'Er ging iets mis. Probeer het opnieuw.'
 }
 
 export function getDefaultRouteForRole(role?: UserRole | null): string {
@@ -189,13 +177,13 @@ export function useCurrentUser() {
     })
 
     if (!result.data?.createOwnUser) {
-      throw new Error('Kon het applicatieprofiel niet aanmaken.')
+      throw new Error(translate('errors.profile.createFailed'))
     }
 
     await loadCurrentUser(true)
 
     if (!currentUser.value) {
-      throw new Error('Kon het applicatieprofiel niet laden.')
+      throw new Error(translate('errors.profile.loadFailed'))
     }
 
     return currentUser.value
@@ -216,13 +204,13 @@ export function useCurrentUser() {
     })
 
     if (!result.data?.updateOwnUser) {
-      throw new Error('Kon het profiel niet bijwerken.')
+      throw new Error(translate('errors.profile.updateFailed'))
     }
 
     await loadCurrentUser(true)
 
     if (!currentUser.value) {
-      throw new Error('Kon het applicatieprofiel niet laden.')
+      throw new Error(translate('errors.profile.loadFailed'))
     }
 
     return currentUser.value
@@ -237,7 +225,7 @@ export function useCurrentUser() {
     })
 
     if (!result.data?.completeApothekerProfile) {
-      throw new Error('Kon het apotheekprofiel niet aanmaken.')
+      throw new Error(translate('errors.profile.apotheker.createFailed'))
     }
 
     await loadCurrentUser(true)
@@ -247,13 +235,15 @@ export function useCurrentUser() {
   async function updateOwnApothekerProfile(
     input: UpdateOwnApothekerProfileMutationVariables['input'],
   ): Promise<ApothekerProfile> {
-    const result = await apolloClient.mutate<UpdateOwnApothekerProfileMutation>({
-      mutation: UPDATE_OWN_APOTHEKER_PROFILE_MUTATION,
-      variables: { input },
-    })
+    const result = await apolloClient.mutate<UpdateOwnApothekerProfileMutation>(
+      {
+        mutation: UPDATE_OWN_APOTHEKER_PROFILE_MUTATION,
+        variables: { input },
+      },
+    )
 
     if (!result.data?.updateOwnApothekerProfile) {
-      throw new Error('Kon het apotheekprofiel niet bijwerken.')
+      throw new Error(translate('errors.profile.apotheker.updateFailed'))
     }
 
     await loadCurrentUser(true)
@@ -269,7 +259,7 @@ export function useCurrentUser() {
     })
 
     if (!result.data?.completeBezorgerProfile) {
-      throw new Error('Kon het bezorgerprofiel niet aanmaken.')
+      throw new Error(translate('errors.profile.bezorger.createFailed'))
     }
 
     await loadCurrentUser(true)
@@ -285,7 +275,7 @@ export function useCurrentUser() {
     })
 
     if (!result.data?.updateOwnBezorgerProfile) {
-      throw new Error('Kon het bezorgerprofiel niet bijwerken.')
+      throw new Error(translate('errors.profile.bezorger.updateFailed'))
     }
 
     await loadCurrentUser(true)

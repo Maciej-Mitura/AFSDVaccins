@@ -1,68 +1,15 @@
-import { createI18n } from 'vue-i18n'
-
 import { loadLocaleWithFallback } from './locale-loader'
 import { resolveInitialLocale } from './locale-resolution'
-import {
-  DEFAULT_LOCALE,
-  FALLBACK_LOCALE,
-  type SupportedLocale,
-} from './supported-locales'
+import { createAppI18n, type AppI18n } from './app-i18n'
+import { FALLBACK_LOCALE, type SupportedLocale } from './supported-locales'
 
-/**
- * Resolve teacher-compatible flat dotted keys (`label.password.recovery`)
- * as literal map keys. Do not use `flatJson` — it cannot represent both
- * `label.password` and `label.password.recovery` without conflicts.
- */
-export function flatKeyMessageResolver(
-  obj: unknown,
-  path: string,
-): string | null {
-  if (obj !== null && typeof obj === 'object' && path in obj) {
-    const value = (obj as Record<string, unknown>)[path]
-    return typeof value === 'string' ? value : null
-  }
-  return null
-}
-
-function buildI18n(initialLocale: SupportedLocale) {
-  return createI18n({
-    legacy: false,
-    locale: initialLocale,
-    fallbackLocale: FALLBACK_LOCALE,
-    messages: {},
-    messageResolver: flatKeyMessageResolver,
-    missingWarn: import.meta.env.DEV,
-    fallbackWarn: import.meta.env.DEV,
-    globalInjection: false,
-  })
-}
-
-export type AppI18n = ReturnType<typeof buildI18n>
-
-let i18nInstance: AppI18n | null = null
-
-/**
- * Composition API mode. Messages stay as flat Record<string, string>
- * matching exporter JSON wrappers after unwrap.
- */
-export function createAppI18n(
-  initialLocale: SupportedLocale = DEFAULT_LOCALE,
-): AppI18n {
-  const i18n = buildI18n(initialLocale)
-  i18nInstance = i18n
-  return i18n
-}
-
-export function getAppI18n(): AppI18n {
-  if (!i18nInstance) {
-    throw new Error('i18n has not been created yet. Call createAppI18n first.')
-  }
-  return i18nInstance
-}
-
-export function __resetAppI18nForTests(): void {
-  i18nInstance = null
-}
+export { flatKeyMessageResolver } from './message-resolver'
+export {
+  createAppI18n,
+  getAppI18n,
+  __resetAppI18nForTests,
+  type AppI18n,
+} from './app-i18n'
 
 export function syncDocumentLang(locale: SupportedLocale): void {
   if (typeof document === 'undefined') {
@@ -115,3 +62,29 @@ export {
   isLocaleLoaded,
   unwrapLocaleCatalog,
 } from './locale-loader'
+
+export { translate, translatePlural } from './translate'
+export { formatDate, formatDateTime, formatNumber } from './format'
+export {
+  orderStatusLabel,
+  routeStatusLabel,
+  userRoleLabel,
+  activeInactiveLabel,
+  notificationReadLabel,
+} from './status-labels'
+export {
+  mapFirebaseAuthError,
+  mapUserFacingGraphQLError,
+  mapGraphQLError,
+} from './error-mapper'
+export { extractGraphQLErrorCode } from './graphql-error-code'
+export {
+  createLoginSchema,
+  createRegisterSchema,
+  createForgotPasswordSchema,
+  createNameFieldsSchema,
+  createRegistrationRoleSchema,
+  createApothekerProfileSchema,
+  createApothekerProfileSchemaOptionalCountry,
+  createBezorgerProfileSchema,
+} from './validation-schemas'

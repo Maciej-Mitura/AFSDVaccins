@@ -15,8 +15,8 @@ test.describe('Authentication journeys', () => {
 
   test('invalid login shows a safe error', async ({ page }) => {
     await page.goto('/auth/login')
-    await page.getByLabel('E-mailadres').fill('nobody@example.com')
-    await page.getByLabel('Wachtwoord').fill(E2E_PASSWORD)
+    await page.getByTestId('login-email').fill('nobody@example.com')
+    await page.getByTestId('login-password').fill(E2E_PASSWORD)
     await page.getByTestId('login-submit').click()
 
     await expect(

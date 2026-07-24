@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, reactive, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
+import { useI18n } from 'vue-i18n'
 
 import type { FormSubmitEvent } from '@nuxt/ui'
 import { StockAdjustmentType } from '@vaccin-delivery/types'
@@ -9,13 +10,12 @@ import * as z from 'zod'
 import CommonEmptyState from '@/components/common/CommonEmptyState.vue'
 import CommonErrorState from '@/components/common/CommonErrorState.vue'
 import CommonLoadingSkeleton from '@/components/common/CommonLoadingSkeleton.vue'
-import {
-  useStock,
-  type StockOverviewItem,
-} from '@/composables/useStock'
+import { useStock, type StockOverviewItem } from '@/composables/useStock'
 import { useOnlineStatus } from '@/composables/useOnlineStatus'
+import { activeInactiveLabel } from '@/i18n'
 
 const router = useRouter()
+const { t } = useI18n()
 const { isOnline } = useOnlineStatus()
 
 const {
@@ -35,11 +35,20 @@ const showForm = ref(false)
 const selectedVaccine = ref<StockOverviewItem | null>(null)
 const formError = ref<string | null>(null)
 
-const adjustmentTypeOptions = [
-  { label: 'Aanvullen', value: StockAdjustmentType.Restock },
-  { label: 'Verlagen', value: StockAdjustmentType.ManualDecrease },
-  { label: 'Correctie', value: StockAdjustmentType.ManualCorrection },
-]
+const adjustmentTypeOptions = computed(() => [
+  {
+    label: t('admin.stock.adjustment.restock'),
+    value: StockAdjustmentType.Restock,
+  },
+  {
+    label: t('admin.stock.adjustment.decrease'),
+    value: StockAdjustmentType.ManualDecrease,
+  },
+  {
+    label: t('admin.stock.adjustment.correction'),
+    value: StockAdjustmentType.ManualCorrection,
+  },
+])
 
 type AdjustForm = {
   type: StockAdjustmentType
@@ -52,14 +61,18 @@ const schema = computed(() =>
     .object({
       type: z.nativeEnum(StockAdjustmentType),
       quantityDelta: z.number().int(),
-      reason: z.string().trim().min(1, 'Reden is verplicht.').max(500),
+      reason: z
+        .string()
+        .trim()
+        .min(1, t('validation.reason.required'))
+        .max(500),
     })
     .superRefine((data, ctx) => {
       if (data.type === StockAdjustmentType.ManualCorrection) {
         if (data.quantityDelta < 0) {
           ctx.addIssue({
             code: 'custom',
-            message: 'Voorraad mag niet negatief zijn.',
+            message: t('validation.stock.nonNegative'),
             path: ['quantityDelta'],
           })
         }
@@ -70,7 +83,7 @@ const schema = computed(() =>
         ) {
           ctx.addIssue({
             code: 'custom',
-            message: 'Voorraad is al gelijk aan deze waarde.',
+            message: t('validation.stock.unchanged'),
             path: ['quantityDelta'],
           })
         }
@@ -81,7 +94,7 @@ const schema = computed(() =>
       if (data.quantityDelta === 0) {
         ctx.addIssue({
           code: 'custom',
-          message: 'Aantal mag niet nul zijn.',
+          message: t('validation.quantity.nonZero'),
           path: ['quantityDelta'],
         })
       }
@@ -96,14 +109,14 @@ const state = reactive<Partial<AdjustForm>>({
 
 const quantityFieldLabel = computed(() =>
   state.type === StockAdjustmentType.ManualCorrection
-    ? 'Nieuwe voorraad (dosissen)'
-    : 'Aantal (dosissen)',
+    ? t('admin.stock.quantityTarget')
+    : t('admin.stock.quantity'),
 )
 
 const formTitle = computed(() =>
   selectedVaccine.value
-    ? `Voorraad aanpassen — ${selectedVaccine.value.name}`
-    : 'Voorraad aanpassen',
+    ? t('admin.stock.adjustTitleNamed', { name: selectedVaccine.value.name })
+    : t('admin.stock.adjustTitle'),
 )
 
 void loadStockOverview(true)
@@ -190,9 +203,9 @@ async function onSubmit(event: FormSubmitEvent<AdjustForm>) {
     closeForm()
   } catch (error: unknown) {
     if (isInsufficientStockError(error)) {
-      formError.value = 'Onvoldoende voorraad voor deze aanpassing.'
+      formError.value = t('errors.stock.insufficient')
     } else if (isInvalidStockAdjustmentError(error)) {
-      formError.value = 'Ongeldige voorraadaanpassing. Controleer type en aantal.'
+      formError.value = t('errors.stock.invalidAdjustment')
     } else {
       formError.value = mapGraphQLError(error)
     }
@@ -207,7 +220,7 @@ function openHistory(vaccineId: string): void {
 <template>
   <div class="space-y-6">
     <div class="flex flex-wrap items-center justify-between gap-3">
-      <h2 class="text-lg font-semibold">Voorraadbeheer</h2>
+      <h2 class="text-lg font-semibold">{{ t('admin.stock.title') }}</h2>
     </div>
 
     <UAlert
@@ -228,14 +241,14 @@ function openHistory(vaccineId: string): void {
 
     <CommonErrorState
       v-else-if="errorMessage && overview.length === 0"
-      title="Voorraad laden mislukt"
+      :title="t('admin.stock.loadFailed')"
       :description="errorMessage"
     />
 
     <CommonEmptyState
       v-else-if="overview.length === 0"
-      title="Geen vaccins"
-      description="Er zijn geen vaccins om voorraad voor te beheren."
+      :title="t('admin.stock.empty.title')"
+      :description="t('admin.stock.empty.description')"
     />
 
     <div v-else class="space-y-4">
@@ -251,21 +264,23 @@ function openHistory(vaccineId: string): void {
                 color="warning"
                 variant="subtle"
               >
-                Lage voorraad
+                {{ t('admin.stock.lowStock') }}
               </UBadge>
               <UBadge
                 :color="vaccine.active ? 'success' : 'neutral'"
                 variant="subtle"
               >
-                {{ vaccine.active ? 'Actief' : 'Inactief' }}
+                {{ activeInactiveLabel(vaccine.active) }}
               </UBadge>
             </div>
             <p>
-              <span class="font-medium">Huidige voorraad:</span>
+              <span class="font-medium">{{ t('admin.stock.current') }}:</span>
               {{ vaccine.stockQuantity }}
             </p>
             <p>
-              <span class="font-medium">Waarschuwing drempel:</span>
+              <span class="font-medium"
+                >{{ t('admin.stock.warningThreshold') }}:</span
+              >
               {{ vaccine.stockWarningThreshold }}
             </p>
           </div>
@@ -276,14 +291,14 @@ function openHistory(vaccineId: string): void {
               :disabled="!isOnline"
               @click="openAdjustForm(vaccine)"
             >
-              Aanpassen
+              {{ t('admin.stock.adjust') }}
             </UButton>
             <UButton
               size="sm"
               variant="outline"
               @click="openHistory(vaccine.id)"
             >
-              Historiek
+              {{ t('admin.stock.history') }}
             </UButton>
           </div>
         </div>
@@ -298,7 +313,7 @@ function openHistory(vaccineId: string): void {
           class="space-y-4"
           @submit="onSubmit"
         >
-          <UFormField label="Type aanpassing" name="type">
+          <UFormField :label="t('admin.stock.adjustmentType')" name="type">
             <USelect
               v-model="state.type"
               :items="adjustmentTypeOptions"
@@ -315,7 +330,7 @@ function openHistory(vaccineId: string): void {
             />
           </UFormField>
 
-          <UFormField label="Reden" name="reason">
+          <UFormField :label="t('admin.stock.reason')" name="reason">
             <UTextarea v-model="state.reason" :rows="3" />
           </UFormField>
 
@@ -328,10 +343,10 @@ function openHistory(vaccineId: string): void {
 
           <div class="flex gap-2">
             <UButton type="submit" :loading="adjusting" :disabled="!isOnline">
-              Opslaan
+              {{ t('common.save') }}
             </UButton>
             <UButton color="neutral" variant="ghost" @click="closeForm">
-              Annuleren
+              {{ t('common.cancel') }}
             </UButton>
           </div>
         </UForm>

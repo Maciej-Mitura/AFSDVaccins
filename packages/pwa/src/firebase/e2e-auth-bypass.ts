@@ -152,7 +152,7 @@ export function e2eBypassLogin(
 
   if (!account || password.trim().length < 8) {
     const error = new Error(
-      'Onjuiste inloggegevens. Controleer e-mail en wachtwoord.',
+      'E2E auth bypass: invalid credential',
     ) as Error & { code: string }
     error.code = 'auth/invalid-credential'
     throw error

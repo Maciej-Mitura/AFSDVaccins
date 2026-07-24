@@ -1,11 +1,15 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted } from 'vue'
+import { useI18n } from 'vue-i18n'
 
 import CommonEmptyState from '@/components/common/CommonEmptyState.vue'
 import CommonErrorState from '@/components/common/CommonErrorState.vue'
 import CommonLoadingSkeleton from '@/components/common/CommonLoadingSkeleton.vue'
 import { useDeliveryRoutes } from '@/composables/useDeliveryRoutes'
 import { useRealtimeConnection } from '@/composables/useRealtimeConnection'
+import { translatePlural } from '@/i18n'
+
+const { t } = useI18n()
 
 const {
   myTomorrowRoutePreview,
@@ -25,6 +29,28 @@ const missingTemplate = computed(() =>
   isMissingTemplatePreviewError(previewErrorCode.value),
 )
 
+const previewSummary = computed(() => {
+  const preview = myTomorrowRoutePreview.value
+  if (!preview) {
+    return ''
+  }
+
+  return t('bezorger.route.tomorrow.summary', {
+    stops: translatePlural('bezorger.route.stops', preview.totalStops),
+    orders: translatePlural('routes.stop.orders', preview.totalOrders),
+    doses: translatePlural('routes.stop.doses', preview.totalQuantity),
+  })
+})
+
+function stopTotalLabel(totalQuantity: number): string {
+  const doses = translatePlural('routes.stop.doses', totalQuantity)
+  return t('bezorger.route.stop.total', { doses })
+}
+
+function stopOrdersLabel(orderCount: number): string {
+  return translatePlural('routes.stop.orders', orderCount)
+}
+
 onMounted(() => {
   void loadMyTomorrowRoutePreview()
   subscribeToTomorrowPreviewReconnect()
@@ -42,18 +68,19 @@ onUnmounted(() => {
         class="text-xs font-medium uppercase tracking-wide text-muted"
         data-testid="tomorrow-preview-label"
       >
-        Voorbeeld — niet opgeslagen
+        {{ t('bezorger.route.tomorrow.badge') }}
       </p>
-      <h1 class="mt-1 text-2xl font-semibold">Voorbeeldroute voor morgen</h1>
+      <h1 class="mt-1 text-2xl font-semibold">
+        {{ t('bezorger.route.tomorrow.title') }}
+      </h1>
       <p class="mt-1 text-sm text-muted">
-        Live berekening op basis van je template en kwalificerende bestellingen.
-        Dit is geen gegenereerde route van vandaag.
+        {{ t('bezorger.route.tomorrow.description') }}
       </p>
       <p
         v-if="connectionState === 'reconnecting'"
         class="mt-1 text-xs text-warning"
       >
-        Verbinding herstellen…
+        {{ t('realtime.reconnecting') }}
       </p>
     </div>
 
@@ -64,7 +91,7 @@ onUnmounted(() => {
         :loading="previewLoading"
         @click="loadMyTomorrowRoutePreview"
       >
-        Opnieuw laden
+        {{ t('bezorger.route.tomorrow.reload') }}
       </UButton>
     </div>
 
@@ -72,39 +99,40 @@ onUnmounted(() => {
 
     <CommonErrorState
       v-else-if="previewErrorMessage && missingTemplate"
-      title="Geen routetemplate"
+      :title="t('bezorger.route.tomorrow.noTemplate.title')"
       :description="previewErrorMessage"
     />
 
     <CommonErrorState
       v-else-if="previewErrorMessage && !myTomorrowRoutePreview"
-      title="Kon voorbeeldroute niet laden"
+      :title="t('bezorger.route.tomorrow.loadFailed')"
       :description="previewErrorMessage"
     />
 
     <template v-else-if="myTomorrowRoutePreview">
       <div class="rounded-lg bg-elevated/50 px-4 py-3">
-        <p class="text-sm text-muted">Leveringsdatum (morgen)</p>
+        <p class="text-sm text-muted">
+          {{ t('bezorger.route.tomorrow.deliveryDate') }}
+        </p>
         <p class="text-lg font-semibold">
           {{ myTomorrowRoutePreview.deliveryDate }}
         </p>
         <p class="mt-1 text-sm">
-          Template:
-          <span class="font-medium">{{
-            myTomorrowRoutePreview.routeTemplateName
-          }}</span>
+          {{
+            t('bezorger.route.tomorrow.template', {
+              name: myTomorrowRoutePreview.routeTemplateName,
+            })
+          }}
         </p>
         <p class="mt-1 text-sm text-muted">
-          {{ myTomorrowRoutePreview.totalStops }} stop(s) ·
-          {{ myTomorrowRoutePreview.totalOrders }} bestelling(en) ·
-          {{ myTomorrowRoutePreview.totalQuantity }} dosissen
+          {{ previewSummary }}
         </p>
       </div>
 
       <CommonEmptyState
         v-if="myTomorrowRoutePreview.stops.length === 0"
-        title="Geen stops voor morgen"
-        description="Je template is gekoppeld, maar er zijn nog geen kwalificerende bestellingen voor morgen. Apotheken zonder bestelling worden overgeslagen."
+        :title="t('bezorger.route.tomorrow.empty.title')"
+        :description="t('bezorger.route.tomorrow.empty.description')"
       />
 
       <ol v-else class="space-y-4">
@@ -114,16 +142,14 @@ onUnmounted(() => {
           class="rounded-lg border border-default px-4 py-4"
         >
           <p class="text-xs font-medium uppercase tracking-wide text-muted">
-            Stop {{ stop.sequence }}
+            {{ t('bezorger.route.stop.label', { sequence: stop.sequence }) }}
           </p>
           <h2 class="mt-1 text-lg font-semibold">{{ stop.pharmacyName }}</h2>
           <p class="mt-1 text-sm">{{ formatAddress(stop) }}</p>
           <p class="mt-3 text-sm font-medium">
-            Totaal {{ stop.totalQuantity }} dosissen
+            {{ stopTotalLabel(stop.totalQuantity) }}
             <span class="font-normal text-muted">
-              ({{ stop.orderCount }} bestelling{{
-                stop.orderCount === 1 ? '' : 'en'
-              }})
+              ({{ stopOrdersLabel(stop.orderCount) }})
             </span>
           </p>
           <ul class="mt-2 space-y-1 text-sm">

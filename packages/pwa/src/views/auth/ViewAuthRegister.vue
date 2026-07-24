@@ -1,10 +1,11 @@
 <script setup lang="ts">
-import { reactive, ref } from 'vue'
+import { computed, reactive, ref } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
 
 import type { FormSubmitEvent } from '@nuxt/ui'
 import { SelfRegistrationRole } from '@vaccin-delivery/types'
-import * as z from 'zod'
+import type * as z from 'zod'
 
 import {
   getDefaultRouteForRole,
@@ -12,7 +13,9 @@ import {
 } from '@/composables/useCurrentUser'
 import { useFirebase } from '@/composables/useFirebase'
 import { useOnlineStatus } from '@/composables/useOnlineStatus'
+import { createRegisterSchema } from '@/i18n'
 
+const { t } = useI18n()
 const router = useRouter()
 const { isOnline } = useOnlineStatus()
 const { register } = useFirebase()
@@ -27,18 +30,9 @@ const loading = ref(false)
 const formError = ref<string | null>(null)
 const profileWarning = ref<string | null>(null)
 
-const schema = z.object({
-  firstName: z.string().min(2, 'Voornaam moet minstens 2 tekens bevatten.'),
-  lastName: z.string().min(2, 'Achternaam moet minstens 2 tekens bevatten.'),
-  email: z.string().email('Voer een geldig e-mailadres in.'),
-  password: z.string().min(8, 'Wachtwoord moet minstens 8 tekens bevatten.'),
-  role: z.enum(
-    [SelfRegistrationRole.Apotheker, SelfRegistrationRole.Bezorger],
-    { message: 'Kies een accounttype.' },
-  ),
-})
+const schema = computed(() => createRegisterSchema(key => t(key)))
 
-type RegisterForm = z.output<typeof schema>
+type RegisterForm = z.output<ReturnType<typeof createRegisterSchema>>
 
 const state = reactive<Partial<RegisterForm>>({
   firstName: undefined,
@@ -74,13 +68,12 @@ async function onSubmit(event: FormSubmitEvent<RegisterForm>) {
         await router.push(getDefaultRouteForRole(user.role))
       }
     } catch (profileError: unknown) {
-      profileWarning.value =
-        'Je Firebase-account is aangemaakt, maar het applicatieprofiel kon niet worden opgeslagen. Log in en kies opnieuw je accounttype via “Profiel aanvullen”.'
+      profileWarning.value = t('auth.register.profileWarning')
       formError.value = mapGraphQLError(profileError)
     }
   } catch (error: unknown) {
     formError.value =
-      error instanceof Error ? error.message : 'Registratie is mislukt.'
+      error instanceof Error ? error.message : t('auth.register.failed')
   } finally {
     loading.value = false
   }
@@ -90,12 +83,11 @@ async function onSubmit(event: FormSubmitEvent<RegisterForm>) {
 <template>
   <UCard>
     <template #header>
-      <h2 class="text-lg font-semibold">Registreren</h2>
+      <h2 class="text-lg font-semibold">{{ t('auth.register.title') }}</h2>
     </template>
 
     <p class="mb-4 text-sm text-muted">
-      Maakt een Firebase-account en een applicatieprofiel aan. Kies expliciet of
-      je als apotheker of bezorger registreert.
+      {{ t('auth.register.intro') }}
     </p>
 
     <UAlert
@@ -115,7 +107,7 @@ async function onSubmit(event: FormSubmitEvent<RegisterForm>) {
     />
 
     <UForm :schema="schema" :state="state" class="space-y-4" @submit="onSubmit">
-      <UFormField label="Accounttype" name="role" required>
+      <UFormField :label="t('auth.register.accountType')" name="role" required>
         <div class="grid gap-3 sm:grid-cols-2">
           <button
             type="button"
@@ -127,9 +119,9 @@ async function onSubmit(event: FormSubmitEvent<RegisterForm>) {
             "
             @click="state.role = SelfRegistrationRole.Apotheker"
           >
-            <p class="font-medium">Apotheker</p>
+            <p class="font-medium">{{ t('shell.apotheker.title') }}</p>
             <p class="mt-1 text-sm text-muted">
-              Ik plaats vaccinbestellingen voor een apotheek.
+              {{ t('auth.register.role.apotheker.description') }}
             </p>
           </button>
 
@@ -143,15 +135,15 @@ async function onSubmit(event: FormSubmitEvent<RegisterForm>) {
             "
             @click="state.role = SelfRegistrationRole.Bezorger"
           >
-            <p class="font-medium">Bezorger</p>
+            <p class="font-medium">{{ t('shell.bezorger.title') }}</p>
             <p class="mt-1 text-sm text-muted">
-              Ik lever geplande vaccinbestellingen.
+              {{ t('auth.register.role.bezorger.description') }}
             </p>
           </button>
         </div>
       </UFormField>
 
-      <UFormField label="Voornaam" name="firstName" required>
+      <UFormField :label="t('label.first.name')" name="firstName" required>
         <UInput
           v-model="state.firstName"
           autocomplete="given-name"
@@ -159,7 +151,7 @@ async function onSubmit(event: FormSubmitEvent<RegisterForm>) {
         />
       </UFormField>
 
-      <UFormField label="Achternaam" name="lastName" required>
+      <UFormField :label="t('label.last.name')" name="lastName" required>
         <UInput
           v-model="state.lastName"
           autocomplete="family-name"
@@ -167,7 +159,7 @@ async function onSubmit(event: FormSubmitEvent<RegisterForm>) {
         />
       </UFormField>
 
-      <UFormField label="E-mailadres" name="email" required>
+      <UFormField :label="t('auth.login.email')" name="email" required>
         <UInput
           v-model="state.email"
           autocomplete="email"
@@ -176,7 +168,7 @@ async function onSubmit(event: FormSubmitEvent<RegisterForm>) {
         />
       </UFormField>
 
-      <UFormField label="Wachtwoord" name="password" required>
+      <UFormField :label="t('auth.login.password')" name="password" required>
         <UInput
           v-model="state.password"
           autocomplete="new-password"
@@ -186,14 +178,14 @@ async function onSubmit(event: FormSubmitEvent<RegisterForm>) {
       </UFormField>
 
       <UButton :loading="loading" :disabled="!isOnline" block type="submit">
-        Account aanmaken
+        {{ t('auth.register.submit') }}
       </UButton>
     </UForm>
 
     <p class="mt-4 text-center text-sm text-muted">
-      Al een account?
+      {{ t('auth.register.hasAccount') }}
       <RouterLink class="text-primary hover:underline" to="/auth/login">
-        Inloggen
+        {{ t('auth.login.submit') }}
       </RouterLink>
     </p>
   </UCard>

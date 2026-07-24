@@ -1,10 +1,14 @@
 <script setup lang="ts">
 import { onMounted, onUnmounted } from 'vue'
+import { useI18n } from 'vue-i18n'
 
 import CommonEmptyState from '@/components/common/CommonEmptyState.vue'
 import CommonErrorState from '@/components/common/CommonErrorState.vue'
 import CommonLoadingSkeleton from '@/components/common/CommonLoadingSkeleton.vue'
 import { useAdminNotifications } from '@/composables/useAdminNotifications'
+import { formatDateTime } from '@/i18n'
+
+const { t } = useI18n()
 
 const {
   notifications,
@@ -30,36 +34,31 @@ onUnmounted(() => {
   stopNotificationSubscription()
   reconnectCleanup?.()
 })
-
-function formatDate(value: string): string {
-  return new Intl.DateTimeFormat('nl-BE', {
-    dateStyle: 'medium',
-    timeStyle: 'short',
-  }).format(new Date(value))
-}
 </script>
 
 <template>
   <div class="space-y-6">
-    <h2 class="text-lg font-semibold">Meldingen</h2>
+    <h2 class="text-lg font-semibold">{{ t('admin.notifications.title') }}</h2>
 
     <CommonLoadingSkeleton v-if="loading && notifications.length === 0" />
 
     <CommonErrorState
       v-else-if="errorMessage"
-      title="Meldingen laden mislukt"
+      :title="t('admin.notifications.loadFailed')"
       :description="errorMessage"
     />
 
     <CommonEmptyState
       v-else-if="notifications.length === 0"
-      title="Geen meldingen"
-      description="Er zijn momenteel geen operationele meldingen."
+      :title="t('admin.notifications.empty.title')"
+      :description="t('admin.notifications.empty.description')"
     />
 
     <div v-else class="space-y-4">
       <UCard v-for="notification in notifications" :key="notification.id">
-        <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div
+          class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between"
+        >
           <div class="space-y-1 text-sm">
             <div class="flex flex-wrap items-center gap-2">
               <h3 class="font-semibold">{{ notification.title }}</h3>
@@ -67,11 +66,17 @@ function formatDate(value: string): string {
                 :color="notification.read ? 'neutral' : 'warning'"
                 variant="subtle"
               >
-                {{ notification.read ? 'Gelezen' : 'Nieuw' }}
+                {{
+                  notification.read
+                    ? t('status.notification.read')
+                    : t('status.notification.new')
+                }}
               </UBadge>
             </div>
             <p>{{ notification.body }}</p>
-            <p class="text-muted">{{ formatDate(notification.createdAt) }}</p>
+            <p class="text-muted">
+              {{ formatDateTime(notification.createdAt) }}
+            </p>
           </div>
 
           <UButton
@@ -80,7 +85,7 @@ function formatDate(value: string): string {
             variant="outline"
             @click="markNotificationRead(notification.id)"
           >
-            Markeer als gelezen
+            {{ t('admin.notifications.markRead') }}
           </UButton>
         </div>
       </UCard>

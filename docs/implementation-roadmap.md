@@ -2570,26 +2570,30 @@ feat(api): add rate limiting, caching, and GraphQL depth guards
 
 ### Implementation progress
 
-| Sub-scope                                        | Status                                                                          |
-| ------------------------------------------------ | ------------------------------------------------------------------------------- |
-| **23A** Sheets exporter (`packages/i18n-export`) | **Implemented** — OAuth Desktop auth, nl/en/zh/es validation, offline tests     |
-| **23B** Runtime `vue-i18n`, switcher, sample UI  | **Implemented** — four locales, shell + login + one flow per role; Sheet is SoT |
-| **23C** Remaining UI string migration            | **Not started** — do not begin until explicitly requested                       |
+| Sub-scope                                        | Status                                                                                                                   |
+| ------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------ |
+| **23A** Sheets exporter (`packages/i18n-export`) | **Implemented** — OAuth Desktop auth, nl/en/zh/es validation, offline tests                                              |
+| **23B** Runtime `vue-i18n`, switcher, sample UI  | **Implemented** — four locales, shell + login + role samples; Sheet is SoT                                               |
+| **23C** Remaining UI string migration            | **Implemented** — 481 identical keys across nl/en/zh/es; central helpers; BCP47 formatting; `offline.html` static locale |
 
-Phase 23 as a whole is **not** complete until remaining string migration (23C) lands.
-FRONT-018 stays **partially implemented** until most screens use catalogs.
+**Phase 23 is complete.** FRONT-018 path is complete (runtime catalogs + switching).
+Honest caveat: `zh`/`es` still rely heavily on Sheet **Default** (EN) export-time
+fallback (~415 keys) — not verified human translations. Do **not** start Phase 24
+until explicitly requested.
 
 ### Exact scope
 
-- `vue-i18n` runtime; locale switcher _(23B done)_
-- Dutch + English (+ zh/es) message catalogs _(JSON generated from Sheet)_
+- `vue-i18n` runtime; locale switcher _(done)_
+- Dutch + English (+ zh/es) message catalogs _(JSON generated from Sheet; 481 keys)_
 - `packages/i18n-export` Sheets exporter (student-owned, not copied) _(23A done)_
-- Migrate existing user-visible strings _(23B sample done; remainder 23C)_
-- Missing-key policy + tests _(23B done)_
+- Migrate existing user-visible strings _(23C done)_
+- Missing-key policy + tests _(done)_
+- Central status-labels, error-mapper, Zod validation-schema factories, format helpers _(23C)_
 
 ### Explicit out-of-scope
 
-- Full date/number formatting migration (beyond representative screens); deployment; domain features
+- Verified human `zh`/`es` translations for every Default-fallback cell (Sheet follow-up)
+- Deployment; domain features 24–31
 
 ### Backend / GraphQL / DB
 
@@ -2599,10 +2603,12 @@ FRONT-018 stays **partially implemented** until most screens use catalogs.
 
 - `useLanguage`, `packages/pwa/src/i18n/*`, locale JSON under `packages/pwa/src/locales/`
 - Persist locale preference (`vaccin-delivery:locale`)
+- Date/number formatting via BCP47 map (`nl-BE`, `en-GB`, `zh-CN`, `es-ES`)
+- `offline.html` reads locale once from `localStorage` (static; not reactive)
 
 ### External / manual steps
 
-- Google OAuth desktop client + Sheet setup (see README — i18n exporter; enhancement-planning §7)
+- Google OAuth desktop client + Sheet setup (see README — i18n; enhancement-planning §7)
 - Edit translations in the Google Sheet; regenerate with `npm run export:i18n` (readonly; local/dev only)
 - Do not hand-merge keys into locale JSON; Google Sheet remains the editable source of truth
 
@@ -2612,15 +2618,16 @@ FRONT-018 stays **partially implemented** until most screens use catalogs.
 
 ### Tests / CI
 
-- Exporter unit tests offline (23A); locale resolution/loader/`setLocale`; Playwright language switch (23B)
+- Exporter unit tests offline (23A); locale resolution/loader/`setLocale`; Playwright language switch (23B+)
 - CI uses committed JSON (no live Sheets)
+- Do not claim a separate 23C CI green push unless that commit is on the remote
 
 ### Manual acceptance
 
 - [x] Exporter documented; credentials not committed
 - [x] Committed `packages/pwa/src/locales/{nl,en,zh,es}.json`
-- [x] Switch NL↔EN (and ES/ZH) updates shell + one flow per role _(23B)_
-- [ ] Remaining screens migrated _(23C)_
+- [x] Switch NL↔EN (and ES/ZH) updates shell + role flows _(23B)_
+- [x] Remaining screens migrated _(23C)_ — catalogs complete; es/zh Default quality caveat documented
 
 ### Rollback
 
@@ -2629,7 +2636,7 @@ FRONT-018 stays **partially implemented** until most screens use catalogs.
 ### Recommended commit message
 
 ```
-feat(pwa): add runtime vue-i18n foundation with locale switcher
+feat(pwa): complete Phase 23C UI string migration and i18n helpers
 ```
 
 ---
@@ -3055,9 +3062,10 @@ docs: finalize submission dossier and presentation rehearsal
 | Phases 0–20 complete?      | **Yes** on `develop` @ `f3e4d07`                                      |
 | Phase 21 complete when?    | Audit docs merged; validation commands green; no feature code changed |
 | Phase 22 complete when?    | Security foundation merged; unit + E2E security suites green          |
-| Next implementation phase? | **Phase 23** — only when explicitly requested                         |
+| Phase 23 complete when?    | 23A + 23B + 23C landed; FRONT-018 implemented (es/zh Default caveat)  |
+| Next implementation phase? | **Phase 24** — only when explicitly requested                         |
 | Tier C mandatory?          | **No** — defer if time-constrained                                    |
 
 ---
 
-_Document version: 2026-07-23 (Phase 22 security foundation). Aligns with `enhancement-planning.md` and updated `requirements-matrix.md`._
+_Document version: 2026-07-24 (Phase 23C i18n migration complete). Aligns with `enhancement-planning.md` and updated `requirements-matrix.md`._

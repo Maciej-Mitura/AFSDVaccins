@@ -1,20 +1,22 @@
 <script setup lang="ts">
 import { computed } from 'vue'
+import { useI18n } from 'vue-i18n'
 
 import { useRealtimeConnection } from '@/composables/useRealtimeConnection'
 
+const { t } = useI18n()
 const { connectionState } = useRealtimeConnection()
 
 const label = computed(() => {
   switch (connectionState.value) {
     case 'connecting':
-      return 'Live updates verbinden…'
+      return t('realtime.connecting')
     case 'connected':
-      return 'Live updates actief'
+      return t('realtime.connected')
     case 'reconnecting':
-      return 'Opnieuw verbinden…'
+      return t('realtime.reconnecting')
     case 'unavailable':
-      return 'Live updates tijdelijk niet beschikbaar'
+      return t('realtime.unavailable')
     default:
       return null
   }

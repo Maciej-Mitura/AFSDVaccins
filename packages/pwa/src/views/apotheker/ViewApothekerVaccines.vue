@@ -1,9 +1,13 @@
 <script setup lang="ts">
+import { useI18n } from 'vue-i18n'
+
 import CommonEmptyState from '@/components/common/CommonEmptyState.vue'
 import CommonErrorState from '@/components/common/CommonErrorState.vue'
 import CommonLoadingSkeleton from '@/components/common/CommonLoadingSkeleton.vue'
 import { useVaccines } from '@/composables/useVaccines'
+import { translatePlural } from '@/i18n'
 
+const { t } = useI18n()
 const { activeVaccines, loading, errorMessage, loadVaccines } = useVaccines()
 
 void loadVaccines(false)
@@ -13,25 +17,25 @@ void loadVaccines(false)
   <div class="space-y-6">
     <UCard>
       <template #header>
-        <h2 class="text-lg font-semibold">Vaccincatalogus</h2>
+        <h2 class="text-lg font-semibold">{{ t('vaccines.title') }}</h2>
       </template>
 
       <p class="mb-4 text-sm text-muted">
-        Overzicht van beschikbare vaccins voor bestellingen.
+        {{ t('apotheker.vaccines.description') }}
       </p>
 
       <CommonLoadingSkeleton v-if="loading && activeVaccines.length === 0" />
 
       <CommonErrorState
         v-else-if="errorMessage"
-        title="Catalogus laden mislukt"
+        :title="t('vaccines.loadFailed')"
         :description="errorMessage"
       />
 
       <CommonEmptyState
         v-else-if="activeVaccines.length === 0"
-        title="Geen actieve vaccins"
-        description="Er zijn momenteel geen vaccins beschikbaar in de catalogus."
+        :title="t('apotheker.vaccines.empty.title')"
+        :description="t('apotheker.vaccines.empty.description')"
       />
 
       <div v-else class="space-y-4">
@@ -39,16 +43,25 @@ void loadVaccines(false)
           <div class="space-y-2 text-sm">
             <div class="flex flex-wrap items-center gap-2">
               <h3 class="font-semibold">{{ vaccine.name }}</h3>
-              <UBadge color="success" variant="subtle">Beschikbaar</UBadge>
+              <UBadge color="success" variant="subtle">{{
+                t('status.available')
+              }}</UBadge>
             </div>
-            <p>{{ vaccine.description || 'Geen beschrijving' }}</p>
+            <p>{{ vaccine.description || t('common.noDescription') }}</p>
             <p>
-              <span class="font-medium">Fabrikant:</span>
+              <span class="font-medium">{{ t('vaccines.manufacturer') }}:</span>
               {{ vaccine.manufacturer }}
             </p>
             <p>
-              <span class="font-medium">Beschikbare voorraad:</span>
-              {{ vaccine.stockQuantity }} dosissen
+              <span class="font-medium"
+                >{{ t('vaccines.availableStock') }}:</span
+              >
+              {{
+                translatePlural(
+                  'admin.orders.totalDoses',
+                  vaccine.stockQuantity,
+                )
+              }}
             </p>
           </div>
         </UCard>

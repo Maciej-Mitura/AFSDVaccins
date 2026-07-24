@@ -8,6 +8,7 @@ import CommonLoadingSkeleton from '@/components/common/CommonLoadingSkeleton.vue
 import { RouteStatus, useDeliveryRoutes } from '@/composables/useDeliveryRoutes'
 import { useOnlineStatus } from '@/composables/useOnlineStatus'
 import { useRealtimeConnection } from '@/composables/useRealtimeConnection'
+import { routeStatusLabel, translatePlural } from '@/i18n'
 
 const { t } = useI18n()
 const {
@@ -43,6 +44,15 @@ const latestCancelReason = computed(() => {
 
   return cancelEntry?.reason ?? null
 })
+
+function stopTotalLabel(totalQuantity: number): string {
+  const doses = translatePlural('routes.stop.doses', totalQuantity)
+  return t('bezorger.route.stop.total', { doses })
+}
+
+function stopOrdersLabel(orderCount: number): string {
+  return translatePlural('routes.stop.orders', orderCount)
+}
 
 async function onStartRoute(): Promise<void> {
   if (!myTodayRoute.value) {
@@ -97,37 +107,37 @@ onUnmounted(() => {
         {{ t('bezorger.route.today.title') }}
       </h1>
       <p class="mt-1 text-sm text-muted">
-        Stops met adressen en dosissen zoals bij generatie vastgelegd.
+        {{ t('bezorger.route.today.description') }}
       </p>
       <p
         v-if="connectionState === 'reconnecting'"
         class="mt-1 text-xs text-warning"
       >
-        Verbinding herstellen…
+        {{ t('realtime.reconnecting') }}
       </p>
     </div>
 
     <CommonLoadingSkeleton v-if="loading && !myTodayRoute" />
     <CommonErrorState
       v-else-if="errorMessage && !myTodayRoute"
-      title="Kon route niet laden"
+      :title="t('bezorger.route.today.loadFailed')"
       :description="errorMessage"
     />
 
     <CommonEmptyState
       v-else-if="!loading && !myTodayRoute"
-      title="Geen route voor vandaag"
-      description="Er is nog geen gegenereerde route voor jouw profiel op de huidige leveringsdatum."
+      :title="t('bezorger.route.today.empty.title')"
+      :description="t('bezorger.route.today.empty.description')"
     />
 
     <template v-else-if="myTodayRoute">
       <div class="rounded-lg bg-elevated/50 px-4 py-3">
-        <p class="text-sm text-muted">Status</p>
+        <p class="text-sm text-muted">{{ t('bezorger.route.status') }}</p>
         <p class="text-lg font-semibold" data-testid="route-status">
-          {{ myTodayRoute.status }}
+          {{ routeStatusLabel(myTodayRoute.status) }}
         </p>
         <p class="mt-1 text-sm text-muted">
-          Datum {{ myTodayRoute.deliveryDate }}
+          {{ t('bezorger.route.date', { date: myTodayRoute.deliveryDate }) }}
         </p>
         <p
           v-if="
@@ -135,13 +145,13 @@ onUnmounted(() => {
           "
           class="mt-2 text-sm"
         >
-          Reden: {{ latestCancelReason }}
+          {{ t('bezorger.route.cancelReason', { reason: latestCancelReason }) }}
         </p>
         <p
           v-else-if="myTodayRoute.status === RouteStatus.Completed"
           class="mt-2 text-sm text-muted"
         >
-          Route afgerond. Bestellingen worden apart als geleverd gemarkeerd.
+          {{ t('bezorger.route.today.completedNote') }}
         </p>
       </div>
 
@@ -156,15 +166,15 @@ onUnmounted(() => {
           v-if="confirmStart"
           color="warning"
           variant="subtle"
-          title="Route starten?"
-          description="Bevestig dat je nu begint met deze bezorgroute."
+          :title="t('bezorger.route.start.title')"
+          :description="t('bezorger.route.start.description')"
         />
         <UAlert
           v-if="confirmComplete"
           color="warning"
           variant="subtle"
-          title="Route voltooien?"
-          description="Bevestig dat je alle stops van deze route hebt afgerond. Bestellingen worden hierdoor niet automatisch geleverd."
+          :title="t('bezorger.route.complete.title')"
+          :description="t('bezorger.route.complete.description')"
         />
 
         <UButton
@@ -177,7 +187,11 @@ onUnmounted(() => {
           :disabled="!isOnline || updatingStatus"
           @click="onStartRoute"
         >
-          {{ confirmStart ? 'Bevestig starten' : 'Route starten' }}
+          {{
+            confirmStart
+              ? t('bezorger.route.start.confirm')
+              : t('bezorger.route.start')
+          }}
         </UButton>
         <UButton
           v-if="confirmStart"
@@ -187,7 +201,7 @@ onUnmounted(() => {
           :disabled="!isOnline || updatingStatus"
           @click="cancelStartConfirm"
         >
-          Annuleren
+          {{ t('common.cancel') }}
         </UButton>
 
         <UButton
@@ -201,7 +215,11 @@ onUnmounted(() => {
           :disabled="!isOnline || updatingStatus"
           @click="onCompleteRoute"
         >
-          {{ confirmComplete ? 'Bevestig voltooien' : 'Route voltooien' }}
+          {{
+            confirmComplete
+              ? t('bezorger.route.complete.confirm')
+              : t('bezorger.route.complete')
+          }}
         </UButton>
         <UButton
           v-if="confirmComplete"
@@ -211,13 +229,13 @@ onUnmounted(() => {
           :disabled="!isOnline || updatingStatus"
           @click="cancelCompleteConfirm"
         >
-          Annuleren
+          {{ t('common.cancel') }}
         </UButton>
       </div>
 
       <CommonErrorState
         v-if="statusError"
-        title="Statuswijziging mislukt"
+        :title="t('routes.status.changeFailed')"
         :description="statusError"
       />
 
@@ -225,7 +243,7 @@ onUnmounted(() => {
         v-if="myTodayRoute.statusHistory.length > 0"
         class="rounded-lg border border-default px-4 py-3"
       >
-        <p class="text-sm font-medium">Statusgeschiedenis</p>
+        <p class="text-sm font-medium">{{ t('routes.statusHistory') }}</p>
         <ul class="mt-2 space-y-1 text-sm text-muted">
           <li
             v-for="(entry, index) in myTodayRoute.statusHistory"
@@ -238,28 +256,26 @@ onUnmounted(() => {
 
       <CommonEmptyState
         v-if="myTodayRoute.stops.length === 0"
-        title="Lege route"
-        description="Je route is toegewezen, maar er zijn vandaag geen stops met kwalificerende bestellingen."
+        :title="t('routes.stop.empty.title')"
+        :description="t('bezorger.route.today.emptyStops.description')"
       />
 
       <ol v-else class="space-y-4">
-          <li
-            v-for="stop in myTodayRoute.stops"
-            :key="`${stop.apothekerProfileId}-${stop.sequence}`"
-            class="rounded-lg border border-default px-4 py-4"
-            data-testid="route-stop"
-          >
+        <li
+          v-for="stop in myTodayRoute.stops"
+          :key="`${stop.apothekerProfileId}-${stop.sequence}`"
+          class="rounded-lg border border-default px-4 py-4"
+          data-testid="route-stop"
+        >
           <p class="text-xs font-medium uppercase tracking-wide text-muted">
-            Stop {{ stop.sequence }}
+            {{ t('bezorger.route.stop.label', { sequence: stop.sequence }) }}
           </p>
           <h2 class="mt-1 text-lg font-semibold">{{ stop.pharmacyName }}</h2>
           <p class="mt-1 text-sm">{{ formatAddress(stop) }}</p>
           <p class="mt-3 text-sm font-medium">
-            Totaal {{ stop.totalQuantity }} dosissen
+            {{ stopTotalLabel(stop.totalQuantity) }}
             <span class="font-normal text-muted">
-              ({{ stop.orderCount }} bestelling{{
-                stop.orderCount === 1 ? '' : 'en'
-              }})
+              ({{ stopOrdersLabel(stop.orderCount) }})
             </span>
           </p>
           <ul class="mt-2 space-y-1 text-sm">

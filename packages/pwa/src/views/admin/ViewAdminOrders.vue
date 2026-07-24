@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, reactive, ref } from 'vue'
+import { useI18n } from 'vue-i18n'
 
 import { OrderStatus } from '@vaccin-delivery/types'
 
@@ -12,7 +13,14 @@ import { useAdminOperationsFeed } from '@/composables/useAdminOperationsFeed'
 import { useOnlineStatus } from '@/composables/useOnlineStatus'
 import { useOrders } from '@/composables/useOrders'
 import { useStock } from '@/composables/useStock'
+import {
+  formatDate,
+  formatDateTime,
+  orderStatusLabel,
+  translatePlural,
+} from '@/i18n'
 
+const { t } = useI18n()
 const { isOnline } = useOnlineStatus()
 
 const {
@@ -69,6 +77,23 @@ const stockByVaccineId = computed(() => {
   return map
 })
 
+const statusFilterItems = computed(() => [
+  { label: t('orders.filter.allStatuses'), value: undefined },
+  { label: orderStatusLabel(OrderStatus.Pending), value: OrderStatus.Pending },
+  {
+    label: t('status.order.planned'),
+    value: OrderStatus.Planned,
+  },
+  {
+    label: orderStatusLabel(OrderStatus.Delivered),
+    value: OrderStatus.Delivered,
+  },
+  {
+    label: orderStatusLabel(OrderStatus.Cancelled),
+    value: OrderStatus.Cancelled,
+  },
+])
+
 function currentFilterVariables() {
   return {
     deliveryDate: filters.deliveryDate || undefined,
@@ -119,27 +144,13 @@ async function applyFilters() {
   restartAdminSubscriptions()
 }
 
-function formatDateTime(value: string): string {
-  return new Date(value).toLocaleString('nl-BE')
-}
-
-function formatDeliveryDate(value: string): string {
-  const [year, month, day] = value.split('-')
-  return `${day}/${month}/${year}`
-}
-
-function statusLabel(status: OrderStatus): string {
-  switch (status) {
-    case OrderStatus.Pending:
-    case OrderStatus.Planned:
-      return 'in behandeling'
-    case OrderStatus.Delivered:
-      return 'geleverd'
-    case OrderStatus.Cancelled:
-      return 'geannuleerd'
-    default:
-      return status
-  }
+function formatStatusCounts(
+  counts: Array<{ status: string; count: number }>,
+): string {
+  return counts
+    .filter(item => item.count > 0)
+    .map(item => `${orderStatusLabel(item.status)}: ${item.count}`)
+    .join(', ')
 }
 
 function canMarkPlanned(status: OrderStatus): boolean {
@@ -163,13 +174,12 @@ function orderStockReady(order: (typeof adminOrders.value)[number]): boolean {
 
 function handleStatusActionError(error: unknown) {
   if (isInsufficientStockError(error)) {
-    actionError.value =
-      'Onvoldoende voorraad om deze bestelling te leveren. Er is geen wijziging doorgevoerd.'
+    actionError.value = t('errors.order.deliverInsufficientStock')
     return
   }
 
   if (isInvalidOrderStatusTransitionError(error)) {
-    actionError.value = 'Deze statusovergang is niet toegestaan.'
+    actionError.value = t('errors.order.invalidStatusTransition')
     return
   }
 
@@ -178,7 +188,7 @@ function handleStatusActionError(error: unknown) {
 
 function handleCancelActionError(error: unknown) {
   if (isOrderCannotBeCancelledError(error)) {
-    cancelActionError.value = 'Deze bestelling kan niet meer geannuleerd worden.'
+    cancelActionError.value = t('errors.order.cancelNotAllowed')
     return
   }
 
@@ -229,6 +239,7 @@ async function onCancel(id: string) {
     actingOrderId.value = null
   }
 }
+
 function closeDeliverModal() {
   confirmDeliverId.value = null
   actionError.value = null
@@ -236,6 +247,18 @@ function closeDeliverModal() {
 
 function closeCancelModal() {
   confirmCancelId.value = null
+}
+
+function historyEntryLabel(entry: {
+  fromStatus?: string | null
+  toStatus: string
+  changedAt: string
+}): string {
+  return t('admin.orders.statusHistory.entry', {
+    before: entry.fromStatus ? orderStatusLabel(entry.fromStatus) : '—',
+    after: orderStatusLabel(entry.toStatus),
+    date: formatDateTime(entry.changedAt),
+  })
 }
 </script>
 
@@ -246,39 +269,50 @@ function closeCancelModal() {
     <UCard v-if="dailyOverview">
       <template #header>
         <h2 class="text-lg font-semibold">
-          Dagoverzicht — {{ formatDeliveryDate(dailyOverview.deliveryDate) }}
+          {{
+            t('admin.orders.daily.title', {
+              date: formatDate(dailyOverview.deliveryDate),
+            })
+          }}
         </h2>
       </template>
 
       <div class="grid gap-3 text-sm sm:grid-cols-2 lg:grid-cols-4">
         <p>
-          <span class="font-medium">Actieve bestellingen:</span>
+          <span class="font-medium"
+            >{{ t('admin.orders.daily.activeOrders') }}:</span
+          >
           {{ dailyOverview.totalOrders }}
         </p>
         <p>
-          <span class="font-medium">Actieve dosissen:</span>
+          <span class="font-medium"
+            >{{ t('admin.orders.daily.activeDoses') }}:</span
+          >
           {{ dailyOverview.totalDoses }}
         </p>
         <p>
-          <span class="font-medium">Geannuleerd:</span>
-          {{ dailyOverview.cancelledOrderCount }} bestellingen /
-          {{ dailyOverview.cancelledDoseCount }} dosissen
+          <span class="font-medium"
+            >{{ t('admin.orders.daily.cancelled') }}:</span
+          >
+          {{
+            t('admin.orders.daily.cancelledDetail', {
+              orders: dailyOverview.cancelledOrderCount,
+              doses: dailyOverview.cancelledDoseCount,
+            })
+          }}
         </p>
         <p>
-          <span class="font-medium">Per status:</span>
-          {{
-            dailyOverview.statusCounts
-              .filter(item => item.count > 0)
-              .map(item => `${item.status}: ${item.count}`)
-              .join(', ')
-          }}
+          <span class="font-medium"
+            >{{ t('admin.orders.daily.perStatus') }}:</span
+          >
+          {{ formatStatusCounts(dailyOverview.statusCounts) }}
         </p>
       </div>
     </UCard>
 
     <UCard v-if="feedEvents.length > 0">
       <template #header>
-        <h3 class="font-semibold">Live operaties</h3>
+        <h3 class="font-semibold">{{ t('admin.orders.liveOperations') }}</h3>
       </template>
       <ul class="space-y-2 text-sm">
         <li v-for="(event, index) in feedEvents.slice(0, 5)" :key="index">
@@ -290,7 +324,7 @@ function closeCancelModal() {
 
     <UCard>
       <template #header>
-        <h2 class="text-lg font-semibold">Bestellingenbeheer</h2>
+        <h2 class="text-lg font-semibold">{{ t('admin.orders.title') }}</h2>
       </template>
 
       <div class="mb-4 grid gap-3 sm:grid-cols-5">
@@ -298,25 +332,19 @@ function closeCancelModal() {
         <UInput
           v-model.number="filters.isoYear"
           type="number"
-          placeholder="ISO-jaar"
+          :placeholder="t('orders.filter.isoYear')"
         />
         <UInput
           v-model.number="filters.isoWeek"
           type="number"
-          placeholder="ISO-week"
+          :placeholder="t('orders.filter.isoWeek')"
         />
         <USelect
           v-model="filters.status"
-          :items="[
-            { label: 'Alle statussen', value: undefined },
-            { label: 'PENDING', value: OrderStatus.Pending },
-            { label: 'PLANNED', value: OrderStatus.Planned },
-            { label: 'DELIVERED', value: OrderStatus.Delivered },
-            { label: 'CANCELLED', value: OrderStatus.Cancelled },
-          ]"
-          placeholder="Status"
+          :items="statusFilterItems"
+          :placeholder="t('orders.filter.status')"
         />
-        <UButton @click="applyFilters">Filteren</UButton>
+        <UButton @click="applyFilters">{{ t('common.filter') }}</UButton>
       </div>
 
       <UAlert
@@ -339,22 +367,26 @@ function closeCancelModal() {
 
       <CommonErrorState
         v-if="ordersError && adminOrders.length === 0"
-        title="Bestellingen laden mislukt"
+        :title="t('admin.orders.loadFailed')"
         :description="ordersError"
       />
 
       <CommonEmptyState
         v-else-if="!ordersLoading && adminOrders.length === 0"
-        title="Geen bestellingen"
-        description="Er zijn geen bestellingen gevonden voor deze filter."
+        :title="t('admin.orders.empty.title')"
+        :description="t('admin.orders.empty.description')"
       />
 
       <div v-if="adminOrders.length > 0" class="space-y-4">
         <UCard v-for="order in adminOrders" :key="order.id">
           <div class="space-y-3 text-sm">
             <div class="flex flex-wrap items-center gap-2">
-              <h3 class="font-semibold">Bestelling {{ order.id }}</h3>
-              <UBadge variant="subtle">{{ statusLabel(order.status) }}</UBadge>
+              <h3 class="font-semibold">
+                {{ t('admin.orders.orderId', { id: order.id }) }}
+              </h3>
+              <UBadge variant="subtle">{{
+                orderStatusLabel(order.status)
+              }}</UBadge>
               <UBadge
                 v-if="canMarkDelivered(order.status)"
                 :color="orderStockReady(order) ? 'success' : 'warning'"
@@ -362,53 +394,67 @@ function closeCancelModal() {
               >
                 {{
                   orderStockReady(order)
-                    ? 'Voorraad OK'
-                    : 'Onvoldoende voorraad'
+                    ? t('admin.orders.stockOk')
+                    : t('admin.orders.stockInsufficient')
                 }}
               </UBadge>
             </div>
             <p>
-              <span class="font-medium">Apotheker:</span>
-              {{ order.apotheker.firstName }} {{ order.apotheker.lastName }}
-              ({{ order.apotheker.email }})
+              <span class="font-medium"
+                >{{ t('admin.orders.pharmacist') }}:</span
+              >
+              {{ order.apotheker.firstName }} {{ order.apotheker.lastName }} ({{
+                order.apotheker.email
+              }})
             </p>
             <p>
-              <span class="font-medium">Ingediend:</span>
+              <span class="font-medium"
+                >{{ t('admin.orders.submittedAt') }}:</span
+              >
               {{ formatDateTime(order.submittedAt) }}
             </p>
             <p>
-              <span class="font-medium">Leverdatum:</span>
-              {{ formatDeliveryDate(order.deliveryDate) }}
+              <span class="font-medium">{{ t('orders.deliveryDate') }}:</span>
+              {{ formatDate(order.deliveryDate) }}
             </p>
             <p>
-              <span class="font-medium">Totaal:</span>
-              {{ order.totalQuantity }} dosissen
+              <span class="font-medium">{{ t('admin.orders.total') }}:</span>
+              {{
+                translatePlural('admin.orders.totalDoses', order.totalQuantity)
+              }}
             </p>
 
             <div class="space-y-2">
-              <p class="font-medium">Regels</p>
+              <p class="font-medium">{{ t('admin.orders.lines') }}</p>
               <div
                 v-for="line in order.orderLines"
                 :key="`${order.id}-${line.vaccineId}`"
                 class="rounded border border-default p-2"
               >
-                {{ line.vaccineName }} — {{ line.quantity }} dosissen
+                {{
+                  t('admin.orders.line', {
+                    name: line.vaccineName,
+                    count: line.quantity,
+                  })
+                }}
                 <span class="text-muted">
-                  (voorraad:
-                  {{ stockByVaccineId.get(line.vaccineId) ?? '—' }})
+                  {{
+                    t('admin.orders.line.stock', {
+                      stock: stockByVaccineId.get(line.vaccineId) ?? '—',
+                    })
+                  }}
                 </span>
               </div>
             </div>
 
             <div v-if="order.statusHistory?.length" class="space-y-2">
-              <p class="font-medium">Statusgeschiedenis</p>
+              <p class="font-medium">{{ t('admin.orders.statusHistory') }}</p>
               <div
                 v-for="(entry, index) in order.statusHistory"
                 :key="`${order.id}-history-${index}`"
                 class="rounded border border-default p-2 text-xs"
               >
-                {{ entry.fromStatus ?? '—' }} → {{ entry.toStatus }}
-                op {{ formatDateTime(entry.changedAt) }}
+                {{ historyEntryLabel(entry) }}
               </div>
             </div>
 
@@ -423,7 +469,7 @@ function closeCancelModal() {
                 "
                 @click="onMarkPlanned(order.id)"
               >
-                Markeer gepland
+                {{ t('admin.orders.markPlanned') }}
               </UButton>
               <UButton
                 v-if="canMarkDelivered(order.status)"
@@ -433,9 +479,13 @@ function closeCancelModal() {
                   actingOrderId === order.id &&
                   (statusActionLoading || cancelActionLoading)
                 "
-                @click="() => { confirmDeliverId = order.id }"
+                @click="
+                  () => {
+                    confirmDeliverId = order.id
+                  }
+                "
               >
-                Markeer geleverd
+                {{ t('admin.orders.markDelivered') }}
               </UButton>
               <UButton
                 v-if="canCancel(order.status)"
@@ -446,9 +496,13 @@ function closeCancelModal() {
                   actingOrderId === order.id &&
                   (statusActionLoading || cancelActionLoading)
                 "
-                @click="() => { confirmCancelId = order.id }"
+                @click="
+                  () => {
+                    confirmCancelId = order.id
+                  }
+                "
               >
-                Annuleren
+                {{ t('common.cancel') }}
               </UButton>
             </div>
           </div>
@@ -458,13 +512,16 @@ function closeCancelModal() {
 
     <UModal
       :open="confirmDeliverId !== null"
-      title="Bestelling leveren"
-      @update:open="open => { if (!open) closeDeliverModal() }"
+      :title="t('admin.orders.deliver.title')"
+      @update:open="
+        open => {
+          if (!open) closeDeliverModal()
+        }
+      "
     >
       <template #body>
         <p class="text-sm">
-          Bevestig dat deze bestelling geleverd is. De voorraad wordt nu
-          afgetrokken.
+          {{ t('admin.orders.deliver.description') }}
         </p>
         <UAlert
           v-if="actionError"
@@ -476,40 +533,51 @@ function closeCancelModal() {
       </template>
       <template #footer>
         <UButton variant="ghost" @click="closeDeliverModal">
-          Terug
+          {{ t('common.back') }}
         </UButton>
         <UButton
           color="primary"
           :loading="statusActionLoading"
           :disabled="!isOnline"
-          @click="() => { if (confirmDeliverId) void onMarkDelivered(confirmDeliverId) }"
+          @click="
+            () => {
+              if (confirmDeliverId) void onMarkDelivered(confirmDeliverId)
+            }
+          "
         >
-          Bevestig levering
+          {{ t('admin.orders.deliver.confirm') }}
         </UButton>
       </template>
     </UModal>
 
     <UModal
       :open="confirmCancelId !== null"
-      title="Bestelling annuleren"
-      @update:open="open => { if (!open) closeCancelModal() }"
+      :title="t('admin.orders.cancel.title')"
+      @update:open="
+        open => {
+          if (!open) closeCancelModal()
+        }
+      "
     >
       <template #body>
         <p class="text-sm">
-          Bevestig dat je deze bestelling wilt annuleren. Er wordt geen voorraad
-          gewijzigd.
+          {{ t('admin.orders.cancel.description') }}
         </p>
       </template>
       <template #footer>
         <UButton variant="ghost" @click="closeCancelModal">
-          Terug
+          {{ t('common.back') }}
         </UButton>
         <UButton
           color="error"
           :disabled="!isOnline"
-          @click="() => { if (confirmCancelId) void onCancel(confirmCancelId) }"
+          @click="
+            () => {
+              if (confirmCancelId) void onCancel(confirmCancelId)
+            }
+          "
         >
-          Bevestig annulering
+          {{ t('admin.orders.cancel.confirm') }}
         </UButton>
       </template>
     </UModal>

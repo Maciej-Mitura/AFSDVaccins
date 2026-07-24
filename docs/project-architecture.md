@@ -73,9 +73,13 @@ All policies above are marked **configurable** in seed data, GraphQL admin setti
 | **Zod + Nuxt UI forms**                      | Optional quality enhancement        | Reference pattern for client validation                     |
 | **Firebase Auth emulator**                   | Optional quality enhancement        | CI convenience (Issue #51)                                  |
 | **MongoMemoryServer**                        | Optional quality enhancement        | CI test isolation                                           |
-| **Runtime i18n (vue-i18n)**                  | Optional quality enhancement        | Phase 23B foundation (nl/en/zh/es); full migration 23C      |
+| **Runtime i18n (vue-i18n)**                  | Optional quality enhancement        | Phase 23 complete (nl/en/zh/es; FRONT-018); see README i18n |
 | **Vitest unit tests**                        | Optional quality enhancement        | Explicit “extra” in checklist                               |
 | **PKCE**                                     | Not required (default)              | Firebase email/password does not use PKCE                   |
+
+### 2.1a i18n pointer
+
+Runtime internationalization is documented in the exam **README** (section **i18n (Phase 23 complete — FRONT-018)**) and tracked as Phase **23A–23C** in [implementation-roadmap.md](./implementation-roadmap.md). Summary: Google Sheet SoT → `npm run export:i18n` → committed JSON → `vue-i18n`; no Google in the PWA runtime; locale key `vaccin-delivery:locale`. Architecture does not duplicate the full workflow here.
 
 ### 2.2 Package scope
 

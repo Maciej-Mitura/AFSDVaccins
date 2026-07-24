@@ -12,20 +12,20 @@ test.describe('BEZORGER journey', () => {
       page.getByRole('heading', { name: 'Route van vandaag' }),
     ).toBeVisible()
 
-    await expect(page.getByTestId('route-status')).toHaveText('ASSIGNED')
+    await expect(page.getByTestId('route-status')).toHaveText('Toegewezen')
     await expect(page.getByTestId('route-stop')).toContainText('E2E Apotheek 1')
     await expect(page.getByTestId('route-stop')).toContainText('12 dosissen')
 
     await page.getByTestId('route-start').click()
     await page.getByTestId('route-start').click()
-    await expect(page.getByTestId('route-status')).toHaveText('IN_PROGRESS')
+    await expect(page.getByTestId('route-status')).toHaveText('Bezig')
 
     await page.reload()
-    await expect(page.getByTestId('route-status')).toHaveText('IN_PROGRESS')
+    await expect(page.getByTestId('route-status')).toHaveText('Bezig')
 
     await page.getByTestId('route-complete').click()
     await page.getByTestId('route-complete').click()
-    await expect(page.getByTestId('route-status')).toHaveText('COMPLETED')
+    await expect(page.getByTestId('route-status')).toHaveText('Voltooid')
     await expect(page.getByTestId('route-start')).toHaveCount(0)
     await expect(page.getByTestId('route-complete')).toHaveCount(0)
 

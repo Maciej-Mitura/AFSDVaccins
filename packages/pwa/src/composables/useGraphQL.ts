@@ -16,11 +16,9 @@ import { createClient } from 'graphql-ws'
 import type { GraphQLFormattedError } from 'graphql'
 import { Kind, OperationTypeNode } from 'graphql'
 
-import {
-  resolveAuthBearerToken,
-  resolveAuthUid,
-} from '@/firebase/auth-session'
+import { resolveAuthBearerToken, resolveAuthUid } from '@/firebase/auth-session'
 import { setRealtimeConnectionState } from '@/composables/useRealtimeConnection'
+import { translate } from '@/i18n'
 
 type SessionExpiredHandler = (message: string) => Promise<void> | void
 
@@ -159,9 +157,7 @@ const authRetryLink = new ApolloLink((operation, forward) => {
             complete: () => observer.complete(),
           })
         } catch {
-          await sessionExpiredHandler?.(
-            'Uw sessie is verlopen. Log opnieuw in.',
-          )
+          await sessionExpiredHandler?.(translate('auth.session.expired'))
           observer.error(error)
         }
       })()

@@ -1,15 +1,23 @@
 <script setup lang="ts">
 import { computed, reactive, ref, watch } from 'vue'
+import { useI18n } from 'vue-i18n'
 
 import type { FormSubmitEvent } from '@nuxt/ui'
 import { UserRole } from '@vaccin-delivery/types'
-import * as z from 'zod'
+import type * as z from 'zod'
 
 import CommonErrorState from '@/components/common/CommonErrorState.vue'
 import CommonLoadingSkeleton from '@/components/common/CommonLoadingSkeleton.vue'
 import { useCurrentUser } from '@/composables/useCurrentUser'
 import { useOnlineStatus } from '@/composables/useOnlineStatus'
+import {
+  createApothekerProfileSchema,
+  createBezorgerProfileSchema,
+  createNameFieldsSchema,
+  userRoleLabel,
+} from '@/i18n'
 
+const { t } = useI18n()
 const { isOnline } = useOnlineStatus()
 
 const {
@@ -26,34 +34,17 @@ const saving = ref(false)
 const formError = ref<string | null>(null)
 const successMessage = ref<string | null>(null)
 
-const adminSchema = z.object({
-  firstName: z.string().min(2, 'Voornaam moet minstens 2 tekens bevatten.'),
-  lastName: z.string().min(2, 'Achternaam moet minstens 2 tekens bevatten.'),
-})
+const adminSchema = computed(() => createNameFieldsSchema(key => t(key)))
+const apothekerSchema = computed(() =>
+  createApothekerProfileSchema(key => t(key)),
+)
+const bezorgerSchema = computed(() =>
+  createBezorgerProfileSchema(key => t(key)),
+)
 
-const apothekerSchema = adminSchema.extend({
-  pharmacyName: z.string().trim().min(1, 'Apotheeknaam is verplicht.').max(120),
-  street: z.string().trim().min(1, 'Straat is verplicht.').max(120),
-  houseNumber: z.string().trim().min(1, 'Huisnummer is verplicht.').max(20),
-  postalCode: z
-    .string()
-    .trim()
-    .regex(/^\d{4}$/, 'Postcode moet 4 cijfers zijn (België).'),
-  city: z.string().trim().min(1, 'Gemeente is verplicht.').max(100),
-  country: z
-    .string()
-    .trim()
-    .regex(/^[A-Za-z]{2}$/, 'Landcode moet 2 letters zijn.'),
-})
-
-const bezorgerSchema = adminSchema.extend({
-  displayName: z.string().trim().min(1, 'Weergavenaam is verplicht.').max(120),
-  vehicleLabel: z.string().trim().max(120).optional().or(z.literal('')),
-})
-
-type AdminForm = z.output<typeof adminSchema>
-type ApothekerForm = z.output<typeof apothekerSchema>
-type BezorgerForm = z.output<typeof bezorgerSchema>
+type AdminForm = z.output<ReturnType<typeof createNameFieldsSchema>>
+type ApothekerForm = z.output<ReturnType<typeof createApothekerProfileSchema>>
+type BezorgerForm = z.output<ReturnType<typeof createBezorgerProfileSchema>>
 
 const adminState = reactive<Partial<AdminForm>>({
   firstName: undefined,
@@ -78,23 +69,14 @@ const bezorgerState = reactive<Partial<BezorgerForm>>({
   vehicleLabel: undefined,
 })
 
-const roleLabel = computed(() => {
-  switch (currentUser.value?.role) {
-    case UserRole.Admin:
-      return 'Administrator'
-    case UserRole.Bezorger:
-      return 'Bezorger'
-    default:
-      return 'Apotheker'
-  }
-})
+const roleLabel = computed(() =>
+  currentUser.value ? userRoleLabel(currentUser.value.role) : '',
+)
 
 const isApotheker = computed(
   () => currentUser.value?.role === UserRole.Apotheker,
 )
-const isBezorger = computed(
-  () => currentUser.value?.role === UserRole.Bezorger,
-)
+const isBezorger = computed(() => currentUser.value?.role === UserRole.Bezorger)
 
 watch(
   currentUser,
@@ -136,7 +118,7 @@ async function onSubmitAdmin(event: FormSubmitEvent<AdminForm>) {
 
   try {
     await updateOwnUser(event.data.firstName, event.data.lastName)
-    successMessage.value = 'Profiel succesvol bijgewerkt.'
+    successMessage.value = t('success.profile.updated')
   } catch (error: unknown) {
     formError.value = mapGraphQLError(error)
   } finally {
@@ -161,7 +143,7 @@ async function onSubmitApotheker(event: FormSubmitEvent<ApothekerForm>) {
         country: event.data.country,
       },
     })
-    successMessage.value = 'Apotheekprofiel succesvol bijgewerkt.'
+    successMessage.value = t('success.profile.apotheker.updated')
   } catch (error: unknown) {
     formError.value = mapGraphQLError(error)
   } finally {
@@ -182,7 +164,7 @@ async function onSubmitBezorger(event: FormSubmitEvent<BezorgerForm>) {
         ? event.data.vehicleLabel
         : null,
     })
-    successMessage.value = 'Bezorgerprofiel succesvol bijgewerkt.'
+    successMessage.value = t('success.profile.bezorger.updated')
   } catch (error: unknown) {
     formError.value = mapGraphQLError(error)
   } finally {
@@ -195,7 +177,7 @@ async function onSubmitBezorger(event: FormSubmitEvent<BezorgerForm>) {
   <div class="space-y-6">
     <UCard>
       <template #header>
-        <h2 class="text-lg font-semibold">Profiel</h2>
+        <h2 class="text-lg font-semibold">{{ t('title.profile') }}</h2>
       </template>
 
       <CommonLoadingSkeleton v-if="loading" />
@@ -219,11 +201,11 @@ async function onSubmitBezorger(event: FormSubmitEvent<BezorgerForm>) {
 
         <div class="mb-4 space-y-2 text-sm">
           <p>
-            <span class="font-medium">E-mail:</span>
+            <span class="font-medium">{{ t('profiles.email.label') }}:</span>
             {{ currentUser.email }}
           </p>
           <p>
-            <span class="font-medium">Rol:</span>
+            <span class="font-medium">{{ t('profiles.role.label') }}:</span>
             {{ roleLabel }} ({{ currentUser.role }})
           </p>
         </div>
@@ -235,40 +217,60 @@ async function onSubmitBezorger(event: FormSubmitEvent<BezorgerForm>) {
           class="space-y-4"
           @submit="onSubmitApotheker"
         >
-          <UFormField label="Voornaam" name="firstName" required>
+          <UFormField :label="t('label.first.name')" name="firstName" required>
             <UInput v-model="apothekerState.firstName" class="w-full" />
           </UFormField>
 
-          <UFormField label="Achternaam" name="lastName" required>
+          <UFormField :label="t('label.last.name')" name="lastName" required>
             <UInput v-model="apothekerState.lastName" class="w-full" />
           </UFormField>
 
-          <UFormField label="Apotheeknaam" name="pharmacyName" required>
+          <UFormField
+            :label="t('profiles.field.pharmacyName')"
+            name="pharmacyName"
+            required
+          >
             <UInput v-model="apothekerState.pharmacyName" class="w-full" />
           </UFormField>
 
-          <UFormField label="Straat" name="street" required>
+          <UFormField
+            :label="t('profiles.field.street')"
+            name="street"
+            required
+          >
             <UInput v-model="apothekerState.street" class="w-full" />
           </UFormField>
 
-          <UFormField label="Huisnummer" name="houseNumber" required>
+          <UFormField
+            :label="t('profiles.field.houseNumber')"
+            name="houseNumber"
+            required
+          >
             <UInput v-model="apothekerState.houseNumber" class="w-full" />
           </UFormField>
 
-          <UFormField label="Postcode" name="postalCode" required>
+          <UFormField
+            :label="t('profiles.field.postalCode')"
+            name="postalCode"
+            required
+          >
             <UInput v-model="apothekerState.postalCode" class="w-full" />
           </UFormField>
 
-          <UFormField label="Gemeente" name="city" required>
+          <UFormField :label="t('profiles.field.city')" name="city" required>
             <UInput v-model="apothekerState.city" class="w-full" />
           </UFormField>
 
-          <UFormField label="Landcode" name="country" required>
+          <UFormField
+            :label="t('profiles.field.countryCode')"
+            name="country"
+            required
+          >
             <UInput v-model="apothekerState.country" class="w-full" />
           </UFormField>
 
           <UButton :loading="saving" type="submit" :disabled="!isOnline">
-            Wijzigingen opslaan
+            {{ t('common.save.changes') }}
           </UButton>
         </UForm>
 
@@ -279,24 +281,31 @@ async function onSubmitBezorger(event: FormSubmitEvent<BezorgerForm>) {
           class="space-y-4"
           @submit="onSubmitBezorger"
         >
-          <UFormField label="Voornaam" name="firstName" required>
+          <UFormField :label="t('label.first.name')" name="firstName" required>
             <UInput v-model="bezorgerState.firstName" class="w-full" />
           </UFormField>
 
-          <UFormField label="Achternaam" name="lastName" required>
+          <UFormField :label="t('label.last.name')" name="lastName" required>
             <UInput v-model="bezorgerState.lastName" class="w-full" />
           </UFormField>
 
-          <UFormField label="Weergavenaam" name="displayName" required>
+          <UFormField
+            :label="t('profiles.field.displayName')"
+            name="displayName"
+            required
+          >
             <UInput v-model="bezorgerState.displayName" class="w-full" />
           </UFormField>
 
-          <UFormField label="Voertuig (optioneel)" name="vehicleLabel">
+          <UFormField
+            :label="t('profiles.field.vehicleOptional')"
+            name="vehicleLabel"
+          >
             <UInput v-model="bezorgerState.vehicleLabel" class="w-full" />
           </UFormField>
 
           <UButton :loading="saving" type="submit" :disabled="!isOnline">
-            Wijzigingen opslaan
+            {{ t('common.save.changes') }}
           </UButton>
         </UForm>
 
@@ -307,24 +316,24 @@ async function onSubmitBezorger(event: FormSubmitEvent<BezorgerForm>) {
           class="space-y-4"
           @submit="onSubmitAdmin"
         >
-          <UFormField label="Voornaam" name="firstName" required>
+          <UFormField :label="t('label.first.name')" name="firstName" required>
             <UInput v-model="adminState.firstName" class="w-full" />
           </UFormField>
 
-          <UFormField label="Achternaam" name="lastName" required>
+          <UFormField :label="t('label.last.name')" name="lastName" required>
             <UInput v-model="adminState.lastName" class="w-full" />
           </UFormField>
 
           <UButton :loading="saving" type="submit" :disabled="!isOnline">
-            Wijzigingen opslaan
+            {{ t('common.save.changes') }}
           </UButton>
         </UForm>
       </template>
 
       <CommonErrorState
         v-else
-        title="Profiel niet beschikbaar"
-        description="Log opnieuw in of voltooi je profiel."
+        :title="t('profiles.unavailable.title')"
+        :description="t('profiles.unavailable.description')"
       />
     </UCard>
   </div>

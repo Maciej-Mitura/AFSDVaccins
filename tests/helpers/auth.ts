@@ -21,6 +21,9 @@ export async function resetFixtures(request: {
   expect(response.ok()).toBeTruthy()
 }
 
+/**
+ * Locale-stable login via data-testid (labels change with UI language).
+ */
 export async function loginAs(
   page: Page,
   email: string,
@@ -31,15 +34,23 @@ export async function loginAs(
     'data-e2e-auth-bypass',
     'true',
   )
-  await page.getByLabel('E-mailadres').fill(email)
-  await page.getByLabel('Wachtwoord').fill(password)
+  await page.getByTestId('login-email').fill(email)
+  await page.getByTestId('login-password').fill(password)
   await page.getByTestId('login-submit').click()
-  await expect(page.getByRole('heading', { name: 'Inloggen' })).toHaveCount(0, {
+  await expect(page.getByTestId('login-form')).toHaveCount(0, {
     timeout: 30_000,
   })
 }
 
 export async function logout(page: Page): Promise<void> {
-  await page.getByRole('button', { name: 'Uitloggen' }).click()
-  await expect(page.getByRole('heading', { name: 'Inloggen' })).toBeVisible()
+  await page.getByTestId('logout-button').click()
+  await expect(page.getByTestId('login-form')).toBeVisible()
+}
+
+export async function switchLanguage(
+  page: Page,
+  optionLabel: 'Nederlands' | 'English' | 'Español' | '中文',
+): Promise<void> {
+  await page.getByTestId('language-selector').click()
+  await page.getByRole('option', { name: optionLabel }).click()
 }

@@ -43,6 +43,7 @@ import {
 } from '@/composables/admin-order-mutation-state'
 import { mapGraphQLError } from '@/composables/useCurrentUser'
 import useGraphQL from '@/composables/useGraphQL'
+import { translate } from '@/i18n'
 
 export type OrderListItem = MyOrdersQuery['myOrders'][number]
 export type AdminOrderListItem = AdminOrdersQuery['adminOrders'][number]
@@ -50,7 +51,8 @@ export type AdminDailyOverview =
   AdminDailyOrderOverviewQuery['adminDailyOrderOverview']
 export type AdminWeeklyStats =
   AdminWeeklyStatisticsQuery['adminWeeklyStatistics']
-export type WeeklyOrderSummary = MyWeeklyOrderSummaryQuery['myWeeklyOrderSummary']
+export type WeeklyOrderSummary =
+  MyWeeklyOrderSummaryQuery['myWeeklyOrderSummary']
 
 const myOrders = ref<OrderListItem[]>([])
 const adminOrders = ref<AdminOrderListItem[]>([])
@@ -87,7 +89,9 @@ function upsertMyOrder(order: OrderListItem): void {
 }
 
 function upsertAdminOrder(order: AdminOrderListItem): void {
-  const existingIndex = adminOrders.value.findIndex(item => item.id === order.id)
+  const existingIndex = adminOrders.value.findIndex(
+    item => item.id === order.id,
+  )
 
   if (existingIndex === -1) {
     adminOrders.value = [order, ...adminOrders.value]
@@ -132,8 +136,7 @@ function extractGraphQLErrorCode(error: unknown): string | null {
 
   const graphQLError = error.graphQLErrors[0]
   const originalError = graphQLError?.extensions?.originalError as
-    | { error?: string }
-    | undefined
+    { error?: string } | undefined
 
   return originalError?.error ?? null
 }
@@ -205,7 +208,7 @@ export function useOrders() {
       })
 
       if (!result.data?.createOrder) {
-        throw new Error('Kon de bestelling niet plaatsen.')
+        throw new Error(translate('errors.order.placeFailed'))
       }
 
       const created = result.data.createOrder
@@ -231,7 +234,7 @@ export function useOrders() {
       })
 
       if (!result.data?.cancelOwnOrder) {
-        throw new Error('Kon de bestelling niet annuleren.')
+        throw new Error(translate('errors.order.cancelFailed'))
       }
 
       const cancelled = result.data.cancelOwnOrder
@@ -284,7 +287,9 @@ export function useOrders() {
     try {
       const result = await apolloClient.query<AdminDailyOrderOverviewQuery>({
         query: ADMIN_DAILY_ORDER_OVERVIEW_QUERY,
-        variables: { deliveryDate } satisfies AdminDailyOrderOverviewQueryVariables,
+        variables: {
+          deliveryDate,
+        } satisfies AdminDailyOrderOverviewQueryVariables,
         fetchPolicy: 'network-only',
       })
 
@@ -337,7 +342,7 @@ export function useOrders() {
       })
 
       if (!result.data?.updateOrderStatus) {
-        throw new Error('Kon de bestellingsstatus niet bijwerken.')
+        throw new Error(translate('errors.order.statusUpdateFailed'))
       }
 
       const updated = result.data.updateOrderStatus as AdminOrderListItem
@@ -373,7 +378,7 @@ export function useOrders() {
       })
 
       if (!result.data?.cancelOrder) {
-        throw new Error('Kon de bestelling niet annuleren.')
+        throw new Error(translate('errors.order.cancelFailed'))
       }
 
       const cancelled = result.data.cancelOrder as AdminOrderListItem

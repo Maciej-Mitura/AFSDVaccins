@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, reactive, ref } from 'vue'
+import { useI18n } from 'vue-i18n'
 
 import type { FormSubmitEvent } from '@nuxt/ui'
 import * as z from 'zod'
@@ -12,7 +13,9 @@ import {
   type RouteTemplateListItem,
 } from '@/composables/useRouteTemplates'
 import { useOnlineStatus } from '@/composables/useOnlineStatus'
+import { activeInactiveLabel } from '@/i18n'
 
+const { t } = useI18n()
 const { isOnline } = useOnlineStatus()
 
 const {
@@ -45,13 +48,19 @@ const successMessage = ref<string | null>(null)
 const togglingId = ref<string | null>(null)
 const selectedPharmacyId = ref<string | undefined>(undefined)
 
-const schema = z.object({
-  name: z.string().trim().min(1, 'Naam is verplicht.').max(120),
-  description: z.string().trim().max(500).optional(),
-  bezorgerProfileId: z.string().min(1, 'Kies een bezorger.'),
-})
+const schema = computed(() =>
+  z.object({
+    name: z.string().trim().min(1, t('validation.name.required')).max(120),
+    description: z.string().trim().max(500).optional(),
+    bezorgerProfileId: z.string().min(1, t('validation.courier.required')),
+  }),
+)
 
-type TemplateForm = z.output<typeof schema>
+type TemplateForm = {
+  name: string
+  description?: string
+  bezorgerProfileId: string
+}
 
 const state = reactive<{
   name?: string
@@ -66,7 +75,9 @@ const state = reactive<{
 const stopIds = ref<string[]>([])
 
 const formTitle = computed(() =>
-  editingTemplate.value ? 'Routetemplate bewerken' : 'Nieuwe routetemplate',
+  editingTemplate.value
+    ? t('routes.templates.editTitle')
+    : t('routes.templates.createTitle'),
 )
 
 const pharmacyOptions = computed(() =>
@@ -155,7 +166,7 @@ function addStop() {
   }
 
   if (stopIds.value.includes(selectedPharmacyId.value)) {
-    formError.value = 'Deze apotheek staat al in de route.'
+    formError.value = t('errors.routeTemplate.duplicatePharmacy')
     return
   }
 
@@ -190,15 +201,15 @@ function moveStop(index: number, direction: -1 | 1) {
 
 function mapFormError(error: unknown): string {
   if (isRouteTemplateAlreadyExistsError(error)) {
-    return 'Er bestaat al een routetemplate met deze naam.'
+    return t('errors.routeTemplate.alreadyExists')
   }
 
   if (isRouteTemplateDuplicateStopError(error)) {
-    return 'Dubbele apotheken in één template zijn niet toegestaan.'
+    return t('errors.routeTemplate.duplicateStop')
   }
 
   if (isRouteTemplateEmptyStopsError(error)) {
-    return 'Voeg minstens één apotheekstop toe.'
+    return t('errors.routeTemplate.emptyStops')
   }
 
   return mapGraphQLError(error)
@@ -206,7 +217,7 @@ function mapFormError(error: unknown): string {
 
 async function onSubmit(event: FormSubmitEvent<TemplateForm>) {
   if (stopIds.value.length === 0) {
-    formError.value = 'Voeg minstens één apotheekstop toe.'
+    formError.value = t('errors.routeTemplate.emptyStops')
     return
   }
 
@@ -224,10 +235,10 @@ async function onSubmit(event: FormSubmitEvent<TemplateForm>) {
 
     if (editingTemplate.value) {
       await updateRouteTemplate(editingTemplate.value.id, payload)
-      successMessage.value = 'Routetemplate bijgewerkt.'
+      successMessage.value = t('success.routes.template.updated')
     } else {
       await createRouteTemplate(payload)
-      successMessage.value = 'Routetemplate aangemaakt.'
+      successMessage.value = t('success.routes.template.created')
     }
 
     closeForm()
@@ -246,8 +257,8 @@ async function toggleActive(template: RouteTemplateListItem) {
   try {
     await setRouteTemplateActive(template.id, !template.active)
     successMessage.value = template.active
-      ? 'Routetemplate gedeactiveerd.'
-      : 'Routetemplate geactiveerd.'
+      ? t('success.routes.template.deactivated')
+      : t('success.routes.template.activated')
     await reloadTemplates()
   } catch (error: unknown) {
     formError.value = mapGraphQLError(error)
@@ -277,7 +288,7 @@ function stopSummary(template: RouteTemplateListItem): string {
 <template>
   <div class="space-y-6">
     <div class="flex flex-wrap items-center justify-between gap-3">
-      <h2 class="text-lg font-semibold">Routetemplates</h2>
+      <h2 class="text-lg font-semibold">{{ t('routes.templates.title') }}</h2>
       <div class="flex flex-wrap items-center gap-3">
         <UButton
           size="sm"
@@ -285,10 +296,14 @@ function stopSummary(template: RouteTemplateListItem): string {
           color="neutral"
           @click="toggleIncludeInactive"
         >
-          {{ includeInactive ? 'Incl. inactief' : 'Alleen actief' }}
+          {{
+            includeInactive
+              ? t('routes.templates.filter.includeInactive')
+              : t('routes.templates.filter.activeOnly')
+          }}
         </UButton>
         <UButton size="sm" :disabled="!isOnline" @click="openCreateForm">
-          Nieuwe template
+          {{ t('routes.templates.create') }}
         </UButton>
       </div>
     </div>
@@ -313,14 +328,14 @@ function stopSummary(template: RouteTemplateListItem): string {
 
     <CommonErrorState
       v-else-if="errorMessage && templates.length === 0"
-      title="Routetemplates laden mislukt"
+      :title="t('routes.templates.loadFailed')"
       :description="errorMessage"
     />
 
     <CommonEmptyState
       v-else-if="templates.length === 0"
-      title="Geen routetemplates"
-      description="Maak een template met een bezorger en geordende apotheekstops."
+      :title="t('routes.templates.empty.title')"
+      :description="t('routes.templates.empty.description')"
     />
 
     <div v-else class="space-y-4">
@@ -335,16 +350,18 @@ function stopSummary(template: RouteTemplateListItem): string {
                 :color="template.active ? 'success' : 'neutral'"
                 variant="subtle"
               >
-                {{ template.active ? 'Actief' : 'Inactief' }}
+                {{ activeInactiveLabel(template.active) }}
               </UBadge>
             </div>
-            <p>{{ template.description || 'Geen beschrijving' }}</p>
+            <p>{{ template.description || t('common.noDescription') }}</p>
             <p>
-              <span class="font-medium">Bezorger:</span>
+              <span class="font-medium">{{ t('routes.courier') }}:</span>
               {{ courierLabel(template.bezorgerProfileId) }}
             </p>
             <p>
-              <span class="font-medium">Stops:</span>
+              <span class="font-medium"
+                >{{ t('routes.templates.stops') }}:</span
+              >
               {{ stopSummary(template) }}
             </p>
           </div>
@@ -355,7 +372,7 @@ function stopSummary(template: RouteTemplateListItem): string {
               variant="outline"
               @click="openEditForm(template)"
             >
-              Bewerken
+              {{ t('common.edit') }}
             </UButton>
             <UButton
               size="sm"
@@ -364,7 +381,9 @@ function stopSummary(template: RouteTemplateListItem): string {
               :loading="togglingId === template.id"
               @click="toggleActive(template)"
             >
-              {{ template.active ? 'Deactiveren' : 'Activeren' }}
+              {{
+                template.active ? t('admin.deactivate') : t('admin.activate')
+              }}
             </UButton>
           </div>
         </div>
@@ -379,31 +398,33 @@ function stopSummary(template: RouteTemplateListItem): string {
           class="space-y-4"
           @submit="onSubmit"
         >
-          <UFormField label="Naam" name="name">
+          <UFormField :label="t('common.name')" name="name">
             <UInput v-model="state.name" autocomplete="off" />
           </UFormField>
 
-          <UFormField label="Beschrijving" name="description">
+          <UFormField :label="t('common.description')" name="description">
             <UTextarea v-model="state.description" :rows="2" />
           </UFormField>
 
-          <UFormField label="Bezorger" name="bezorgerProfileId">
+          <UFormField :label="t('routes.courier')" name="bezorgerProfileId">
             <USelect
               v-model="state.bezorgerProfileId"
               :items="courierOptions"
-              placeholder="Kies een bezorger"
+              :placeholder="t('routes.templates.courierPlaceholder')"
               class="w-full"
             />
           </UFormField>
 
           <div class="space-y-3">
-            <p class="text-sm font-medium">Apotheekstops</p>
+            <p class="text-sm font-medium">
+              {{ t('routes.templates.stops.label') }}
+            </p>
 
             <div class="flex flex-col gap-2 sm:flex-row">
               <USelect
                 v-model="selectedPharmacyId"
                 :items="availablePharmacyOptions"
-                placeholder="Kies een apotheek"
+                :placeholder="t('routes.templates.pharmacyPlaceholder')"
                 class="w-full"
               />
               <UButton
@@ -412,14 +433,14 @@ function stopSummary(template: RouteTemplateListItem): string {
                 :disabled="!selectedPharmacyId"
                 @click="addStop"
               >
-                Toevoegen
+                {{ t('common.add') }}
               </UButton>
             </div>
 
             <CommonEmptyState
               v-if="orderedStops.length === 0"
-              title="Nog geen stops"
-              description="Voeg minstens één apotheek toe en orden met omhoog/omlaag."
+              :title="t('routes.templates.stops.empty.title')"
+              :description="t('routes.templates.stops.empty.description')"
             />
 
             <ul v-else class="space-y-2">
@@ -439,7 +460,7 @@ function stopSummary(template: RouteTemplateListItem): string {
                     :disabled="index === 0"
                     @click="moveStop(index, -1)"
                   >
-                    Omhoog
+                    {{ t('routes.templates.moveUp') }}
                   </UButton>
                   <UButton
                     size="xs"
@@ -447,7 +468,7 @@ function stopSummary(template: RouteTemplateListItem): string {
                     :disabled="index === orderedStops.length - 1"
                     @click="moveStop(index, 1)"
                   >
-                    Omlaag
+                    {{ t('routes.templates.moveDown') }}
                   </UButton>
                   <UButton
                     size="xs"
@@ -455,7 +476,7 @@ function stopSummary(template: RouteTemplateListItem): string {
                     variant="soft"
                     @click="removeStop(index)"
                   >
-                    Verwijderen
+                    {{ t('common.delete') }}
                   </UButton>
                 </div>
               </li>
@@ -471,10 +492,10 @@ function stopSummary(template: RouteTemplateListItem): string {
 
           <div class="flex gap-2">
             <UButton type="submit" :loading="saving" :disabled="!isOnline">
-              Opslaan
+              {{ t('common.save') }}
             </UButton>
             <UButton color="neutral" variant="ghost" @click="closeForm">
-              Annuleren
+              {{ t('common.cancel') }}
             </UButton>
           </div>
         </UForm>

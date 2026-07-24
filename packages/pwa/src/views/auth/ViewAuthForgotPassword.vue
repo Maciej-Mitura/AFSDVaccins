@@ -1,12 +1,13 @@
 <template>
   <UCard>
     <template #header>
-      <h2 class="text-lg font-semibold">Wachtwoord vergeten</h2>
+      <h2 class="text-lg font-semibold">
+        {{ t('auth.forgotPassword.title') }}
+      </h2>
     </template>
 
     <p class="mb-4 text-sm text-muted">
-      Vul je e-mailadres in. Firebase stuurt een resetlink als het account
-      bestaat.
+      {{ t('auth.forgotPassword.intro') }}
     </p>
 
     <UAlert
@@ -26,7 +27,7 @@
     />
 
     <UForm :schema="schema" :state="state" class="space-y-4" @submit="onSubmit">
-      <UFormField label="E-mailadres" name="email" required>
+      <UFormField :label="t('auth.login.email')" name="email" required>
         <UInput
           v-model="state.email"
           autocomplete="email"
@@ -36,37 +37,40 @@
       </UFormField>
 
       <UButton :loading="loading" block type="submit">
-        Resetlink versturen
+        {{ t('auth.forgotPassword.submit') }}
       </UButton>
     </UForm>
 
     <p class="mt-4 text-center text-sm text-muted">
       <RouterLink class="text-primary hover:underline" to="/auth/login">
-        Terug naar inloggen
+        {{ t('common.back.login') }}
       </RouterLink>
     </p>
   </UCard>
 </template>
 
 <script setup lang="ts">
-import { reactive, ref } from 'vue'
+import { computed, reactive, ref } from 'vue'
+import { useI18n } from 'vue-i18n'
 
 import type { FormSubmitEvent } from '@nuxt/ui'
-import * as z from 'zod'
+import type * as z from 'zod'
 
 import { useFirebase } from '@/composables/useFirebase'
+import { createForgotPasswordSchema } from '@/i18n'
 
+const { t } = useI18n()
 const { requestPasswordReset } = useFirebase()
 
 const loading = ref(false)
 const formError = ref<string | null>(null)
 const successMessage = ref<string | null>(null)
 
-const schema = z.object({
-  email: z.string().email('Voer een geldig e-mailadres in.'),
-})
+const schema = computed(() => createForgotPasswordSchema(key => t(key)))
 
-type ForgotPasswordForm = z.output<typeof schema>
+type ForgotPasswordForm = z.output<
+  ReturnType<typeof createForgotPasswordSchema>
+>
 
 const state = reactive<Partial<ForgotPasswordForm>>({
   email: undefined,
@@ -79,13 +83,10 @@ async function onSubmit(event: FormSubmitEvent<ForgotPasswordForm>) {
 
   try {
     await requestPasswordReset(event.data.email)
-    successMessage.value =
-      'Als dit e-mailadres bij ons bekend is, ontvang je binnenkort een resetlink.'
+    successMessage.value = t('auth.forgotPassword.success')
   } catch (error: unknown) {
     formError.value =
-      error instanceof Error
-        ? error.message
-        : 'Het versturen van de resetlink is mislukt.'
+      error instanceof Error ? error.message : t('auth.forgotPassword.failed')
   } finally {
     loading.value = false
   }

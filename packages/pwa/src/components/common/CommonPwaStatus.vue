@@ -1,5 +1,7 @@
 <template>
-  <div class="pointer-events-none fixed inset-x-0 top-0 z-50 flex flex-col gap-2 p-2 sm:p-3">
+  <div
+    class="pointer-events-none fixed inset-x-0 top-0 z-50 flex flex-col gap-2 p-2 sm:p-3"
+  >
     <div
       v-if="!isOnline"
       class="pointer-events-auto rounded-md bg-warning-500 px-4 py-2 text-center text-sm text-white shadow"
@@ -7,7 +9,7 @@
       aria-live="polite"
       data-testid="pwa-offline-banner"
     >
-      Je bent offline. Live gegevens en acties zijn tijdelijk niet beschikbaar.
+      {{ t('pwa.offline.message') }}
     </div>
 
     <div
@@ -17,7 +19,7 @@
       aria-live="polite"
       data-testid="pwa-online-banner"
     >
-      Verbinding hersteld. Gegevens worden bijgewerkt…
+      {{ t('pwa.online.restored') }}
     </div>
 
     <div
@@ -27,13 +29,18 @@
       aria-live="polite"
       data-testid="pwa-update-banner"
     >
-      <span>Er is een nieuwe versie beschikbaar.</span>
+      <span>{{ t('pwa.update.available') }}</span>
       <div class="flex shrink-0 gap-2">
-        <UButton size="xs" variant="ghost" color="neutral" @click="dismissUpdate">
-          Later
+        <UButton
+          size="xs"
+          variant="ghost"
+          color="neutral"
+          @click="dismissUpdate"
+        >
+          {{ t('pwa.update.later') }}
         </UButton>
         <UButton size="xs" color="primary" @click="onApplyUpdate">
-          Bijwerken
+          {{ t('pwa.update.apply') }}
         </UButton>
       </div>
     </div>
@@ -43,9 +50,9 @@
       class="pointer-events-auto mx-auto flex w-full max-w-lg items-center justify-between gap-3 rounded-md border border-default bg-elevated px-4 py-2 text-sm shadow"
       data-testid="pwa-install-banner"
     >
-      <span>Installeer de app voor snellere toegang.</span>
+      <span>{{ t('pwa.install.message') }}</span>
       <UButton size="xs" color="primary" variant="soft" @click="onInstall">
-        App installeren
+        {{ t('pwa.install.action') }}
       </UButton>
     </div>
   </div>
@@ -53,11 +60,13 @@
 
 <script setup lang="ts">
 import { ref, watch } from 'vue'
+import { useI18n } from 'vue-i18n'
 
 import { useAppInstall } from '@/composables/useAppInstall'
 import { useAppUpdate } from '@/composables/useAppUpdate'
 import { useOnlineStatus } from '@/composables/useOnlineStatus'
 
+const { t } = useI18n()
 const { isOnline, lastReconnectedAt } = useOnlineStatus()
 const { needRefresh, applyUpdate, dismissUpdate } = useAppUpdate()
 const { canInstall, promptInstall } = useAppInstall()

@@ -23,6 +23,12 @@ import { ROUTE_TEMPLATES_QUERY } from '@/assets/graphql/route-templates'
 import type { RouteTemplatesQuery } from '@/assets/graphql/route-templates'
 import { mapGraphQLError } from '@/composables/useCurrentUser'
 import useGraphQL, { registerReconnectHandler } from '@/composables/useGraphQL'
+import {
+  formatDateTime,
+  routeStatusLabel,
+  translate,
+  translatePlural,
+} from '@/i18n'
 
 export type DeliveryRouteItem = NonNullable<
   DeliveryRoutesQuery['deliveryRoutes'][number]
@@ -194,8 +200,11 @@ export function useDeliveryRoutes() {
 
         successMessage.value =
           route.stops.length === 0
-            ? 'Route gegenereerd zonder stops (geen kwalificerende bestellingen).'
-            : `Route gegenereerd met ${route.stops.length} stop(s).`
+            ? translate('success.routes.generatedEmpty')
+            : translatePlural(
+                'success.routes.generatedStops',
+                route.stops.length,
+              )
       }
 
       return route
@@ -242,7 +251,9 @@ export function useDeliveryRoutes() {
           })
         }
 
-        successMessage.value = `Routestatus bijgewerkt naar ${route.status}.`
+        successMessage.value = translate('success.routes.statusUpdated', {
+          status: routeStatusLabel(route.status),
+        })
       }
 
       return route
@@ -321,10 +332,20 @@ export function useDeliveryRoutes() {
   }
 
   function formatStatusHistoryEntry(entry: RouteStatusHistoryItem): string {
-    const from = entry.fromStatus ?? '—'
-    const reason = entry.reason ? ` (${entry.reason})` : ''
-    const when = new Date(entry.changedAt).toLocaleString('nl-BE')
-    return `${from} → ${entry.toStatus} · ${when}${reason}`
+    const before = entry.fromStatus ? routeStatusLabel(entry.fromStatus) : '—'
+    const after = routeStatusLabel(entry.toStatus)
+    const date = formatDateTime(entry.changedAt)
+
+    if (entry.reason) {
+      return translate('routes.statusHistory.entryWithReason', {
+        before,
+        after,
+        date,
+        reason: entry.reason,
+      })
+    }
+
+    return translate('routes.statusHistory.entry', { before, after, date })
   }
 
   function isRouteTemplateInactiveError(error: unknown): boolean {

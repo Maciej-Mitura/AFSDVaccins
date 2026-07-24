@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { onMounted, onUnmounted, ref } from 'vue'
+import { useI18n } from 'vue-i18n'
 
 import CommonEmptyState from '@/components/common/CommonEmptyState.vue'
 import CommonErrorState from '@/components/common/CommonErrorState.vue'
@@ -7,6 +8,9 @@ import CommonLoadingSkeleton from '@/components/common/CommonLoadingSkeleton.vue
 import CommonRealtimeStatus from '@/components/common/CommonRealtimeStatus.vue'
 import { useNotifications } from '@/composables/useNotifications'
 import { useOrders } from '@/composables/useOrders'
+import { formatDateTime, mapUserFacingGraphQLError } from '@/i18n'
+
+const { t } = useI18n()
 
 const {
   notifications,
@@ -48,10 +52,6 @@ onUnmounted(() => {
   reconnectCleanup?.()
 })
 
-function formatDateTime(value: string): string {
-  return new Date(value).toLocaleString('nl-BE')
-}
-
 async function onMarkRead(id: string): Promise<void> {
   actionError.value = null
   markingId.value = id
@@ -61,8 +61,8 @@ async function onMarkRead(id: string): Promise<void> {
   } catch (error: unknown) {
     actionError.value =
       error instanceof Error
-        ? error.message
-        : 'Kon de melding niet als gelezen markeren.'
+        ? mapUserFacingGraphQLError(error)
+        : t('errors.notification.markReadFailed')
   } finally {
     markingId.value = null
   }
@@ -75,21 +75,23 @@ async function onMarkRead(id: string): Promise<void> {
 
     <UCard>
       <template #header>
-        <h2 class="text-lg font-semibold">Meldingen</h2>
+        <h2 class="text-lg font-semibold">
+          {{ t('admin.notifications.title') }}
+        </h2>
       </template>
 
       <CommonLoadingSkeleton v-if="loading && notifications.length === 0" />
 
       <CommonErrorState
         v-else-if="errorMessage"
-        title="Meldingen laden mislukt"
+        :title="t('admin.notifications.loadFailed')"
         :description="errorMessage"
       />
 
       <CommonEmptyState
         v-else-if="notifications.length === 0"
-        title="Geen meldingen"
-        description="Je hebt nog geen meldingen ontvangen."
+        :title="t('admin.notifications.empty.title')"
+        :description="t('apotheker.notifications.empty.description')"
       />
 
       <div v-else class="space-y-4">
@@ -104,8 +106,12 @@ async function onMarkRead(id: string): Promise<void> {
           <div class="space-y-3 text-sm">
             <div class="flex flex-wrap items-center gap-2">
               <h3 class="font-semibold">{{ notification.title }}</h3>
-              <UBadge v-if="!notification.read" color="primary" variant="subtle">
-                Ongelezen
+              <UBadge
+                v-if="!notification.read"
+                color="primary"
+                variant="subtle"
+              >
+                {{ t('status.notification.unread') }}
               </UBadge>
             </div>
 
@@ -123,7 +129,7 @@ async function onMarkRead(id: string): Promise<void> {
                 variant="outline"
                 color="neutral"
               >
-                Naar bestellingen
+                {{ t('admin.dashboard.goToOrders') }}
               </UButton>
 
               <UButton
@@ -134,7 +140,7 @@ async function onMarkRead(id: string): Promise<void> {
                 :loading="markingId === notification.id"
                 @click="onMarkRead(notification.id)"
               >
-                Markeer als gelezen
+                {{ t('admin.notifications.markRead') }}
               </UButton>
             </div>
           </div>

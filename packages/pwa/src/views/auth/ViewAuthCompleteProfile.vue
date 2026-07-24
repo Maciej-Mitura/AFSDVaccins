@@ -1,15 +1,22 @@
 <script setup lang="ts">
 import { computed, reactive, ref, watch } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 
 import type { FormSubmitEvent } from '@nuxt/ui'
 import { SelfRegistrationRole, UserRole } from '@vaccin-delivery/types'
-import * as z from 'zod'
+import type * as z from 'zod'
 
 import { resolveProfileCompletionMode } from '@/composables/profile-completion-mode'
 import { useCurrentUser } from '@/composables/useCurrentUser'
 import { useFirebase } from '@/composables/useFirebase'
+import {
+  createApothekerProfileSchemaOptionalCountry,
+  createBezorgerProfileSchema,
+  createRegistrationRoleSchema,
+} from '@/i18n'
 
+const { t } = useI18n()
 const route = useRoute()
 const router = useRouter()
 const { isAuthenticated } = useFirebase()
@@ -46,9 +53,7 @@ const isUnregistered = computed(() => completionMode.value === 'unregistered')
 const isApothekerCompletion = computed(
   () => completionMode.value === 'apotheker',
 )
-const isBezorgerCompletion = computed(
-  () => completionMode.value === 'bezorger',
-)
+const isBezorgerCompletion = computed(() => completionMode.value === 'bezorger')
 
 const showLoading = computed(
   () =>
@@ -56,44 +61,23 @@ const showLoading = computed(
     (!userInitialized.value && userLoading.value),
 )
 
-const registrationSchema = z.object({
-  firstName: z.string().min(2, 'Voornaam moet minstens 2 tekens bevatten.'),
-  lastName: z.string().min(2, 'Achternaam moet minstens 2 tekens bevatten.'),
-  role: z.enum(
-    [SelfRegistrationRole.Apotheker, SelfRegistrationRole.Bezorger],
-    { message: 'Kies een accounttype.' },
-  ),
-})
+const registrationSchema = computed(() =>
+  createRegistrationRoleSchema(key => t(key)),
+)
+const apothekerSchema = computed(() =>
+  createApothekerProfileSchemaOptionalCountry(key => t(key)),
+)
+const bezorgerSchema = computed(() =>
+  createBezorgerProfileSchema(key => t(key)),
+)
 
-const apothekerSchema = z.object({
-  firstName: z.string().min(2, 'Voornaam moet minstens 2 tekens bevatten.'),
-  lastName: z.string().min(2, 'Achternaam moet minstens 2 tekens bevatten.'),
-  pharmacyName: z.string().trim().min(1, 'Apotheeknaam is verplicht.').max(120),
-  street: z.string().trim().min(1, 'Straat is verplicht.').max(120),
-  houseNumber: z.string().trim().min(1, 'Huisnummer is verplicht.').max(20),
-  postalCode: z
-    .string()
-    .trim()
-    .regex(/^\d{4}$/, 'Postcode moet 4 cijfers zijn (België).'),
-  city: z.string().trim().min(1, 'Gemeente is verplicht.').max(100),
-  country: z
-    .string()
-    .trim()
-    .regex(/^[A-Za-z]{2}$/, 'Landcode moet 2 letters zijn.')
-    .optional()
-    .or(z.literal('')),
-})
-
-const bezorgerSchema = z.object({
-  firstName: z.string().min(2, 'Voornaam moet minstens 2 tekens bevatten.'),
-  lastName: z.string().min(2, 'Achternaam moet minstens 2 tekens bevatten.'),
-  displayName: z.string().trim().min(1, 'Weergavenaam is verplicht.').max(120),
-  vehicleLabel: z.string().trim().max(120).optional().or(z.literal('')),
-})
-
-type RegistrationForm = z.output<typeof registrationSchema>
-type ApothekerForm = z.output<typeof apothekerSchema>
-type BezorgerForm = z.output<typeof bezorgerSchema>
+type RegistrationForm = z.output<
+  ReturnType<typeof createRegistrationRoleSchema>
+>
+type ApothekerForm = z.output<
+  ReturnType<typeof createApothekerProfileSchemaOptionalCountry>
+>
+type BezorgerForm = z.output<ReturnType<typeof createBezorgerProfileSchema>>
 
 const registrationState = reactive<Partial<RegistrationForm>>({
   firstName: undefined,
@@ -192,8 +176,7 @@ async function onSubmitRegistration(event: FormSubmitEvent<RegistrationForm>) {
 
 async function onSubmitApotheker(event: FormSubmitEvent<ApothekerForm>) {
   if (!currentUser.value || currentUser.value.role !== UserRole.Apotheker) {
-    formError.value =
-      'Dit account is geen apotheker. Herlaad de pagina om het juiste formulier te zien.'
+    formError.value = t('auth.completeProfile.wrongRole.apotheker')
     await loadCurrentUser(true)
     return
   }
@@ -205,8 +188,7 @@ async function onSubmitApotheker(event: FormSubmitEvent<ApothekerForm>) {
     await ensureApplicationUserNames(event.data.firstName, event.data.lastName)
 
     if (currentUser.value?.role !== UserRole.Apotheker) {
-      formError.value =
-        'Je rol is geen APOTHEKER. Vul het bezorgerprofiel in in plaats van het apotheekprofiel.'
+      formError.value = t('auth.completeProfile.roleMismatch.useBezorger')
       await loadCurrentUser(true)
       return
     }
@@ -237,8 +219,7 @@ async function onSubmitApotheker(event: FormSubmitEvent<ApothekerForm>) {
 
 async function onSubmitBezorger(event: FormSubmitEvent<BezorgerForm>) {
   if (!currentUser.value || currentUser.value.role !== UserRole.Bezorger) {
-    formError.value =
-      'Dit account is geen bezorger. Herlaad de pagina om het juiste formulier te zien.'
+    formError.value = t('auth.completeProfile.wrongRole.bezorger')
     await loadCurrentUser(true)
     return
   }
@@ -250,8 +231,7 @@ async function onSubmitBezorger(event: FormSubmitEvent<BezorgerForm>) {
     await ensureApplicationUserNames(event.data.firstName, event.data.lastName)
 
     if (currentUser.value?.role !== UserRole.Bezorger) {
-      formError.value =
-        'Je rol is geen BEZORGER. Vul het apotheekprofiel in in plaats van het bezorgerprofiel.'
+      formError.value = t('auth.completeProfile.roleMismatch.useApotheker')
       await loadCurrentUser(true)
       return
     }
@@ -280,7 +260,9 @@ async function onSubmitBezorger(event: FormSubmitEvent<BezorgerForm>) {
 <template>
   <UCard>
     <template #header>
-      <h2 class="text-lg font-semibold">Profiel aanvullen</h2>
+      <h2 class="text-lg font-semibold">
+        {{ t('auth.completeProfile.title') }}
+      </h2>
     </template>
 
     <UAlert
@@ -291,12 +273,13 @@ async function onSubmitBezorger(event: FormSubmitEvent<BezorgerForm>) {
       :title="formError"
     />
 
-    <div v-if="showLoading" class="text-sm text-muted">Laden…</div>
+    <div v-if="showLoading" class="text-sm text-muted">
+      {{ t('common.loading') }}…
+    </div>
 
     <template v-else-if="isUnregistered">
       <p class="mb-4 text-sm text-muted">
-        Je Firebase-account bestaat, maar er is nog geen applicatieprofiel.
-        Kies opnieuw je accounttype. Dit kan daarna niet meer worden gewijzigd.
+        {{ t('auth.completeProfile.unregistered.intro') }}
       </p>
 
       <UForm
@@ -305,7 +288,11 @@ async function onSubmitBezorger(event: FormSubmitEvent<BezorgerForm>) {
         class="space-y-4"
         @submit="onSubmitRegistration"
       >
-        <UFormField label="Accounttype" name="role" required>
+        <UFormField
+          :label="t('auth.register.accountType')"
+          name="role"
+          required
+        >
           <div class="grid gap-3 sm:grid-cols-2">
             <button
               type="button"
@@ -317,9 +304,9 @@ async function onSubmitBezorger(event: FormSubmitEvent<BezorgerForm>) {
               "
               @click="registrationState.role = SelfRegistrationRole.Apotheker"
             >
-              <p class="font-medium">Apotheker</p>
+              <p class="font-medium">{{ t('shell.apotheker.title') }}</p>
               <p class="mt-1 text-sm text-muted">
-                Ik plaats vaccinbestellingen voor een apotheek.
+                {{ t('auth.register.role.apotheker.description') }}
               </p>
             </button>
 
@@ -333,15 +320,15 @@ async function onSubmitBezorger(event: FormSubmitEvent<BezorgerForm>) {
               "
               @click="registrationState.role = SelfRegistrationRole.Bezorger"
             >
-              <p class="font-medium">Bezorger</p>
+              <p class="font-medium">{{ t('shell.bezorger.title') }}</p>
               <p class="mt-1 text-sm text-muted">
-                Ik lever geplande vaccinbestellingen.
+                {{ t('auth.register.role.bezorger.description') }}
               </p>
             </button>
           </div>
         </UFormField>
 
-        <UFormField label="Voornaam" name="firstName" required>
+        <UFormField :label="t('label.first.name')" name="firstName" required>
           <UInput
             v-model="registrationState.firstName"
             autocomplete="given-name"
@@ -349,7 +336,7 @@ async function onSubmitBezorger(event: FormSubmitEvent<BezorgerForm>) {
           />
         </UFormField>
 
-        <UFormField label="Achternaam" name="lastName" required>
+        <UFormField :label="t('label.last.name')" name="lastName" required>
           <UInput
             v-model="registrationState.lastName"
             autocomplete="family-name"
@@ -358,15 +345,14 @@ async function onSubmitBezorger(event: FormSubmitEvent<BezorgerForm>) {
         </UFormField>
 
         <UButton :loading="saving" block type="submit">
-          Applicatieprofiel aanmaken
+          {{ t('auth.completeProfile.unregistered.submit') }}
         </UButton>
       </UForm>
     </template>
 
     <template v-else-if="isBezorgerCompletion">
       <p class="mb-4 text-sm text-muted">
-        Vul je bezorgergegevens aan om routes te kunnen ontvangen. Je rol is
-        vastgelegd als BEZORGER.
+        {{ t('auth.completeProfile.bezorger.intro') }}
       </p>
 
       <UForm
@@ -375,7 +361,7 @@ async function onSubmitBezorger(event: FormSubmitEvent<BezorgerForm>) {
         class="space-y-4"
         @submit="onSubmitBezorger"
       >
-        <UFormField label="Voornaam" name="firstName" required>
+        <UFormField :label="t('label.first.name')" name="firstName" required>
           <UInput
             v-model="bezorgerState.firstName"
             autocomplete="given-name"
@@ -383,7 +369,7 @@ async function onSubmitBezorger(event: FormSubmitEvent<BezorgerForm>) {
           />
         </UFormField>
 
-        <UFormField label="Achternaam" name="lastName" required>
+        <UFormField :label="t('label.last.name')" name="lastName" required>
           <UInput
             v-model="bezorgerState.lastName"
             autocomplete="family-name"
@@ -391,23 +377,30 @@ async function onSubmitBezorger(event: FormSubmitEvent<BezorgerForm>) {
           />
         </UFormField>
 
-        <UFormField label="Weergavenaam" name="displayName" required>
+        <UFormField
+          :label="t('profiles.field.displayName')"
+          name="displayName"
+          required
+        >
           <UInput v-model="bezorgerState.displayName" class="w-full" />
         </UFormField>
 
-        <UFormField label="Voertuig (optioneel)" name="vehicleLabel">
+        <UFormField
+          :label="t('profiles.field.vehicleOptional')"
+          name="vehicleLabel"
+        >
           <UInput v-model="bezorgerState.vehicleLabel" class="w-full" />
         </UFormField>
 
         <UButton :loading="saving" block type="submit">
-          Bezorgerprofiel opslaan
+          {{ t('auth.completeProfile.bezorger.submit') }}
         </UButton>
       </UForm>
     </template>
 
     <template v-else-if="isApothekerCompletion">
       <p class="mb-4 text-sm text-muted">
-        Vul je apotheekgegevens aan. Je rol is vastgelegd als APOTHEKER.
+        {{ t('auth.completeProfile.apotheker.intro') }}
       </p>
 
       <UForm
@@ -416,7 +409,7 @@ async function onSubmitBezorger(event: FormSubmitEvent<BezorgerForm>) {
         class="space-y-4"
         @submit="onSubmitApotheker"
       >
-        <UFormField label="Voornaam" name="firstName" required>
+        <UFormField :label="t('label.first.name')" name="firstName" required>
           <UInput
             v-model="apothekerState.firstName"
             autocomplete="given-name"
@@ -424,7 +417,7 @@ async function onSubmitBezorger(event: FormSubmitEvent<BezorgerForm>) {
           />
         </UFormField>
 
-        <UFormField label="Achternaam" name="lastName" required>
+        <UFormField :label="t('label.last.name')" name="lastName" required>
           <UInput
             v-model="apothekerState.lastName"
             autocomplete="family-name"
@@ -432,11 +425,15 @@ async function onSubmitBezorger(event: FormSubmitEvent<BezorgerForm>) {
           />
         </UFormField>
 
-        <UFormField label="Apotheeknaam" name="pharmacyName" required>
+        <UFormField
+          :label="t('profiles.field.pharmacyName')"
+          name="pharmacyName"
+          required
+        >
           <UInput v-model="apothekerState.pharmacyName" class="w-full" />
         </UFormField>
 
-        <UFormField label="Straat" name="street" required>
+        <UFormField :label="t('profiles.field.street')" name="street" required>
           <UInput
             v-model="apothekerState.street"
             autocomplete="address-line1"
@@ -444,11 +441,19 @@ async function onSubmitBezorger(event: FormSubmitEvent<BezorgerForm>) {
           />
         </UFormField>
 
-        <UFormField label="Huisnummer" name="houseNumber" required>
+        <UFormField
+          :label="t('profiles.field.houseNumber')"
+          name="houseNumber"
+          required
+        >
           <UInput v-model="apothekerState.houseNumber" class="w-full" />
         </UFormField>
 
-        <UFormField label="Postcode" name="postalCode" required>
+        <UFormField
+          :label="t('profiles.field.postalCode')"
+          name="postalCode"
+          required
+        >
           <UInput
             v-model="apothekerState.postalCode"
             autocomplete="postal-code"
@@ -456,7 +461,7 @@ async function onSubmitBezorger(event: FormSubmitEvent<BezorgerForm>) {
           />
         </UFormField>
 
-        <UFormField label="Gemeente" name="city" required>
+        <UFormField :label="t('profiles.field.city')" name="city" required>
           <UInput
             v-model="apothekerState.city"
             autocomplete="address-level2"
@@ -464,7 +469,7 @@ async function onSubmitBezorger(event: FormSubmitEvent<BezorgerForm>) {
           />
         </UFormField>
 
-        <UFormField label="Landcode" name="country">
+        <UFormField :label="t('profiles.field.countryCode')" name="country">
           <UInput
             v-model="apothekerState.country"
             autocomplete="country"
@@ -474,13 +479,13 @@ async function onSubmitBezorger(event: FormSubmitEvent<BezorgerForm>) {
         </UFormField>
 
         <UButton :loading="saving" block type="submit">
-          Apotheekprofiel opslaan
+          {{ t('auth.completeProfile.apotheker.submit') }}
         </UButton>
       </UForm>
     </template>
 
     <p v-else class="text-sm text-muted">
-      Geen rolspecifiek profiel vereist voor dit account.
+      {{ t('auth.completeProfile.notRequired') }}
     </p>
   </UCard>
 </template>

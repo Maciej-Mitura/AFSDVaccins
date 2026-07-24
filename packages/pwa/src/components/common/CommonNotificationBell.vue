@@ -4,10 +4,10 @@
     size="sm"
     variant="ghost"
     color="neutral"
-    aria-label="Meldingen"
+    :aria-label="t('accessibility.notifications')"
     class="relative"
   >
-    Meldingen
+    {{ t('accessibility.notifications') }}
     <UBadge
       v-if="unreadCount > 0"
       color="error"
@@ -21,7 +21,10 @@
 </template>
 
 <script setup lang="ts">
+import { useI18n } from 'vue-i18n'
+
 import { useNotifications } from '@/composables/useNotifications'
 
+const { t } = useI18n()
 const { unreadCount } = useNotifications()
 </script>

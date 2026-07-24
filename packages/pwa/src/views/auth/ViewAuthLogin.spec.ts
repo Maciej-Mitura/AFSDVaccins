@@ -6,7 +6,7 @@ import { mount } from '@vue/test-utils'
 import { nextTick } from 'vue'
 
 import ViewAuthLogin from '@/views/auth/ViewAuthLogin.vue'
-import { LOGIN_OFFLINE_MESSAGE } from '@/views/auth/login-offline'
+import { getLoginOfflineMessage } from '@/views/auth/login-offline'
 import { __resetOnlineStatusForTests } from '@/composables/useOnlineStatus'
 
 const loginMock = vi.fn()
@@ -108,7 +108,7 @@ describe('ViewAuthLogin offline UX', () => {
 
     await nextTick()
 
-    expect(wrapper.text()).toContain(LOGIN_OFFLINE_MESSAGE)
+    expect(wrapper.text()).toContain(getLoginOfflineMessage())
     expect(
       wrapper.find('[data-testid="login-submit"]').attributes('disabled'),
     ).toBeDefined()
@@ -152,7 +152,7 @@ describe('ViewAuthLogin offline UX', () => {
     expect((emailInput.element as HTMLInputElement).value).toBe(
       'apotheker@example.com',
     )
-    expect(wrapper.text()).not.toContain(LOGIN_OFFLINE_MESSAGE)
+    expect(wrapper.text()).not.toContain(getLoginOfflineMessage())
 
     wrapper.unmount()
   })

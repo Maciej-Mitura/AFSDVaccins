@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue'
+import { useI18n } from 'vue-i18n'
 
 import CommonEmptyState from '@/components/common/CommonEmptyState.vue'
 import CommonErrorState from '@/components/common/CommonErrorState.vue'
@@ -12,6 +13,7 @@ import {
 } from '@/composables/useDeliveryRoutes'
 import { useOnlineStatus } from '@/composables/useOnlineStatus'
 import { useRouteTemplates } from '@/composables/useRouteTemplates'
+import { formatDateTime, routeStatusLabel, translatePlural } from '@/i18n'
 
 function todayLocalDate(): string {
   const now = new Date()
@@ -20,6 +22,8 @@ function todayLocalDate(): string {
   const day = String(now.getDate()).padStart(2, '0')
   return `${year}-${month}-${day}`
 }
+
+const { t } = useI18n()
 
 const {
   deliveryRoutes,
@@ -114,6 +118,12 @@ const routesForDate = computed(() =>
   ),
 )
 
+const confirmModalTitle = computed(() =>
+  confirmAction.value
+    ? t('routes.status.confirmTitle', { action: confirmAction.value.label })
+    : '',
+)
+
 async function refresh(): Promise<void> {
   await Promise.all([
     loadActiveTemplates(),
@@ -180,19 +190,33 @@ function availableAdminActions(
 ): Array<{ status: RouteStatusValue; label: string; color?: 'error' }> {
   if (status === RouteStatus.Assigned) {
     return [
-      { status: RouteStatus.InProgress, label: 'Starten' },
-      { status: RouteStatus.Cancelled, label: 'Annuleren', color: 'error' },
+      { status: RouteStatus.InProgress, label: t('routes.status.start') },
+      {
+        status: RouteStatus.Cancelled,
+        label: t('common.cancel'),
+        color: 'error',
+      },
     ]
   }
 
   if (status === RouteStatus.InProgress) {
     return [
-      { status: RouteStatus.Completed, label: 'Voltooien' },
-      { status: RouteStatus.Cancelled, label: 'Annuleren', color: 'error' },
+      { status: RouteStatus.Completed, label: t('routes.status.complete') },
+      {
+        status: RouteStatus.Cancelled,
+        label: t('common.cancel'),
+        color: 'error',
+      },
     ]
   }
 
   return []
+}
+
+function stopSummary(orderCount: number, totalQuantity: number): string {
+  const orders = translatePlural('routes.stop.orders', orderCount)
+  const doses = translatePlural('routes.stop.doses', totalQuantity)
+  return t('routes.stop.summary', { orders, doses })
 }
 
 watch(deliveryDate, () => {
@@ -212,28 +236,27 @@ onMounted(() => {
 <template>
   <div class="space-y-6">
     <div>
-      <h1 class="text-2xl font-semibold">Routeplanning</h1>
+      <h1 class="text-2xl font-semibold">{{ t('routes.planning.title') }}</h1>
       <p class="mt-1 text-sm text-muted">
-        Genereer dagelijkse bezorgroutes vanuit actieve routetemplates en beheer
-        uitvoeringsstatus.
+        {{ t('routes.planning.description') }}
       </p>
     </div>
 
     <UCard>
       <template #header>
-        <h2 class="text-lg font-semibold">Route genereren</h2>
+        <h2 class="text-lg font-semibold">{{ t('routes.generate.title') }}</h2>
       </template>
 
       <div class="grid gap-4 md:grid-cols-2">
-        <UFormField label="Leveringsdatum">
+        <UFormField :label="t('orders.deliveryDate')">
           <UInput v-model="deliveryDate" type="date" />
         </UFormField>
 
-        <UFormField label="Actieve template">
+        <UFormField :label="t('routes.template.active')">
           <USelect
             v-model="selectedTemplateId"
             :items="templateOptions"
-            placeholder="Kies een template"
+            :placeholder="t('routes.template.placeholder')"
             :loading="templatesLoading"
           />
         </UFormField>
@@ -243,7 +266,7 @@ onMounted(() => {
         v-if="selectedCourier"
         class="mt-4 rounded-md bg-elevated/50 px-3 py-2 text-sm"
       >
-        <span class="font-medium">Bezorger:</span>
+        <span class="font-medium">{{ t('routes.courier') }}:</span>
         {{ selectedCourier.displayName }}
         <span v-if="selectedCourier.vehicleLabel" class="text-muted">
           ({{ selectedCourier.vehicleLabel }})
@@ -255,8 +278,12 @@ onMounted(() => {
         class="mt-4"
         color="warning"
         variant="subtle"
-        title="Route niet regenererbaar"
-        :description="`Route met status ${existingRouteForSelection.status} kan niet opnieuw gegenereerd worden.`"
+        :title="t('routes.generate.notRegenerable.title')"
+        :description="
+          t('routes.generate.notRegenerable.description', {
+            status: routeStatusLabel(existingRouteForSelection.status),
+          })
+        "
       />
 
       <UAlert
@@ -266,24 +293,27 @@ onMounted(() => {
         class="mt-4"
         color="warning"
         variant="subtle"
-        title="Bestaande route bijwerken?"
-        description="Er bestaat al een route voor deze bezorger en datum. Regenereren werkt de bestaande route bij (geen duplicaat)."
+        :title="t('routes.generate.existing.title')"
+        :description="t('routes.generate.existing.description')"
       />
 
       <div class="mt-4 flex flex-wrap gap-2">
         <UButton
           :loading="generating"
           :disabled="
-            !isOnline || !selectedTemplateId || generating || !canGenerateSelected
+            !isOnline ||
+            !selectedTemplateId ||
+            generating ||
+            !canGenerateSelected
           "
           @click="onGenerate"
         >
           {{
             existingRouteForSelection
               ? confirmRegenerate
-                ? 'Bevestig regenereren'
-                : 'Opnieuw genereren'
-              : 'Genereer route'
+                ? t('routes.generate.confirmRegenerate')
+                : t('routes.generate.regenerate')
+              : t('routes.generate.submit')
           }}
         </UButton>
         <UButton
@@ -291,7 +321,7 @@ onMounted(() => {
           variant="ghost"
           @click="cancelRegenerateConfirm"
         >
-          Annuleren
+          {{ t('common.cancel') }}
         </UButton>
       </div>
 
@@ -305,7 +335,7 @@ onMounted(() => {
       <CommonErrorState
         v-if="generateError"
         class="mt-4"
-        title="Genereren mislukt"
+        :title="t('routes.generate.failed')"
         :description="generateError"
       />
     </UCard>
@@ -313,20 +343,20 @@ onMounted(() => {
     <UCard>
       <template #header>
         <h2 class="text-lg font-semibold">
-          Gegenereerde routes — {{ deliveryDate }}
+          {{ t('routes.generatedList.title', { date: deliveryDate }) }}
         </h2>
       </template>
 
       <CommonLoadingSkeleton v-if="loading" />
       <CommonErrorState
         v-else-if="errorMessage"
-        title="Kon routes niet laden"
+        :title="t('routes.loadFailed')"
         :description="errorMessage"
       />
       <CommonEmptyState
         v-else-if="routesForDate.length === 0"
-        title="Geen routes voor deze datum"
-        description="Genereer een route vanuit een actieve template."
+        :title="t('routes.planning.empty.title')"
+        :description="t('routes.planning.empty.description')"
       />
 
       <div v-else class="space-y-6">
@@ -344,8 +374,12 @@ onMounted(() => {
                 }}
               </p>
               <p class="text-sm text-muted">
-                Status: {{ route.status }} · Gegenereerd
-                {{ new Date(route.generatedAt).toLocaleString('nl-BE') }}
+                {{
+                  t('routes.meta.statusGenerated', {
+                    status: routeStatusLabel(route.status),
+                    date: formatDateTime(route.generatedAt),
+                  })
+                }}
               </p>
             </div>
             <UBadge
@@ -353,8 +387,12 @@ onMounted(() => {
               color="neutral"
               variant="subtle"
             >
-              {{ route.skippedApothekerProfileIds.length }} overgeslagen
-              apotheek(en)
+              {{
+                translatePlural(
+                  'routes.skippedPharmacies',
+                  route.skippedApothekerProfileIds.length,
+                )
+              }}
             </UBadge>
           </div>
 
@@ -380,7 +418,7 @@ onMounted(() => {
             v-if="route.statusHistory.length > 0"
             class="rounded-md bg-elevated/30 px-3 py-2 text-sm"
           >
-            <p class="font-medium">Statusgeschiedenis</p>
+            <p class="font-medium">{{ t('routes.statusHistory') }}</p>
             <ul class="mt-1 space-y-1 text-muted">
               <li
                 v-for="(entry, index) in route.statusHistory"
@@ -393,8 +431,8 @@ onMounted(() => {
 
           <CommonEmptyState
             v-if="route.stops.length === 0"
-            title="Lege route"
-            description="Geen kwalificerende bestellingen voor de template-stops. Overgeslagen apotheken staan in de auditlijst."
+            :title="t('routes.stop.empty.title')"
+            :description="t('routes.stop.empty.description')"
           />
 
           <ul v-else class="space-y-3">
@@ -408,8 +446,7 @@ onMounted(() => {
               </p>
               <p class="text-sm text-muted">{{ formatAddress(stop) }}</p>
               <p class="mt-1 text-sm">
-                {{ stop.orderCount }} bestelling(en) ·
-                {{ stop.totalQuantity }} dosissen
+                {{ stopSummary(stop.orderCount, stop.totalQuantity) }}
               </p>
               <ul class="mt-1 text-sm text-muted">
                 <li v-for="line in stop.lines" :key="line.vaccineId">
@@ -424,14 +461,14 @@ onMounted(() => {
       <CommonErrorState
         v-if="statusError"
         class="mt-4"
-        title="Statuswijziging mislukt"
+        :title="t('routes.status.changeFailed')"
         :description="statusError"
       />
     </UCard>
 
     <UModal
       :open="confirmAction !== null"
-      :title="confirmAction ? `Route ${confirmAction.label.toLowerCase()}` : ''"
+      :title="confirmModalTitle"
       @update:open="
         open => {
           if (!open) closeStatusModal()
@@ -441,27 +478,25 @@ onMounted(() => {
       <template #body>
         <p class="text-sm">
           <template v-if="confirmAction?.status === RouteStatus.Cancelled">
-            Bevestig annulering van deze route. Bestellingen en voorraad blijven
-            ongewijzigd.
+            {{ t('routes.status.confirmCancel') }}
           </template>
           <template
             v-else-if="confirmAction?.status === RouteStatus.InProgress"
           >
-            Bevestig dat deze route gestart wordt.
+            {{ t('routes.status.confirmStart') }}
           </template>
           <template v-else>
-            Bevestig dat deze route voltooid is. Bestellingen worden niet
-            automatisch als geleverd gemarkeerd.
+            {{ t('routes.status.confirmComplete') }}
           </template>
         </p>
         <UFormField
           v-if="confirmAction?.status === RouteStatus.Cancelled"
           class="mt-4"
-          label="Reden (optioneel)"
+          :label="t('routes.status.reasonOptional')"
         >
           <UInput
             v-model="cancelReason"
-            placeholder="Bijv. bezorger niet beschikbaar"
+            :placeholder="t('routes.status.reasonPlaceholder')"
           />
         </UFormField>
         <UAlert
@@ -473,7 +508,9 @@ onMounted(() => {
         />
       </template>
       <template #footer>
-        <UButton variant="ghost" @click="closeStatusModal"> Terug </UButton>
+        <UButton variant="ghost" @click="closeStatusModal">
+          {{ t('common.back') }}
+        </UButton>
         <UButton
           :color="
             confirmAction?.status === RouteStatus.Cancelled
@@ -484,7 +521,7 @@ onMounted(() => {
           :disabled="!isOnline"
           @click="confirmStatusChange"
         >
-          Bevestig
+          {{ t('common.confirm') }}
         </UButton>
       </template>
     </UModal>

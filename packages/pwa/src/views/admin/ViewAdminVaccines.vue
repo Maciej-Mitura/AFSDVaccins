@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, reactive, ref } from 'vue'
+import { useI18n } from 'vue-i18n'
 
 import type { FormSubmitEvent } from '@nuxt/ui'
 import * as z from 'zod'
@@ -9,7 +10,9 @@ import CommonErrorState from '@/components/common/CommonErrorState.vue'
 import CommonLoadingSkeleton from '@/components/common/CommonLoadingSkeleton.vue'
 import { useVaccines, type VaccineListItem } from '@/composables/useVaccines'
 import { useOnlineStatus } from '@/composables/useOnlineStatus'
+import { activeInactiveLabel } from '@/i18n'
 
+const { t } = useI18n()
 const { isOnline } = useOnlineStatus()
 
 const {
@@ -31,17 +34,28 @@ const formError = ref<string | null>(null)
 const successMessage = ref<string | null>(null)
 const togglingId = ref<string | null>(null)
 
-const schema = z.object({
-  name: z.string().trim().min(1, 'Naam is verplicht.').max(120),
-  description: z.string().trim().max(500).optional(),
-  manufacturer: z.string().trim().min(1, 'Fabrikant is verplicht.').max(120),
-  stockWarningThreshold: z
-    .number()
-    .int()
-    .min(0, 'Drempel kan niet negatief zijn.'),
-})
+const schema = computed(() =>
+  z.object({
+    name: z.string().trim().min(1, t('validation.name.required')).max(120),
+    description: z.string().trim().max(500).optional(),
+    manufacturer: z
+      .string()
+      .trim()
+      .min(1, t('validation.manufacturer.required'))
+      .max(120),
+    stockWarningThreshold: z
+      .number()
+      .int()
+      .min(0, t('validation.stockThreshold.nonNegative')),
+  }),
+)
 
-type VaccineForm = z.output<typeof schema>
+type VaccineForm = {
+  name: string
+  description?: string
+  manufacturer: string
+  stockWarningThreshold: number
+}
 
 const state = reactive<Partial<VaccineForm>>({
   name: undefined,
@@ -51,7 +65,7 @@ const state = reactive<Partial<VaccineForm>>({
 })
 
 const formTitle = computed(() =>
-  editingVaccine.value ? 'Vaccin bewerken' : 'Nieuw vaccin',
+  editingVaccine.value ? t('vaccines.editTitle') : t('vaccines.createTitle'),
 )
 
 void loadVaccines(true)
@@ -63,7 +77,6 @@ function resetForm() {
   state.manufacturer = undefined
   state.stockWarningThreshold = 0
   formError.value = null
-  successMessage.value = null
 }
 
 function openCreateForm() {
@@ -102,16 +115,16 @@ async function onSubmit(event: FormSubmitEvent<VaccineForm>) {
 
     if (editingVaccine.value) {
       await updateVaccine(editingVaccine.value.id, payload)
-      successMessage.value = 'Vaccin bijgewerkt.'
+      successMessage.value = t('success.vaccines.updated')
     } else {
       await createVaccine(payload)
-      successMessage.value = 'Vaccin aangemaakt.'
+      successMessage.value = t('success.vaccines.created')
     }
 
     closeForm()
   } catch (error: unknown) {
     formError.value = isVaccineAlreadyExistsError(error)
-      ? 'Er bestaat al een vaccin met deze naam.'
+      ? t('errors.vaccine.alreadyExists')
       : mapGraphQLError(error)
   } finally {
     saving.value = false
@@ -135,9 +148,9 @@ async function toggleActive(vaccine: VaccineListItem) {
 <template>
   <div class="space-y-6">
     <div class="flex flex-wrap items-center justify-between gap-3">
-      <h2 class="text-lg font-semibold">Vaccincatalogus</h2>
+      <h2 class="text-lg font-semibold">{{ t('vaccines.title') }}</h2>
       <UButton size="sm" :disabled="!isOnline" @click="openCreateForm">
-        Nieuw vaccin
+        {{ t('vaccines.create') }}
       </UButton>
     </div>
 
@@ -148,18 +161,25 @@ async function toggleActive(vaccine: VaccineListItem) {
       :title="formError"
     />
 
+    <UAlert
+      v-if="successMessage && !showForm"
+      color="success"
+      variant="subtle"
+      :title="successMessage"
+    />
+
     <CommonLoadingSkeleton v-if="loading && vaccines.length === 0" />
 
     <CommonErrorState
       v-else-if="errorMessage && vaccines.length === 0"
-      title="Catalogus laden mislukt"
+      :title="t('vaccines.loadFailed')"
       :description="errorMessage"
     />
 
     <CommonEmptyState
       v-else-if="vaccines.length === 0"
-      title="Geen vaccins"
-      description="Maak het eerste vaccin aan om de catalogus te starten."
+      :title="t('vaccines.empty.title')"
+      :description="t('vaccines.empty.description')"
     />
 
     <div v-else class="space-y-4">
@@ -174,28 +194,32 @@ async function toggleActive(vaccine: VaccineListItem) {
                 :color="vaccine.active ? 'success' : 'neutral'"
                 variant="subtle"
               >
-                {{ vaccine.active ? 'Actief' : 'Inactief' }}
+                {{ activeInactiveLabel(vaccine.active) }}
               </UBadge>
             </div>
-            <p>{{ vaccine.description || 'Geen beschrijving' }}</p>
+            <p>{{ vaccine.description || t('common.noDescription') }}</p>
             <p>
-              <span class="font-medium">Fabrikant:</span>
+              <span class="font-medium">{{ t('vaccines.manufacturer') }}:</span>
               {{ vaccine.manufacturer }}
             </p>
             <p>
-              <span class="font-medium">Voorraad:</span>
+              <span class="font-medium">{{ t('vaccines.stock') }}:</span>
               {{ vaccine.stockQuantity }}
-              <span class="text-muted">(beheer via Voorraad)</span>
+              <span class="text-muted">{{
+                t('vaccines.stock.manageHint')
+              }}</span>
             </p>
             <p>
-              <span class="font-medium">Lage-voorraad drempel:</span>
+              <span class="font-medium"
+                >{{ t('vaccines.stockWarningThreshold') }}:</span
+              >
               {{ vaccine.stockWarningThreshold }}
             </p>
           </div>
 
           <div class="flex flex-wrap gap-2">
             <UButton size="sm" variant="outline" @click="openEditForm(vaccine)">
-              Bewerken
+              {{ t('common.edit') }}
             </UButton>
             <UButton
               size="sm"
@@ -204,7 +228,7 @@ async function toggleActive(vaccine: VaccineListItem) {
               :loading="togglingId === vaccine.id"
               @click="toggleActive(vaccine)"
             >
-              {{ vaccine.active ? 'Deactiveren' : 'Activeren' }}
+              {{ vaccine.active ? t('admin.deactivate') : t('admin.activate') }}
             </UButton>
           </div>
         </div>
@@ -219,20 +243,20 @@ async function toggleActive(vaccine: VaccineListItem) {
           class="space-y-4"
           @submit="onSubmit"
         >
-          <UFormField label="Naam" name="name">
+          <UFormField :label="t('common.name')" name="name">
             <UInput v-model="state.name" autocomplete="off" />
           </UFormField>
 
-          <UFormField label="Beschrijving" name="description">
+          <UFormField :label="t('common.description')" name="description">
             <UTextarea v-model="state.description" :rows="3" />
           </UFormField>
 
-          <UFormField label="Fabrikant" name="manufacturer">
+          <UFormField :label="t('vaccines.manufacturer')" name="manufacturer">
             <UInput v-model="state.manufacturer" autocomplete="off" />
           </UFormField>
 
           <UFormField
-            label="Lage-voorraad drempel"
+            :label="t('vaccines.stockWarningThreshold')"
             name="stockWarningThreshold"
           >
             <UInput
@@ -251,10 +275,10 @@ async function toggleActive(vaccine: VaccineListItem) {
 
           <div class="flex gap-2">
             <UButton type="submit" :loading="saving" :disabled="!isOnline">
-              Opslaan
+              {{ t('common.save') }}
             </UButton>
             <UButton color="neutral" variant="ghost" @click="closeForm">
-              Annuleren
+              {{ t('common.cancel') }}
             </UButton>
           </div>
         </UForm>

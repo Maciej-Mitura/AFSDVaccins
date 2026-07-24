@@ -15,6 +15,7 @@ import {
 } from '@/assets/graphql/vaccine'
 import { mapGraphQLError } from '@/composables/useCurrentUser'
 import useGraphQL from '@/composables/useGraphQL'
+import { translate } from '@/i18n'
 
 export type VaccineListItem = VaccinesQuery['vaccines'][number]
 
@@ -74,7 +75,7 @@ export function useVaccines() {
       })
 
       if (!result.data?.createVaccine) {
-        throw new Error('Kon het vaccin niet aanmaken.')
+        throw new Error(translate('errors.vaccine.createFailed'))
       }
 
       const created = result.data.createVaccine
@@ -102,7 +103,7 @@ export function useVaccines() {
       })
 
       if (!result.data?.updateVaccine) {
-        throw new Error('Kon het vaccin niet bijwerken.')
+        throw new Error(translate('errors.vaccine.updateFailed'))
       }
 
       const updated = result.data.updateVaccine
@@ -133,7 +134,7 @@ export function useVaccines() {
       })
 
       if (!result.data?.setVaccineActive) {
-        throw new Error('Kon de vaccinstatus niet bijwerken.')
+        throw new Error(translate('errors.vaccine.statusUpdateFailed'))
       }
 
       vaccines.value = vaccines.value.map(vaccine =>

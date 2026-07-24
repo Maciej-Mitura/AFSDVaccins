@@ -10,6 +10,7 @@ import {
 } from '@/assets/graphql/settings'
 import useGraphQL from '@/composables/useGraphQL'
 import { mapGraphQLError } from '@/composables/useCurrentUser'
+import { translate } from '@/i18n'
 
 export type ApplicationSettings = NonNullable<
   ApplicationSettingsQuery['applicationSettings']
@@ -61,7 +62,7 @@ export function useApplicationSettings() {
         })
 
       if (!result.data?.updateApplicationSettings) {
-        throw new Error('Kon de instellingen niet bijwerken.')
+        throw new Error(translate('errors.settings.updateFailed'))
       }
 
       settings.value = {

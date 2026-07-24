@@ -21,6 +21,7 @@ import {
 } from '@/assets/graphql/route-templates'
 import { mapGraphQLError } from '@/composables/useCurrentUser'
 import useGraphQL from '@/composables/useGraphQL'
+import { translate } from '@/i18n'
 
 export type RouteTemplateListItem =
   RouteTemplatesQuery['routeTemplates'][number]
@@ -109,7 +110,7 @@ export function useRouteTemplates() {
     })
 
     if (!result.data?.createRouteTemplate) {
-      throw new Error('Kon de routetemplate niet aanmaken.')
+      throw new Error(translate('errors.routeTemplate.createFailed'))
     }
 
     const created = result.data.createRouteTemplate
@@ -127,7 +128,7 @@ export function useRouteTemplates() {
     })
 
     if (!result.data?.updateRouteTemplate) {
-      throw new Error('Kon de routetemplate niet bijwerken.')
+      throw new Error(translate('errors.routeTemplate.updateFailed'))
     }
 
     const updated = result.data.updateRouteTemplate
@@ -147,7 +148,7 @@ export function useRouteTemplates() {
     })
 
     if (!result.data?.setRouteTemplateActive) {
-      throw new Error('Kon de templatestatus niet bijwerken.')
+      throw new Error(translate('errors.routeTemplate.statusUpdateFailed'))
     }
 
     templates.value = templates.value.map(template =>

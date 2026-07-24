@@ -3,18 +3,17 @@
     color="warning"
     variant="subtle"
     icon="i-lucide-shield-alert"
-    title="Geen toegang"
-    :description="description"
+    :title="t('common.permission.denied.title')"
+    :description="description ?? t('common.permission.denied.description')"
   />
 </template>
 
 <script setup lang="ts">
-withDefaults(
-  defineProps<{
-    description?: string
-  }>(),
-  {
-    description: 'Je hebt geen rechten om deze pagina te bekijken.',
-  },
-)
+import { useI18n } from 'vue-i18n'
+
+defineProps<{
+  description?: string
+}>()
+
+const { t } = useI18n()
 </script>

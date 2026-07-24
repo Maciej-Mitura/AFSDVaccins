@@ -15,6 +15,9 @@ import {
   __setNeedRefreshForTests,
 } from '@/composables/useAppUpdate'
 import { __resetOnlineStatusForTests } from '@/composables/useOnlineStatus'
+import { __resetAppI18nForTests, translate } from '@/i18n'
+import { __resetLocaleLoaderForTests } from '@/i18n/locale-loader'
+import { createTestI18n } from '@/i18n/test-utils'
 
 vi.mock('@/composables/useGraphQL', () => ({
   triggerReconnectHandlers: vi.fn(() => Promise.resolve()),
@@ -29,13 +32,31 @@ describe('CommonPwaStatus', () => {
     __resetOnlineStatusForTests()
     __resetAppUpdateForTests()
     __resetAppInstallForTests()
+    __resetLocaleLoaderForTests()
+    __resetAppI18nForTests()
   })
 
   afterEach(() => {
     __resetOnlineStatusForTests()
     __resetAppUpdateForTests()
     __resetAppInstallForTests()
+    __resetLocaleLoaderForTests()
+    __resetAppI18nForTests()
   })
+
+  function mountStatus() {
+    const i18n = createTestI18n('nl')
+    return mount(CommonPwaStatus, {
+      global: {
+        plugins: [i18n],
+        stubs: {
+          UButton: {
+            template: '<button><slot /></button>',
+          },
+        },
+      },
+    })
+  }
 
   it('shows offline message when offline', async () => {
     Object.defineProperty(navigator, 'onLine', {
@@ -44,20 +65,18 @@ describe('CommonPwaStatus', () => {
     })
     __resetOnlineStatusForTests()
 
-    const wrapper = mount(CommonPwaStatus)
+    const wrapper = mountStatus()
     await nextTick()
 
     expect(wrapper.find('[data-testid="pwa-offline-banner"]').exists()).toBe(
       true,
     )
-    expect(wrapper.text()).toContain(
-      'Je bent offline. Live gegevens en acties zijn tijdelijk niet beschikbaar.',
-    )
+    expect(wrapper.text()).toContain(translate('pwa.offline.message'))
     wrapper.unmount()
   })
 
   it('hides offline message when online', async () => {
-    const wrapper = mount(CommonPwaStatus)
+    const wrapper = mountStatus()
     await nextTick()
 
     expect(wrapper.find('[data-testid="pwa-offline-banner"]').exists()).toBe(
@@ -67,7 +86,7 @@ describe('CommonPwaStatus', () => {
   })
 
   it('shows restored-connection feedback after reconnect', async () => {
-    const wrapper = mount(CommonPwaStatus)
+    const wrapper = mountStatus()
 
     window.dispatchEvent(new Event('offline'))
     await nextTick()
@@ -77,12 +96,12 @@ describe('CommonPwaStatus', () => {
     expect(wrapper.find('[data-testid="pwa-online-banner"]').exists()).toBe(
       true,
     )
-    expect(wrapper.text()).toContain('Verbinding hersteld')
+    expect(wrapper.text()).toContain(translate('pwa.online.restored'))
     wrapper.unmount()
   })
 
   it('exposes update action only when update is available', async () => {
-    const wrapper = mount(CommonPwaStatus)
+    const wrapper = mountStatus()
     await nextTick()
     expect(wrapper.find('[data-testid="pwa-update-banner"]').exists()).toBe(
       false,
@@ -94,13 +113,13 @@ describe('CommonPwaStatus', () => {
     expect(wrapper.find('[data-testid="pwa-update-banner"]').exists()).toBe(
       true,
     )
-    expect(wrapper.text()).toContain('Er is een nieuwe versie beschikbaar.')
-    expect(wrapper.text()).toContain('Bijwerken')
+    expect(wrapper.text()).toContain(translate('pwa.update.available'))
+    expect(wrapper.text()).toContain(translate('pwa.update.apply'))
     wrapper.unmount()
   })
 
   it('exposes install action only when install prompt is available', async () => {
-    const wrapper = mount(CommonPwaStatus)
+    const wrapper = mountStatus()
     await nextTick()
     expect(wrapper.find('[data-testid="pwa-install-banner"]').exists()).toBe(
       false,
@@ -112,7 +131,7 @@ describe('CommonPwaStatus', () => {
     expect(wrapper.find('[data-testid="pwa-install-banner"]').exists()).toBe(
       true,
     )
-    expect(wrapper.text()).toContain('App installeren')
+    expect(wrapper.text()).toContain(translate('pwa.install.action'))
     wrapper.unmount()
   })
 })

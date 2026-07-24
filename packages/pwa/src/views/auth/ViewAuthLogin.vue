@@ -17,7 +17,7 @@
       class="mb-4"
       color="warning"
       variant="subtle"
-      :title="LOGIN_OFFLINE_MESSAGE"
+      :title="t('auth.login.offline')"
       data-testid="login-offline-alert"
     />
 
@@ -43,6 +43,7 @@
           autocomplete="email"
           class="w-full"
           type="email"
+          data-testid="login-email"
         />
       </UFormField>
 
@@ -52,6 +53,7 @@
           autocomplete="current-password"
           class="w-full"
           type="password"
+          data-testid="login-password"
         />
       </UFormField>
 
@@ -92,15 +94,13 @@ import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 
 import type { FormSubmitEvent } from '@nuxt/ui'
-import * as z from 'zod'
+import type * as z from 'zod'
 
 import { useCurrentUser } from '@/composables/useCurrentUser'
 import { useFirebase } from '@/composables/useFirebase'
 import { useOnlineStatus } from '@/composables/useOnlineStatus'
-import {
-  LOGIN_OFFLINE_MESSAGE,
-  shouldBlockLoginWhileOffline,
-} from '@/views/auth/login-offline'
+import { createLoginSchema } from '@/i18n'
+import { shouldBlockLoginWhileOffline } from '@/views/auth/login-offline'
 import { isE2eAuthBypassEnabled } from '@/firebase/e2e-auth-bypass'
 
 const { t } = useI18n()
@@ -115,17 +115,12 @@ const loading = ref(false)
 const formError = ref<string | null>(null)
 
 const sessionExpiredMessage = computed(() =>
-  route.query.reason === 'session-expired'
-    ? 'Uw sessie is verlopen. Log opnieuw in.'
-    : null,
+  route.query.reason === 'session-expired' ? t('auth.session.expired') : null,
 )
 
-const schema = z.object({
-  email: z.string().email('Voer een geldig e-mailadres in.'),
-  password: z.string().min(8, 'Wachtwoord moet minstens 8 tekens bevatten.'),
-})
+const schema = computed(() => createLoginSchema(key => t(key)))
 
-type LoginForm = z.output<typeof schema>
+type LoginForm = z.output<ReturnType<typeof createLoginSchema>>
 
 const state = reactive<Partial<LoginForm>>({
   email: undefined,
@@ -134,7 +129,7 @@ const state = reactive<Partial<LoginForm>>({
 
 async function onSubmit(event: FormSubmitEvent<LoginForm>) {
   if (shouldBlockLoginWhileOffline(isOnline.value)) {
-    formError.value = LOGIN_OFFLINE_MESSAGE
+    formError.value = t('auth.login.offline')
     return
   }
 
@@ -157,7 +152,7 @@ async function onSubmit(event: FormSubmitEvent<LoginForm>) {
     await router.push(redirect)
   } catch (error: unknown) {
     formError.value =
-      error instanceof Error ? error.message : 'Inloggen is mislukt.'
+      error instanceof Error ? error.message : t('auth.login.failed')
   } finally {
     loading.value = false
   }

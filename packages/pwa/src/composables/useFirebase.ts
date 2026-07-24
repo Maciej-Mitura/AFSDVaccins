@@ -18,17 +18,7 @@ import {
   subscribeE2eBypassAuth,
   type E2eBypassUser,
 } from '@/firebase/e2e-auth-bypass'
-
-export type AuthErrorCode =
-  | 'auth/email-already-in-use'
-  | 'auth/invalid-email'
-  | 'auth/invalid-credential'
-  | 'auth/too-many-requests'
-  | 'auth/user-disabled'
-  | 'auth/user-not-found'
-  | 'auth/weak-password'
-  | 'auth/network-request-failed'
-  | 'auth/unknown'
+import { mapFirebaseAuthError, translate } from '@/i18n'
 
 type AuthUserView = User | E2eBypassUser
 
@@ -38,37 +28,6 @@ const authInitialized = ref(false)
 
 let authReadyPromise: Promise<void> | null = null
 let authListenerRegistered = false
-
-function mapFirebaseAuthError(error: unknown): string {
-  const code =
-    typeof error === 'object' &&
-    error !== null &&
-    'code' in error &&
-    typeof error.code === 'string'
-      ? error.code
-      : 'auth/unknown'
-
-  switch (code as AuthErrorCode) {
-    case 'auth/email-already-in-use':
-      return 'Dit e-mailadres is al in gebruikt.'
-    case 'auth/invalid-email':
-      return 'Voer een geldig e-mailadres in.'
-    case 'auth/invalid-credential':
-      return 'Onjuiste inloggegevens. Controleer e-mail en wachtwoord.'
-    case 'auth/too-many-requests':
-      return 'Te veel pogingen. Probeer het later opnieuw.'
-    case 'auth/user-disabled':
-      return 'Dit account is uitgeschakeld.'
-    case 'auth/user-not-found':
-      return 'Geen account gevonden voor dit e-mailadres.'
-    case 'auth/weak-password':
-      return 'Kies een wachtwoord van minstens 8 tekens.'
-    case 'auth/network-request-failed':
-      return 'Netwerkfout. Controleer je internetverbinding.'
-    default:
-      return 'Er ging iets mis. Probeer het opnieuw.'
-  }
-}
 
 function ensureAuthListener(): void {
   if (authListenerRegistered) {
@@ -124,9 +83,7 @@ export function useFirebase() {
     password: string,
   ): Promise<AuthUserView> {
     if (isE2eAuthBypassEnabled()) {
-      throw new Error(
-        'Registreren is niet beschikbaar in de Playwright auth-bypass modus.',
-      )
+      throw new Error(translate('auth.error.registerBypass'))
     }
 
     if (!firebaseAuth) {
@@ -180,9 +137,7 @@ export function useFirebase() {
 
   async function requestPasswordReset(email: string): Promise<void> {
     if (isE2eAuthBypassEnabled()) {
-      throw new Error(
-        'Wachtwoord reset is niet beschikbaar in de Playwright auth-bypass modus.',
-      )
+      throw new Error(translate('auth.error.resetBypass'))
     }
 
     if (!firebaseAuth) {

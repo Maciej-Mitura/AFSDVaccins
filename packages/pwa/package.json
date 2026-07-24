@@ -16,7 +16,8 @@
     "test:e2e:pwa:preview": "node ./scripts/run-e2e-preview.mjs",
     "typecheck": "vue-tsc --build",
     "lint": "eslint .",
-    "test": "vitest run"
+    "test": "vitest run",
+    "audit:hardcoded-strings": "node ./scripts/audit-hardcoded-strings.mjs"
   },
   "dependencies": {
     "@apollo/client": "^3.14.0",

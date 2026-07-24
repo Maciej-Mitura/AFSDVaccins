@@ -7,11 +7,20 @@ screens.
 
 ## Current status
 
-**Phase 23B complete — runtime Vue i18n foundation** (`vue-i18n` in the PWA).
-Supported locales: **nl** (default), **en** (runtime fallback), **zh**, **es**.
-Language selector in the app shell and auth layout; global shell + login + one
-representative screen per role translated. Locale JSON is generated from the
-Google Sheet via `npm run export:i18n`. Full UI string migration is **Phase 23C**.
+**Phase 23 complete (23A + 23B + 23C)** — teacher-aligned i18n path for **FRONT-018**.
+Supported locales: **nl** (default), **en** (runtime missing-key fallback), **zh**, **es**.
+Google Sheet is the editable source of truth → `npm run export:i18n` → committed
+`packages/pwa/src/locales/*.json` → PWA `vue-i18n` (no Google in the PWA runtime).
+Catalog: **481 keys** identical across all four locales. Language selector,
+locale persistence (`vaccin-delivery:locale`), BCP47 date/number formatting, and
+central helpers (status labels, error mapper, Zod schema factories, format) are in
+place. **Caveat:** most `zh`/`es` cells still use the Sheet **Default** (EN)
+fallback (~415 keys) — not verified human translations.
+
+**Phase 23C complete** — remaining UI string migration (views, composables,
+validation messages, offline shell note).
+
+**Phase 23B complete** — runtime `vue-i18n` foundation and language switcher.
 
 **Phase 23A complete** — Google Sheets → locale JSON exporter (`packages/i18n-export`).
 
@@ -21,13 +30,14 @@ caching with invalidation, Helmet headers, GraphQL depth/complexity, body-size g
 **Phase 21** remains complete (requirements audit / enhancement roadmap docs).
 
 Authoritative requirement statuses in `docs/requirements-matrix.md` §0.1:
-FRONT-018 is **partially implemented** (runtime foundation + limited migration;
-most screens still hardcoded Dutch until Phase 23C).
+FRONT-018 is **implemented** (full key catalog + runtime switching), with the
+honest quality caveat that `es`/`zh` largely still carry Default/EN fallback
+text until translators fill those Sheet columns.
 
 **Phases 0–20** remain complete (domain, PWA, Docker, CI green @ `f3e4d07`).
 
-**Next phase:** Phase 23C — remaining UI string migration. Do not start until
-explicitly requested. Phase 24 remains blocked until requested.
+**Next phase:** Phase 24 — public deployment. Do not start until explicitly
+requested.
 
 ## Planned stack
 
@@ -1821,7 +1831,9 @@ the production Compose file.
 - Playwright `VITE_E2E_AUTH_BYPASS` is refused at PWA image build time
 - CORS `URL_FRONTEND` defaults to `http://localhost:8080` (no wildcard)
 
-## i18n exporter (Phase 23A) and runtime i18n (Phase 23B)
+## i18n (Phase 23 complete — FRONT-018)
+
+**Locales:** `nl` (default), `en` (runtime missing-key fallback), `zh`, `es`.
 
 **Source-of-truth workflow (do not invert):**
 
@@ -1835,30 +1847,77 @@ local/dev-only: it never runs from app startup, PWA/API build, CI, Docker, or
 unit/e2e tests. Normal export is **strictly read-only** against the Sheets API
 (even if a local token happens to carry a broader scope from earlier consent).
 
-### Runtime (`vue-i18n` — Phase 23B)
+**Catalog size (after Phase 23C):** **481 keys**, identical key sets across
+`nl` / `en` / `zh` / `es`.
 
-| Item           | Behaviour                                                                                                   |
-| -------------- | ----------------------------------------------------------------------------------------------------------- |
-| Package        | `vue-i18n` in `@vaccin-delivery/pwa` only (not API / not exporter runtime)                                  |
-| Locales        | `nl` (default), `en` (runtime missing-key fallback), `zh`, `es`                                             |
-| Catalogs       | Committed `packages/pwa/src/locales/{nl,en,zh,es}.json` (Vite-bundled; **generated**, not hand-edited)      |
-| Bootstrap      | Auth restore → `app.use(i18n)` → `app.use(router)` → mount                                                  |
-| Resolution     | 1) `localStorage['vaccin-delivery:locale']` 2) normalized `navigator.languages` / `language` 3) `nl`        |
-| Browser tags   | `nl-BE`→`nl`, `en-US`→`en`, `zh-Hans`→`zh`, `es-MX`→`es`, etc.; unsupported → `nl`                          |
-| Persistence    | Explicit user choice only (`vaccin-delivery:locale`); no page reload on switch                              |
-| Selector       | `CommonLanguageSelector` in app shell header + auth layout (Nuxt UI)                                        |
-| Formatting map | `nl`→`nl-BE`, `en`→`en-GB`, `es`→`es-ES`, `zh`→`zh-CN` (representative screens; full date migration in 23C) |
+**Known quality caveat (`es` / `zh`):** a large majority of newer keys still
+resolve via the Sheet **Default** column (English) at export time
+(~**415** Default fallbacks). Those locales switch and load correctly, but the
+copy is **not** verified human translation until translators fill column C.
+
+### Runtime (`vue-i18n`)
+
+| Item           | Behaviour                                                                                              |
+| -------------- | ------------------------------------------------------------------------------------------------------ |
+| Package        | `vue-i18n` in `@vaccin-delivery/pwa` only (not API / not exporter runtime)                             |
+| Locales        | `nl` (default), `en` (runtime missing-key fallback), `zh`, `es`                                        |
+| Catalogs       | Committed `packages/pwa/src/locales/{nl,en,zh,es}.json` (Vite-bundled; **generated**, not hand-edited) |
+| Bootstrap      | Auth restore → `app.use(i18n)` → `app.use(router)` → mount                                             |
+| Resolution     | 1) `localStorage['vaccin-delivery:locale']` 2) normalized `navigator.languages` / `language` 3) `nl`   |
+| Browser tags   | `nl-BE`→`nl`, `en-US`→`en`, `zh-Hans`→`zh`, `es-MX`→`es`, etc.; unsupported → `nl`                     |
+| Persistence    | Explicit user choice only (`vaccin-delivery:locale`); no page reload on switch                         |
+| Selector       | `CommonLanguageSelector` in app shell header + auth layout (Nuxt UI)                                   |
+| Formatting map | `nl`→`nl-BE`, `en`→`en-GB`, `es`→`es-ES`, `zh`→`zh-CN` via `getLocaleBcp47` / `format.ts` helpers      |
 
 **Two fallback layers (do not confuse):**
 
 1. **Export-time** (Phase 23A): blank locale cell → Sheet **Default** column when generating JSON.
-2. **Runtime** (Phase 23B): missing key in the active locale → English catalog (`fallbackLocale: 'en'`).
+2. **Runtime**: missing key in the active locale → English catalog (`fallbackLocale: 'en'`).
 
-Export-time still requires equal key sets across locales. Runtime fallback is a safety net, not an excuse for incomplete catalogs.
+Export-time still requires equal key sets across locales. Runtime fallback is a
+safety net for missing keys, not a substitute for filling Sheet locale columns.
 
-**Translated in 23B:** global shell (brand, nav, logout, language label, common loading/error), login view, ADMIN dashboard heading, APOTHEKER orders heading, BEZORGER today-route heading. Remaining screens: **Phase 23C**.
+**Central helpers** (prefer these over ad-hoc strings):
+
+| Helper               | Path / export                       | Role                                           |
+| -------------------- | ----------------------------------- | ---------------------------------------------- |
+| Status labels        | `i18n/status-labels.ts`             | Order / route / vaccine status display         |
+| Error mapper         | `i18n/error-mapper.ts`              | Firebase + GraphQL → user-facing keys          |
+| Validation schemas   | `i18n/validation-schemas.ts`        | Zod factories that re-read messages per locale |
+| Date / number format | `i18n/format.ts` + BCP47 locale map | `Intl` formatting from the active UI locale    |
+| Translate            | `translate` / `translatePlural`     | Non-template call sites (composables, mappers) |
+
+Zod schema factories **react to locale** (messages are resolved when the schema
+runs, not frozen at module load).
+
+**`offline.html`:** static multilingual page. It reads
+`localStorage['vaccin-delivery:locale']` **once** on load and picks embedded
+copy for `nl`/`en`/`zh`/`es`. It is **not** reactive to later SPA locale
+changes (service-worker navigation fallback, not the Vue app).
 
 No Google credentials or Sheets calls in the PWA bundle, CI, or Docker image.
+
+### Key conventions
+
+- Dot-notation segments: `[A-Za-z0-9_-]+` separated by `.`
+  (e.g. `common.save`, `auth.login.title`, `bezorger.route.today.title`).
+- Prefer domain prefixes: `common.*`, `auth.*`, `admin.*`, `apotheker.*`,
+  `bezorger.*`, `errors.*`, `status.*`, `validation.*`.
+- Reject whitespace, leading/trailing dots, empty segments, consecutive dots
+  (exporter validation).
+
+### How to add new UI text
+
+1. Add the key + **Default** (usually English) + locale columns in the Google Sheet
+   on **all four** tabs (`nl`, `en`, `zh`, `es`). Leave column C blank only when
+   intentionally accepting Default fallback for that locale.
+2. Run `npm run export:i18n` from the monorepo root.
+3. Commit the regenerated `packages/pwa/src/locales/{nl,en,zh,es}.json`.
+4. In Vue: `$t('your.key')` / `useI18n()`. Outside templates: `translate('your.key')`
+   from `@/i18n`. Prefer status-labels / error-mapper / validation-schemas /
+   format helpers when the string is a status, error, form message, or date/number.
+5. Do **not** hand-merge keys into locale JSON; do **not** hardcode user-visible
+   Dutch/English in components.
 
 ### Exporter (Phase 23A)
 
@@ -1893,8 +1952,7 @@ For each non-empty data row the exporter resolves an **effective translation**:
 because Default is the guaranteed per-row export fallback source.
 
 This is **build-time / export-time** fallback only. It is not
-`vue-i18n` `fallbackLocale` (runtime missing-key fallback to English), which
-belongs in Phase 23B.
+`vue-i18n` `fallbackLocale` (runtime missing-key fallback to English).
 
 Placeholder multiset checks use the **effective** exported strings.
 
@@ -1999,15 +2057,17 @@ editable translation source.
 
 ### Phase 23 status
 
-| Item                        | Status                                  |
-| --------------------------- | --------------------------------------- |
-| Sheets exporter foundation  | Implemented (23A)                       |
-| Runtime `vue-i18n`          | Implemented (23B)                       |
-| `useLanguage` / switcher    | Implemented (23B)                       |
-| Limited shell + role sample | Implemented (23B)                       |
-| Sheet → catalog sync        | Established (edit Sheet, then export)   |
-| Full UI string migration    | Not started (23C)                       |
-| FRONT-018 fully implemented | No — partial until most screens migrate |
+| Item                         | Status                                                                 |
+| ---------------------------- | ---------------------------------------------------------------------- |
+| Sheets exporter foundation   | Implemented (23A)                                                      |
+| Runtime `vue-i18n`           | Implemented (23B)                                                      |
+| `useLanguage` / switcher     | Implemented (23B)                                                      |
+| Sheet → catalog sync         | Established (edit Sheet, then export)                                  |
+| Full UI string migration     | Implemented (23C) — 481 keys across nl/en/zh/es                        |
+| Central helpers + formatting | Implemented (status-labels, error-mapper, Zod factories, BCP47 format) |
+| `offline.html` multilingual  | Implemented (static; reads storage once)                               |
+| FRONT-018                    | **Implemented** (with es/zh Default-fallback quality caveat)           |
+| Phase 23 as a whole          | **Complete** — next implementation phase is **24** (not started)       |
 
 ## API security foundation (Phase 22)
 

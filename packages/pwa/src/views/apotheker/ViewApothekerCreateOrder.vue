@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, reactive, ref } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
 
 import type { FormSubmitEvent } from '@nuxt/ui'
@@ -10,12 +11,19 @@ import { useApplicationSettings } from '@/composables/useApplicationSettings'
 import { useOnlineStatus } from '@/composables/useOnlineStatus'
 import { useOrders } from '@/composables/useOrders'
 import { useVaccines } from '@/composables/useVaccines'
+import { formatDate, mapUserFacingGraphQLError, translatePlural } from '@/i18n'
 
 type OrderLineDraft = {
   vaccineId: string
   quantity: number
 }
 
+type OrderLineForm = {
+  vaccineId: string
+  quantity: number
+}
+
+const { t } = useI18n()
 const router = useRouter()
 const { isOnline } = useOnlineStatus()
 const { activeVaccines, loading: vaccinesLoading, loadVaccines } = useVaccines()
@@ -25,7 +33,6 @@ const {
   errorMessage,
   loadWeeklySummary,
   createOrder,
-  mapGraphQLError,
   isWeeklyLimitExceededError,
   isDailyLimitExceededError,
   isVaccineInactiveError,
@@ -37,13 +44,15 @@ const formError = ref<string | null>(null)
 const successMessage = ref<string | null>(null)
 const submitting = ref(false)
 
-const schema = z.object({
-  vaccineId: z.string().min(1, 'Selecteer een vaccin.'),
-  quantity: z.number().int().min(1, 'Aantal moet minstens 1 zijn.'),
-})
+const schema = computed(() =>
+  z.object({
+    vaccineId: z.string().min(1, t('validation.vaccine.required')),
+    quantity: z.number().int().min(1, t('validation.quantity.min')),
+  }),
+)
 
-const state = reactive({
-  vaccineId: undefined as string | undefined,
+const state = reactive<Partial<OrderLineForm>>({
+  vaccineId: undefined,
   quantity: 1,
 })
 
@@ -51,7 +60,11 @@ const loading = computed(
   () => vaccinesLoading.value || ordersLoading.value || submitting.value,
 )
 
-void Promise.all([loadVaccines(false), loadApplicationSettings(), loadWeeklySummary()])
+void Promise.all([
+  loadVaccines(false),
+  loadApplicationSettings(),
+  loadWeeklySummary(),
+])
 
 const closingTime = computed(
   () => settings.value?.orderingClosingTime ?? '14:00',
@@ -65,7 +78,7 @@ function resetLineForm() {
   state.quantity = 1
 }
 
-function addOrMergeLine(event: FormSubmitEvent<z.output<typeof schema>>) {
+function addOrMergeLine(event: FormSubmitEvent<OrderLineForm>) {
   formError.value = null
   const vaccineId = event.data.vaccineId
   const nextQuantity = event.data.quantity
@@ -85,12 +98,10 @@ function removeLine(vaccineId: string) {
 }
 
 function vaccineName(vaccineId: string): string {
-  return activeVaccines.value.find(vaccine => vaccine.id === vaccineId)?.name ?? vaccineId
-}
-
-function formatDeliveryDate(value: string): string {
-  const [year, month, day] = value.split('-')
-  return `${day}/${month}/${year}`
+  return (
+    activeVaccines.value.find(vaccine => vaccine.id === vaccineId)?.name ??
+    vaccineId
+  )
 }
 
 async function submitOrder() {
@@ -98,7 +109,7 @@ async function submitOrder() {
   successMessage.value = null
 
   if (lines.value.length === 0) {
-    formError.value = 'Voeg minstens één bestelregel toe.'
+    formError.value = t('apotheker.orders.create.linesRequired')
     return
   }
 
@@ -112,17 +123,23 @@ async function submitOrder() {
       })),
     })
 
-    successMessage.value = `Bestelling geplaatst. Leverdatum: ${formatDeliveryDate(created.deliveryDate)}.`
+    successMessage.value = t('success.order.placed', {
+      date: formatDate(created.deliveryDate),
+    })
     await router.push({ name: 'apotheker-orders' })
   } catch (error: unknown) {
     if (isWeeklyLimitExceededError(error)) {
-      formError.value = `Het weekmaximum van ${weeklyLimit.value} dosissen is overschreden.`
+      formError.value = t('errors.order.weeklyLimitExceeded', {
+        limit: weeklyLimit.value,
+      })
     } else if (isDailyLimitExceededError(error)) {
-      formError.value = `Het dagmaximum van ${dailyLimit.value} dosissen per vaccin is overschreden.`
+      formError.value = t('errors.order.dailyLimitExceeded', {
+        limit: dailyLimit.value,
+      })
     } else if (isVaccineInactiveError(error)) {
-      formError.value = 'Een geselecteerd vaccin is niet meer beschikbaar.'
+      formError.value = t('errors.order.vaccineInactive')
     } else {
-      formError.value = mapGraphQLError(error)
+      formError.value = mapUserFacingGraphQLError(error)
     }
   } finally {
     submitting.value = false
@@ -134,7 +151,7 @@ async function submitOrder() {
   <div class="space-y-6">
     <UCard>
       <template #header>
-        <h2 class="text-lg font-semibold">Nieuwe bestelling</h2>
+        <h2 class="text-lg font-semibold">{{ t('apotheker.orders.new') }}</h2>
       </template>
 
       <CommonLoadingSkeleton v-if="loading && !weeklySummary" />
@@ -143,34 +160,52 @@ async function submitOrder() {
         <UAlert
           color="info"
           variant="subtle"
-          title="Leveringsregels"
-          :description="`Bestellingen vóór ${closingTime} worden vandaag geleverd. Bestellingen vanaf ${closingTime} worden morgen geleverd.`"
+          :title="t('apotheker.orders.create.deliveryRules.title')"
+          :description="
+            t('apotheker.orders.create.deliveryRules.description', {
+              time: closingTime,
+            })
+          "
         />
 
         <UAlert
           v-if="weeklySummary?.warningReached"
           color="warning"
           variant="subtle"
-          title="Weekwaarschuwing"
-          :description="`Je hebt ${weeklySummary.percentageUsed}% van het weekmaximum (${weeklySummary.weeklyLimit}) bereikt.`"
+          :title="t('apotheker.orders.create.weekWarning.title')"
+          :description="
+            t('apotheker.orders.create.weekWarning.description', {
+              percentage: weeklySummary.percentageUsed,
+              limit: weeklySummary.weeklyLimit,
+            })
+          "
         />
 
         <div class="grid gap-2 sm:grid-cols-2">
           <p>
-            <span class="font-medium">Week:</span>
-            {{ weeklySummary?.isoWeek ?? '—' }} / {{ weeklySummary?.isoYear ?? '—' }}
+            <span class="font-medium"
+              >{{ t('apotheker.orders.create.week') }}:</span
+            >
+            {{ weeklySummary?.isoWeek ?? '—' }} /
+            {{ weeklySummary?.isoYear ?? '—' }}
           </p>
           <p>
-            <span class="font-medium">Besteld deze week:</span>
+            <span class="font-medium"
+              >{{ t('apotheker.orders.create.orderedThisWeek') }}:</span
+            >
             {{ weeklySummary?.orderedQuantity ?? 0 }} /
             {{ weeklySummary?.weeklyLimit ?? weeklyLimit }}
           </p>
           <p>
-            <span class="font-medium">Resterend:</span>
+            <span class="font-medium"
+              >{{ t('apotheker.orders.create.remaining') }}:</span
+            >
             {{ weeklySummary?.remainingQuantity ?? weeklyLimit }}
           </p>
           <p>
-            <span class="font-medium">Sluitingstijd:</span>
+            <span class="font-medium"
+              >{{ t('apotheker.orders.create.closingTime') }}:</span
+            >
             {{ closingTime }} ({{ settings?.timezone ?? 'Europe/Brussels' }})
           </p>
         </div>
@@ -179,7 +214,9 @@ async function submitOrder() {
 
     <UCard>
       <template #header>
-        <h3 class="font-semibold">Bestelregels toevoegen</h3>
+        <h3 class="font-semibold">
+          {{ t('apotheker.orders.create.addLines') }}
+        </h3>
       </template>
 
       <UForm
@@ -188,7 +225,7 @@ async function submitOrder() {
         class="space-y-4"
         @submit="addOrMergeLine"
       >
-        <UFormField label="Vaccin" name="vaccineId">
+        <UFormField :label="t('vaccines.label')" name="vaccineId">
           <USelect
             v-model="state.vaccineId"
             :items="
@@ -197,25 +234,29 @@ async function submitOrder() {
                 value: vaccine.id,
               }))
             "
-            placeholder="Selecteer vaccin"
+            :placeholder="t('vaccines.selectPlaceholder')"
           />
         </UFormField>
 
-        <UFormField label="Aantal" name="quantity">
+        <UFormField :label="t('common.quantity')" name="quantity">
           <UInput v-model.number="state.quantity" type="number" min="1" />
         </UFormField>
 
-        <UButton type="submit" variant="outline">Regel toevoegen</UButton>
+        <UButton type="submit" variant="outline">{{
+          t('apotheker.orders.create.addLine')
+        }}</UButton>
       </UForm>
     </UCard>
 
     <UCard>
       <template #header>
-        <h3 class="font-semibold">Huidige bestelling</h3>
+        <h3 class="font-semibold">
+          {{ t('apotheker.orders.create.current') }}
+        </h3>
       </template>
 
       <p v-if="lines.length === 0" class="text-sm text-muted">
-        Nog geen regels toegevoegd.
+        {{ t('apotheker.orders.create.linesEmpty') }}
       </p>
 
       <div v-else class="space-y-3">
@@ -226,7 +267,9 @@ async function submitOrder() {
         >
           <div>
             <p class="font-medium">{{ vaccineName(line.vaccineId) }}</p>
-            <p>{{ line.quantity }} dosissen</p>
+            <p>
+              {{ translatePlural('admin.orders.totalDoses', line.quantity) }}
+            </p>
           </div>
           <UButton
             size="sm"
@@ -234,7 +277,7 @@ async function submitOrder() {
             variant="ghost"
             @click="removeLine(line.vaccineId)"
           >
-            Verwijderen
+            {{ t('common.delete') }}
           </UButton>
         </div>
       </div>
@@ -268,10 +311,10 @@ async function submitOrder() {
           :disabled="!isOnline || lines.length === 0"
           @click="submitOrder"
         >
-          Bestelling plaatsen
+          {{ t('apotheker.orders.create.place') }}
         </UButton>
         <UButton to="/apotheker/orders" variant="ghost" color="neutral">
-          Naar mijn bestellingen
+          {{ t('apotheker.orders.title') }}
         </UButton>
       </div>
     </UCard>

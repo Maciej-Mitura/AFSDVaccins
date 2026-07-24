@@ -15,6 +15,7 @@ import { registerReconnectHandler } from '@/composables/useGraphQL'
 import { useAdminOperationsFeed } from '@/composables/useAdminOperationsFeed'
 import { useCurrentUser } from '@/composables/useCurrentUser'
 import { useOrders } from '@/composables/useOrders'
+import { orderStatusLabel, userRoleLabel } from '@/i18n'
 
 const { t } = useI18n()
 const { currentUser, loading: userLoading } = useCurrentUser()
@@ -34,10 +35,7 @@ const today = new Date().toISOString().slice(0, 10)
 let reconnectCleanup: (() => void) | null = null
 
 void loadAdminDailyOverview(today)
-void loadAdminWeeklyStatistics(
-  new Date().getFullYear(),
-  getIsoWeek(new Date()),
-)
+void loadAdminWeeklyStatistics(new Date().getFullYear(), getIsoWeek(new Date()))
 
 const { result: healthResult, loading: healthLoading } =
   useQuery<HealthQuery>(HEALTH_QUERY)
@@ -49,15 +47,28 @@ const { result, loading, error } = useQuery(ADMIN_AREA_QUERY, null, () => ({
 const health = computed(() => healthResult.value?.health)
 const roleProof = computed(() => result.value?.adminArea)
 const errorMessage = computed(
-  () => error.value?.message ?? 'Kon autorisatieproof niet ophalen.',
+  () => error.value?.message ?? t('admin.dashboard.roleProof.fetchFailed'),
 )
 
 function getIsoWeek(date: Date): number {
-  const target = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()))
+  const target = new Date(
+    Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()),
+  )
   const dayNumber = target.getUTCDay() || 7
   target.setUTCDate(target.getUTCDate() + 4 - dayNumber)
   const yearStart = new Date(Date.UTC(target.getUTCFullYear(), 0, 1))
-  return Math.ceil(((target.getTime() - yearStart.getTime()) / 86400000 + 1) / 7)
+  return Math.ceil(
+    ((target.getTime() - yearStart.getTime()) / 86400000 + 1) / 7,
+  )
+}
+
+function formatStatusCounts(
+  counts: Array<{ status: string; count: number }>,
+): string {
+  return counts
+    .filter(item => item.count > 0)
+    .map(item => `${orderStatusLabel(item.status)}: ${item.count}`)
+    .join(', ')
 }
 
 onMounted(() => {
@@ -83,30 +94,27 @@ onUnmounted(() => {
 
     <UCard v-if="dailyOverview">
       <template #header>
-        <h2 class="text-lg font-semibold">Vandaag — leveroverzicht</h2>
+        <h2 class="text-lg font-semibold">
+          {{ t('admin.dashboard.dailyOverview') }}
+        </h2>
       </template>
       <CommonLoadingSkeleton v-if="adminOverviewLoading && !dailyOverview" />
       <div v-else class="grid gap-3 text-sm sm:grid-cols-2 lg:grid-cols-4">
         <p>
-          <span class="font-medium">Bestellingen:</span>
+          <span class="font-medium">{{ t('admin.dashboard.orders') }}:</span>
           {{ dailyOverview.totalOrders }}
         </p>
         <p>
-          <span class="font-medium">Dosissen:</span>
+          <span class="font-medium">{{ t('admin.dashboard.doses') }}:</span>
           {{ dailyOverview.totalDoses }}
         </p>
         <p>
-          <span class="font-medium">Geannuleerd:</span>
+          <span class="font-medium">{{ t('admin.dashboard.cancelled') }}:</span>
           {{ dailyOverview.cancelledOrderCount }}
         </p>
         <p>
-          <span class="font-medium">Status:</span>
-          {{
-            dailyOverview.statusCounts
-              .filter(item => item.count > 0)
-              .map(item => `${item.status}: ${item.count}`)
-              .join(', ')
-          }}
+          <span class="font-medium">{{ t('admin.dashboard.status') }}:</span>
+          {{ formatStatusCounts(dailyOverview.statusCounts) }}
         </p>
       </div>
     </UCard>
@@ -114,19 +122,28 @@ onUnmounted(() => {
     <UCard v-if="weeklyStatistics">
       <template #header>
         <h3 class="font-semibold">
-          Week {{ weeklyStatistics.isoWeek }} / {{ weeklyStatistics.isoYear }}
+          {{
+            t('admin.dashboard.weekTitle', {
+              week: weeklyStatistics.isoWeek,
+              year: weeklyStatistics.isoYear,
+            })
+          }}
         </h3>
       </template>
       <div class="space-y-2 text-sm">
         <p>
-          <span class="font-medium">Actieve bestellingen:</span>
-          {{ weeklyStatistics.totalOrders }} ({{
-            weeklyStatistics.totalDoses
+          <span class="font-medium"
+            >{{ t('admin.dashboard.activeOrders') }}:</span
+          >
+          {{
+            t('admin.dashboard.weeklyOrdersSummary', {
+              count: weeklyStatistics.totalOrders,
+              doses: weeklyStatistics.totalDoses,
+            })
           }}
-          dosissen)
         </p>
         <div v-if="weeklyStatistics.vaccineQuantities.length">
-          <p class="font-medium">Per vaccin:</p>
+          <p class="font-medium">{{ t('admin.dashboard.perVaccine') }}:</p>
           <ul class="list-inside list-disc">
             <li
               v-for="item in weeklyStatistics.vaccineQuantities"
@@ -142,16 +159,18 @@ onUnmounted(() => {
     <UCard>
       <template #header>
         <div class="flex items-center justify-between gap-3">
-          <h3 class="font-semibold">Operaties feed</h3>
+          <h3 class="font-semibold">
+            {{ t('admin.dashboard.operationsFeed') }}
+          </h3>
           <UButton to="/admin/orders" size="sm" variant="ghost">
-            Naar bestellingen
+            {{ t('admin.dashboard.goToOrders') }}
           </UButton>
         </div>
       </template>
       <CommonEmptyState
         v-if="feedEvents.length === 0"
-        title="Nog geen live events"
-        description="Nieuwe bestellingen en statuswijzigingen verschijnen hier."
+        :title="t('admin.dashboard.operationsFeed.empty.title')"
+        :description="t('admin.dashboard.operationsFeed.empty.description')"
       />
       <ul v-else class="space-y-2 text-sm">
         <li v-for="(event, index) in feedEvents.slice(0, 10)" :key="index">
@@ -170,28 +189,28 @@ onUnmounted(() => {
 
       <div v-else-if="currentUser" class="space-y-2 text-sm">
         <p>
-          <span class="font-medium">Naam:</span>
+          <span class="font-medium">{{ t('common.name') }}:</span>
           {{ currentUser.firstName }} {{ currentUser.lastName }}
         </p>
         <p>
-          <span class="font-medium">E-mail:</span>
+          <span class="font-medium">{{ t('common.email') }}:</span>
           {{ currentUser.email }}
         </p>
         <p>
-          <span class="font-medium">Rol:</span>
-          {{ currentUser.role }}
+          <span class="font-medium">{{ t('common.role') }}:</span>
+          {{ userRoleLabel(currentUser.role) }}
         </p>
       </div>
     </UCard>
 
     <UCard>
       <template #header>
-        <h3 class="font-semibold">API status</h3>
+        <h3 class="font-semibold">{{ t('admin.dashboard.apiStatus') }}</h3>
       </template>
       <CommonLoadingSkeleton v-if="healthLoading" />
       <div v-else-if="health" class="space-y-2 text-sm">
         <p>
-          <span class="font-medium">Status:</span>
+          <span class="font-medium">{{ t('admin.dashboard.status') }}:</span>
           {{ health.status }}
         </p>
       </div>
@@ -199,20 +218,22 @@ onUnmounted(() => {
 
     <UCard>
       <template #header>
-        <h3 class="font-semibold">Rol-proof</h3>
+        <h3 class="font-semibold">
+          {{ t('admin.dashboard.roleProof.title') }}
+        </h3>
       </template>
 
       <CommonLoadingSkeleton v-if="loading" />
       <CommonErrorState
         v-else-if="error"
-        title="Autorisatieproof mislukt"
+        :title="t('admin.dashboard.roleProof.failed')"
         :description="errorMessage"
       />
       <p v-else-if="roleProof" class="text-sm">{{ roleProof }}</p>
       <CommonEmptyState
         v-else
-        title="Geen proof"
-        description="De admin proof query gaf geen resultaat terug."
+        :title="t('admin.dashboard.roleProof.empty.title')"
+        :description="t('admin.dashboard.roleProof.empty.description')"
       />
     </UCard>
   </div>

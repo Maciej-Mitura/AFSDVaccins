@@ -11,6 +11,13 @@ import CommonRealtimeStatus from '@/components/common/CommonRealtimeStatus.vue'
 import { registerReconnectHandler } from '@/composables/useGraphQL'
 import { useNotifications } from '@/composables/useNotifications'
 import { useOrders } from '@/composables/useOrders'
+import {
+  formatDate,
+  formatDateTime,
+  mapUserFacingGraphQLError,
+  orderStatusLabel,
+  translatePlural,
+} from '@/i18n'
 
 const { t } = useI18n()
 const {
@@ -23,13 +30,10 @@ const {
   subscribeToMyOrderEvents,
   stopMyOrderSubscriptions,
   isOrderCannotBeCancelledError,
-  mapGraphQLError,
 } = useOrders()
 
-const {
-  subscribeToNotificationEvents,
-  stopNotificationSubscription,
-} = useNotifications()
+const { subscribeToNotificationEvents, stopNotificationSubscription } =
+  useNotifications()
 
 const cancellingId = ref<string | null>(null)
 const actionError = ref<string | null>(null)
@@ -52,31 +56,8 @@ onUnmounted(() => {
   reconnectCleanup?.()
 })
 
-function statusLabel(status: OrderStatus): string {
-  switch (status) {
-    case OrderStatus.Pending:
-    case OrderStatus.Planned:
-      return 'in behandeling'
-    case OrderStatus.Delivered:
-      return 'geleverd'
-    case OrderStatus.Cancelled:
-      return 'geannuleerd'
-    default:
-      return status
-  }
-}
-
 function canCancel(status: OrderStatus): boolean {
   return status === OrderStatus.Pending
-}
-
-function formatDateTime(value: string): string {
-  return new Date(value).toLocaleString('nl-BE')
-}
-
-function formatDeliveryDate(value: string): string {
-  const [year, month, day] = value.split('-')
-  return `${day}/${month}/${year}`
 }
 
 async function onCancel(id: string) {
@@ -88,8 +69,8 @@ async function onCancel(id: string) {
     await loadMyOrders()
   } catch (error: unknown) {
     actionError.value = isOrderCannotBeCancelledError(error)
-      ? 'Deze bestelling kan niet meer geannuleerd worden.'
-      : mapGraphQLError(error)
+      ? t('errors.order.cancelNotAllowed')
+      : mapUserFacingGraphQLError(error)
   } finally {
     cancellingId.value = null
   }
@@ -103,7 +84,9 @@ async function onCancel(id: string) {
     <UCard>
       <template #header>
         <div class="flex flex-wrap items-center justify-between gap-3">
-          <h2 class="text-lg font-semibold">{{ t('apotheker.orders.title') }}</h2>
+          <h2 class="text-lg font-semibold">
+            {{ t('apotheker.orders.title') }}
+          </h2>
           <UButton to="/apotheker/orders/new" size="sm">{{
             t('apotheker.orders.new')
           }}</UButton>
@@ -114,14 +97,14 @@ async function onCancel(id: string) {
 
       <CommonErrorState
         v-else-if="errorMessage"
-        title="Bestellingen laden mislukt"
+        :title="t('admin.orders.loadFailed')"
         :description="errorMessage"
       />
 
       <CommonEmptyState
         v-else-if="myOrders.length === 0"
-        title="Geen bestellingen"
-        description="Je hebt nog geen bestellingen geplaatst."
+        :title="t('admin.orders.empty.title')"
+        :description="t('apotheker.orders.empty.description')"
       />
 
       <div v-else class="space-y-4">
@@ -132,34 +115,47 @@ async function onCancel(id: string) {
         >
           <div class="space-y-3 text-sm">
             <div class="flex flex-wrap items-center gap-2">
-              <h3 class="font-semibold">Bestelling {{ order.id }}</h3>
-              <UBadge variant="subtle">{{ statusLabel(order.status) }}</UBadge>
+              <h3 class="font-semibold">
+                {{ t('admin.orders.orderId', { id: order.id }) }}
+              </h3>
+              <UBadge variant="subtle">{{
+                orderStatusLabel(order.status)
+              }}</UBadge>
             </div>
             <p>
-              <span class="font-medium">Ingediend:</span>
+              <span class="font-medium"
+                >{{ t('admin.orders.submittedAt') }}:</span
+              >
               {{ formatDateTime(order.submittedAt) }}
             </p>
             <p>
-              <span class="font-medium">Leverdatum:</span>
-              {{ formatDeliveryDate(order.deliveryDate) }}
+              <span class="font-medium">{{ t('orders.deliveryDate') }}:</span>
+              {{ formatDate(order.deliveryDate) }}
             </p>
             <p>
-              <span class="font-medium">ISO-week:</span>
+              <span class="font-medium">{{ t('orders.filter.isoWeek') }}:</span>
               {{ order.isoWeek }} / {{ order.isoYear }}
             </p>
             <p>
-              <span class="font-medium">Totaal:</span>
-              {{ order.totalQuantity }} dosissen
+              <span class="font-medium">{{ t('admin.orders.total') }}:</span>
+              {{
+                translatePlural('admin.orders.totalDoses', order.totalQuantity)
+              }}
             </p>
 
             <div class="space-y-2">
-              <p class="font-medium">Regels</p>
+              <p class="font-medium">{{ t('admin.orders.lines') }}</p>
               <div
                 v-for="line in order.orderLines"
                 :key="`${order.id}-${line.vaccineId}`"
                 class="rounded border border-default p-2"
               >
-                {{ line.vaccineName }} — {{ line.quantity }} dosissen
+                {{
+                  t('admin.orders.line', {
+                    name: line.vaccineName,
+                    count: line.quantity,
+                  })
+                }}
               </div>
             </div>
 
@@ -171,7 +167,7 @@ async function onCancel(id: string) {
               :loading="cancellingId === order.id"
               @click="onCancel(order.id)"
             >
-              Annuleren
+              {{ t('common.cancel') }}
             </UButton>
           </div>
         </UCard>
