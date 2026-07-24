@@ -268,15 +268,18 @@ Do **not** deploy in Phase 21.
 
 ### Planned exam approach (Phase 23)
 
-| Item            | Plan                                                                                                        |
-| --------------- | ----------------------------------------------------------------------------------------------------------- |
-| Locales         | **Dutch + English** mandatory (demo zh/es optional later)                                                   |
-| Runtime         | `vue-i18n` with locale switcher                                                                             |
-| Source of truth | Google Sheet (teacher workflow) **or** committed JSON if Sheets blocked — prefer Sheets to match course     |
-| Generated files | `packages/pwa/src/locales/{nl,en}.json` (committed after a successful local export for CI reproducibility)  |
-| Exporter        | `packages/i18n-export` workspace (student-owned; Phase 23A implemented)                                     |
-| Missing keys    | Fallback to Dutch key string + dev warning; tests assert no silent empty _(runtime — Phase 23B)_            |
-| Tests           | Exporter offline unit tests (23A); missing-key safety, locale switch unit, Playwright language-switch (23B) |
+| Item            | Plan                                                                                      |
+| --------------- | ----------------------------------------------------------------------------------------- |
+| Locales         | **nl** (default), **en** (runtime fallback), **zh**, **es**                               |
+| Runtime         | `vue-i18n` Composition API + `useLanguage` + `CommonLanguageSelector` _(23B done)_        |
+| Source of truth | Google Sheet (editable) → exporter → committed locale JSON (runtime/CI); no Google in PWA |
+| Generated files | `packages/pwa/src/locales/{nl,en,zh,es}.json`                                             |
+| Exporter        | `packages/i18n-export` workspace (student-owned; Phase 23A implemented)                   |
+| Persistence     | `localStorage['vaccin-delivery:locale']`                                                  |
+| Missing keys    | Runtime → English catalog; export-time → Sheet Default (separate) _(23B)_                 |
+| Tests           | Exporter offline (23A); resolution/loader/`setLocale`; Playwright language-switch (23B)   |
+| Remaining       | Full UI string + date/number migration → **Phase 23C**                                    |
+| Sync note       | Edit Sheet in Google UI, then `npm run export:i18n` (readonly; no offline merge)          |
 
 ### External / manual student steps (not done by agent in Phase 23 alone)
 

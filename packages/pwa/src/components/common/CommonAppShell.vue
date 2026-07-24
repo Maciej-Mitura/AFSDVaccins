@@ -6,11 +6,11 @@
       >
         <div>
           <p class="text-xs uppercase tracking-wide text-muted">
-            Vaccinatie-levering
+            {{ t('app.title') }}
           </p>
           <h1 class="text-lg font-semibold">{{ title }}</h1>
         </div>
-        <nav aria-label="Hoofdnavigatie">
+        <nav :aria-label="t('navigation.main')">
           <div class="flex flex-wrap items-center gap-2">
             <UButton
               v-for="link in navigationLinks"
@@ -22,6 +22,7 @@
             >
               {{ link.label }}
             </UButton>
+            <CommonLanguageSelector />
             <slot name="header-actions" />
             <UButton
               v-if="isAuthenticated"
@@ -29,9 +30,10 @@
               size="sm"
               variant="outline"
               :loading="loggingOut"
+              data-testid="logout-button"
               @click="onLogout"
             >
-              Uitloggen
+              {{ t('account.log.out') }}
             </UButton>
           </div>
         </nav>
@@ -45,13 +47,17 @@
 
 <script setup lang="ts">
 import { computed, ref } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
 
+import CommonLanguageSelector from '@/components/common/CommonLanguageSelector.vue'
 import { clearApolloCache } from '@/composables/useGraphQL'
 import { useCurrentUser } from '@/composables/useCurrentUser'
 import { useFirebase } from '@/composables/useFirebase'
 import { useNotifications } from '@/composables/useNotifications'
 import { useAdminNotifications } from '@/composables/useAdminNotifications'
+
+const { t } = useI18n()
 
 export type AppShellLink = {
   label: string

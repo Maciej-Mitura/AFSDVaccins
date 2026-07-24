@@ -16,6 +16,9 @@ import {
   credentialsToPersistedToken,
   loadPersistedToken,
   savePersistedToken,
+  SHEETS_READONLY_SCOPE,
+  SHEETS_READWRITE_SCOPE,
+  tokenSatisfiesAuthMode,
 } from '../src/authorize.js'
 import type { SheetsAuthClient } from '../src/auth-types.js'
 import {
@@ -589,7 +592,10 @@ describe('token persistence', () => {
       }),
       'utf8',
     )
-    await savePersistedToken(tokenPath, { refresh_token: 'stale-refresh' })
+    await savePersistedToken(tokenPath, {
+      refresh_token: 'stale-refresh',
+      scope: SHEETS_READONLY_SCOPE,
+    })
 
     const browserClient: SheetsAuthClient = {
       credentials: {
@@ -677,6 +683,110 @@ describe('token persistence', () => {
     await expect(
       clearPersistedToken(path.join(dir, 'missing-token.json')),
     ).resolves.toBeUndefined()
+  })
+
+  it('treats readonly scope as insufficient for readwrite mode', () => {
+    expect(
+      tokenSatisfiesAuthMode(
+        { refresh_token: 'r', scope: SHEETS_READONLY_SCOPE },
+        'readwrite',
+      ),
+    ).toBe(false)
+    expect(
+      tokenSatisfiesAuthMode(
+        { refresh_token: 'r', scope: SHEETS_READWRITE_SCOPE },
+        'readwrite',
+      ),
+    ).toBe(true)
+    expect(
+      tokenSatisfiesAuthMode(
+        { refresh_token: 'r', scope: SHEETS_READWRITE_SCOPE },
+        'readonly',
+      ),
+    ).toBe(true)
+  })
+
+  it('refuses scope upgrade without deleting the cached token', async () => {
+    const dir = await makeTempDir()
+    const credentialsPath = path.join(dir, 'credentials.json')
+    const tokenPath = path.join(dir, 'token.json')
+
+    await writeFile(
+      credentialsPath,
+      JSON.stringify({
+        installed: {
+          client_id: 'client-id',
+          client_secret: 'client-secret',
+          redirect_uris: ['http://localhost'],
+        },
+      }),
+      'utf8',
+    )
+    await savePersistedToken(tokenPath, {
+      refresh_token: 'readonly-refresh',
+      scope: SHEETS_READONLY_SCOPE,
+    })
+
+    const runBrowserAuth = vi.fn()
+
+    await expect(
+      authorizeGoogleSheets({
+        credentialsPath,
+        tokenPath,
+        mode: 'readwrite',
+        runBrowserAuth,
+      }),
+    ).rejects.toThrow(/Manually delete only that ignored token file/)
+
+    expect(runBrowserAuth).not.toHaveBeenCalled()
+    expect(await loadPersistedToken(tokenPath)).toMatchObject({
+      refresh_token: 'readonly-refresh',
+      scope: SHEETS_READONLY_SCOPE,
+    })
+  })
+
+  it('requests write scope from browser auth when seeding with no cache', async () => {
+    const dir = await makeTempDir()
+    const credentialsPath = path.join(dir, 'credentials.json')
+    const tokenPath = path.join(dir, 'token.json')
+
+    await writeFile(
+      credentialsPath,
+      JSON.stringify({
+        installed: {
+          client_id: 'client-id',
+          client_secret: 'client-secret',
+          redirect_uris: ['http://localhost'],
+        },
+      }),
+      'utf8',
+    )
+
+    const browserClient: SheetsAuthClient = {
+      credentials: {
+        refresh_token: 'write-refresh',
+        access_token: 'write-access',
+        scope: SHEETS_READWRITE_SCOPE,
+      },
+      getAccessToken: () => Promise.resolve({ token: 'write-access' }),
+    }
+
+    const runBrowserAuth = vi.fn(() => Promise.resolve(browserClient))
+
+    await authorizeGoogleSheets({
+      credentialsPath,
+      tokenPath,
+      mode: 'readwrite',
+      runBrowserAuth,
+    })
+
+    expect(runBrowserAuth).toHaveBeenCalledWith(credentialsPath, [
+      SHEETS_READWRITE_SCOPE,
+    ])
+    expect(await loadPersistedToken(tokenPath)).toMatchObject({
+      refresh_token: 'write-refresh',
+      scope: SHEETS_READWRITE_SCOPE,
+    })
   })
 })
 

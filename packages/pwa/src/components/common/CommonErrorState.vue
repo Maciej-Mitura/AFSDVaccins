@@ -3,20 +3,24 @@
     color="error"
     variant="subtle"
     icon="i-lucide-circle-alert"
-    :title="title"
-    :description="description"
+    :title="resolvedTitle"
+    :description="resolvedDescription"
   />
 </template>
 
 <script setup lang="ts">
-withDefaults(
-  defineProps<{
-    title?: string
-    description?: string
-  }>(),
-  {
-    title: 'Er is iets misgegaan',
-    description: 'Probeer het later opnieuw of neem contact op met support.',
-  },
+import { computed } from 'vue'
+import { useI18n } from 'vue-i18n'
+
+const props = defineProps<{
+  title?: string
+  description?: string
+}>()
+
+const { t } = useI18n()
+
+const resolvedTitle = computed(() => props.title ?? t('common.error.title'))
+const resolvedDescription = computed(
+  () => props.description ?? t('common.error.description'),
 )
 </script>

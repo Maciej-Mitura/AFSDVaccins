@@ -73,7 +73,7 @@ All policies above are marked **configurable** in seed data, GraphQL admin setti
 | **Zod + Nuxt UI forms**                      | Optional quality enhancement        | Reference pattern for client validation                     |
 | **Firebase Auth emulator**                   | Optional quality enhancement        | CI convenience (Issue #51)                                  |
 | **MongoMemoryServer**                        | Optional quality enhancement        | CI test isolation                                           |
-| **Runtime i18n (vue-i18n)**                  | Optional quality enhancement        | Rubric bonus points                                         |
+| **Runtime i18n (vue-i18n)**                  | Optional quality enhancement        | Phase 23B foundation (nl/en/zh/es); full migration 23C      |
 | **Vitest unit tests**                        | Optional quality enhancement        | Explicit “extra” in checklist                               |
 | **PKCE**                                     | Not required (default)              | Firebase email/password does not use PKCE                   |
 

@@ -15,10 +15,11 @@ export async function runExport(): Promise<void> {
   const config = loadExporterConfig()
   assertCredentialsPresent(config.credentialsPath)
 
-  console.info('Authenticating with Google Sheets (readonly)…')
+  console.info('Authenticating with Google Sheets (readonly export)…')
   const auth = await authorizeGoogleSheets({
     credentialsPath: config.credentialsPath,
     tokenPath: config.tokenPath,
+    mode: 'readonly',
   })
 
   const reader = new GoogleSheetsReader(auth)

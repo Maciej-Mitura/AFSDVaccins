@@ -1,7 +1,7 @@
 <template>
   <UCard>
     <template #header>
-      <h2 class="text-lg font-semibold">Inloggen</h2>
+      <h2 class="text-lg font-semibold">{{ t('auth.login.title') }}</h2>
     </template>
 
     <UAlert
@@ -37,7 +37,7 @@
       :data-e2e-auth-bypass="e2eAuthBypassEnabled ? 'true' : 'false'"
       @submit="onSubmit"
     >
-      <UFormField label="E-mailadres" name="email" required>
+      <UFormField :label="t('auth.login.email')" name="email" required>
         <UInput
           v-model="state.email"
           autocomplete="email"
@@ -46,7 +46,7 @@
         />
       </UFormField>
 
-      <UFormField label="Wachtwoord" name="password" required>
+      <UFormField :label="t('auth.login.password')" name="password" required>
         <UInput
           v-model="state.password"
           autocomplete="current-password"
@@ -62,7 +62,7 @@
           class="text-sm text-primary hover:underline"
           to="/auth/forgot-password"
         >
-          Wachtwoord vergeten?
+          {{ t('auth.login.forgotPassword') }}
         </RouterLink>
 
         <UButton
@@ -72,15 +72,15 @@
           type="submit"
           data-testid="login-submit"
         >
-          Inloggen
+          {{ t('auth.login.submit') }}
         </UButton>
       </div>
     </UForm>
 
     <p class="mt-4 text-center text-sm text-muted">
-      Nog geen account?
+      {{ t('auth.login.noAccount') }}
       <RouterLink class="text-primary hover:underline" to="/auth/register">
-        Registreren
+        {{ t('auth.login.register') }}
       </RouterLink>
     </p>
   </UCard>
@@ -88,6 +88,7 @@
 
 <script setup lang="ts">
 import { computed, reactive, ref } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 
 import type { FormSubmitEvent } from '@nuxt/ui'
@@ -102,6 +103,7 @@ import {
 } from '@/views/auth/login-offline'
 import { isE2eAuthBypassEnabled } from '@/firebase/e2e-auth-bypass'
 
+const { t } = useI18n()
 const route = useRoute()
 const router = useRouter()
 const { isOnline } = useOnlineStatus()

@@ -4,7 +4,19 @@ import { OAuth2Client, type Credentials } from 'google-auth-library'
 
 import type { SheetsAuthClient } from './auth-types.js'
 
-const SCOPES = ['https://www.googleapis.com/auth/spreadsheets.readonly']
+/** Read-only Sheets access — sufficient for `npm run export:i18n`. */
+export const SHEETS_READONLY_SCOPE =
+  'https://www.googleapis.com/auth/spreadsheets.readonly'
+
+/**
+ * Read/write Sheets access — required for explicit Sheet seed/sync only.
+ * Broader than readonly; never requested by normal export when a sufficient
+ * readonly token already exists.
+ */
+export const SHEETS_READWRITE_SCOPE =
+  'https://www.googleapis.com/auth/spreadsheets'
+
+export type SheetsAuthMode = 'readonly' | 'readwrite'
 
 /** Persisted token fields only — never arbitrary OAuth2Client internals. */
 export interface PersistedOAuthToken {
@@ -26,6 +38,55 @@ interface DesktopOAuthKeyfile {
     client_secret?: string
     redirect_uris?: string[]
   }
+}
+
+export function scopesForAuthMode(mode: SheetsAuthMode): string[] {
+  return mode === 'readwrite'
+    ? [SHEETS_READWRITE_SCOPE]
+    : [SHEETS_READONLY_SCOPE]
+}
+
+/**
+ * Whether a persisted token's scope string satisfies the requested mode.
+ * Missing scope is treated as insufficient (force explicit reauthorization).
+ */
+export function tokenSatisfiesAuthMode(
+  token: PersistedOAuthToken,
+  mode: SheetsAuthMode,
+): boolean {
+  const scopes = (token.scope ?? '')
+    .split(/\s+/)
+    .map(s => s.trim())
+    .filter(Boolean)
+
+  if (scopes.length === 0) {
+    return false
+  }
+
+  const hasReadWrite = scopes.includes(SHEETS_READWRITE_SCOPE)
+  const hasReadOnly = scopes.includes(SHEETS_READONLY_SCOPE)
+
+  if (mode === 'readwrite') {
+    // Full spreadsheets scope only — `.readonly` alone cannot write.
+    return hasReadWrite
+  }
+
+  // Readonly export accepts either readonly or full spreadsheets (superset).
+  return hasReadWrite || hasReadOnly
+}
+
+export function scopeUpgradeRequiredMessage(
+  tokenPath: string,
+  mode: SheetsAuthMode,
+): string {
+  const needed = scopesForAuthMode(mode).join(' ')
+  return (
+    `Cached Google OAuth token at ${tokenPath} does not include the required scope(s): ${needed}. ` +
+    `OAuth scopes are fixed at consent time — refreshing will not widen them. ` +
+    `Manually delete only that ignored token file (do not commit credentials), then re-run this command ` +
+    `so the browser consent flow can request the broader scope. ` +
+    `Normal export:i18n remains read-only against the Sheets API even when a write-capable token is present.`
+  )
 }
 
 export async function readDesktopClientSecrets(
@@ -191,8 +252,17 @@ async function refreshOrThrow(client: SheetsAuthClient): Promise<void> {
 export interface AuthorizeOptions {
   credentialsPath: string
   tokenPath: string
+  /**
+   * `readonly` — normal export (Sheets values.get only).
+   * `readwrite` — explicit Sheet seed/sync commands only.
+   * Default: `readonly`.
+   */
+  mode?: SheetsAuthMode
   /** Injected for tests — browser OAuth when cache miss. */
-  runBrowserAuth?: (credentialsPath: string) => Promise<SheetsAuthClient>
+  runBrowserAuth?: (
+    credentialsPath: string,
+    scopes: string[],
+  ) => Promise<SheetsAuthClient>
   /** Injected for tests — build an OAuth2 client from secrets + persisted token. */
   createClient?: (
     clientId: string,
@@ -203,22 +273,29 @@ export interface AuthorizeOptions {
 
 async function defaultBrowserAuth(
   credentialsPath: string,
+  scopes: string[],
 ): Promise<SheetsAuthClient> {
   const client = await authenticate({
-    scopes: SCOPES,
+    scopes,
     keyfilePath: credentialsPath,
   })
   return client
 }
 
 /**
- * Authorize a Sheets-readonly OAuth2 client.
- * Uses cached refresh tokens when valid; otherwise opens the desktop browser flow.
+ * Authorize a Google Sheets OAuth2 client.
+ * Uses cached refresh tokens when valid and scope-sufficient; otherwise opens
+ * the desktop browser flow for the requested mode.
+ *
+ * Never silently deletes a token merely because a broader scope is needed —
+ * that requires an explicit manual delete of the ignored token.json.
  * Never logs secrets or token material.
  */
 export async function authorizeGoogleSheets(
   options: AuthorizeOptions,
 ): Promise<SheetsAuthClient> {
+  const mode: SheetsAuthMode = options.mode ?? 'readonly'
+  const scopes = scopesForAuthMode(mode)
   const { clientId, clientSecret } = await readDesktopClientSecrets(
     options.credentialsPath,
   )
@@ -227,6 +304,11 @@ export async function authorizeGoogleSheets(
 
   const cached = await loadPersistedToken(options.tokenPath)
   if (cached) {
+    if (!tokenSatisfiesAuthMode(cached, mode)) {
+      // Do not unlink — operator must delete token.json intentionally.
+      throw new Error(scopeUpgradeRequiredMessage(options.tokenPath, mode))
+    }
+
     const client = createClient(clientId, clientSecret, cached)
     try {
       await refreshOrThrow(client)
@@ -235,11 +317,11 @@ export async function authorizeGoogleSheets(
       return client
     } catch {
       await clearPersistedToken(options.tokenPath)
-      // Fall through to browser login.
+      // Fall through to browser login (invalid/expired refresh only).
     }
   }
 
-  const browserClient = await runBrowserAuth(options.credentialsPath)
+  const browserClient = await runBrowserAuth(options.credentialsPath, scopes)
   const persisted = credentialsToPersistedToken(browserClient.credentials)
   await savePersistedToken(options.tokenPath, persisted)
 

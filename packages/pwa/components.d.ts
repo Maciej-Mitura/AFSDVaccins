@@ -14,6 +14,7 @@ declare module 'vue' {
     CommonAppShell: typeof import('./src/components/common/CommonAppShell.vue')['default']
     CommonEmptyState: typeof import('./src/components/common/CommonEmptyState.vue')['default']
     CommonErrorState: typeof import('./src/components/common/CommonErrorState.vue')['default']
+    CommonLanguageSelector: typeof import('./src/components/common/CommonLanguageSelector.vue')['default']
     CommonLoadingSkeleton: typeof import('./src/components/common/CommonLoadingSkeleton.vue')['default']
     CommonNotificationBell: typeof import('./src/components/common/CommonNotificationBell.vue')['default']
     CommonOfflineBanner: typeof import('./src/components/common/CommonOfflineBanner.vue')['default']

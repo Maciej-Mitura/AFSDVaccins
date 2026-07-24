@@ -7,29 +7,26 @@ screens.
 
 ## Current status
 
-**Phase 23A in progress — Google Sheets translation exporter foundation**
-(`packages/i18n-export`). Dev-only Sheets → locale JSON workflow with validation,
-offline unit tests, and gitignored OAuth credentials/tokens. Runtime `vue-i18n`,
-locale switcher, and UI string migration are **not** started (Phase 23B+).
+**Phase 23B complete — runtime Vue i18n foundation** (`vue-i18n` in the PWA).
+Supported locales: **nl** (default), **en** (runtime fallback), **zh**, **es**.
+Language selector in the app shell and auth layout; global shell + login + one
+representative screen per role translated. Locale JSON is generated from the
+Google Sheet via `npm run export:i18n`. Full UI string migration is **Phase 23C**.
 
-**Phase 22 complete — backend security foundation** (rate limiting, process-local
+**Phase 23A complete** — Google Sheets → locale JSON exporter (`packages/i18n-export`).
+
+**Phase 22 complete** — backend security foundation (rate limiting, process-local
 caching with invalidation, Helmet headers, GraphQL depth/complexity, body-size gate).
-Shared bootstrap (`configureApiApp`) is used by `main.ts` and E2E. No PWA changes;
-rate-limit errors use GraphQL `extensions.code = RATE_LIMITED`.
 
 **Phase 21** remains complete (requirements audit / enhancement roadmap docs).
 
 Authoritative requirement statuses in `docs/requirements-matrix.md` §0.1:
-**98** implemented, **22** partially implemented, **12** deferred, **11** not applicable,
-**4** missing, **2** ambiguous (**149** total) — ARCH-004 exporter path updated in Phase 23A;
-FRONT-018 runtime i18n remains missing until Phase 23B+.
-
-Runtime i18n and public deployment remain optional/extra in the original checklist;
-mandatory for this project’s chosen Tier A final scope (Phases 23–24).
+FRONT-018 is **partially implemented** (runtime foundation + limited migration;
+most screens still hardcoded Dutch until Phase 23C).
 
 **Phases 0–20** remain complete (domain, PWA, Docker, CI green @ `f3e4d07`).
 
-**Next phase:** Phase 23B — runtime `vue-i18n` + UI string migration. Do not start until
+**Next phase:** Phase 23C — remaining UI string migration. Do not start until
 explicitly requested. Phase 24 remains blocked until requested.
 
 ## Planned stack
@@ -1824,20 +1821,46 @@ the production Compose file.
 - Playwright `VITE_E2E_AUTH_BYPASS` is refused at PWA image build time
 - CORS `URL_FRONTEND` defaults to `http://localhost:8080` (no wildcard)
 
-## i18n exporter (Phase 23A)
+## i18n exporter (Phase 23A) and runtime i18n (Phase 23B)
 
-Dev-only Google Sheets → locale JSON toolchain. **Not** part of PWA/API/Docker
-runtime. Normal `npm install`, PWA build, CI, and app startup never call Google.
+**Source-of-truth workflow (do not invert):**
 
-### Architecture
+1. **Google Sheet** — editable translation source (humans edit here)
+2. **`npm run export:i18n`** — local exporter **reads** the Sheet and regenerates JSON
+3. **Committed `packages/pwa/src/locales/*.json`** — generated artifacts for runtime/CI
+4. **PWA `vue-i18n`** — consumes committed JSON only (never Google)
 
-```
-Google Sheet (tabs: nl, en)
-  → packages/i18n-export (OAuth Desktop + validation)
-  → packages/i18n-export/dist/locales/{nl,en}.json  (gitignored via **/dist/)
-  → packages/pwa/src/locales/{nl,en}.json           (committed after a real export)
-  → vue-i18n runtime                                (Phase 23B — not started)
-```
+Do **not** hand-edit locale JSON as a second translation source. The exporter is
+local/dev-only: it never runs from app startup, PWA/API build, CI, Docker, or
+unit/e2e tests. Normal export is **strictly read-only** against the Sheets API
+(even if a local token happens to carry a broader scope from earlier consent).
+
+### Runtime (`vue-i18n` — Phase 23B)
+
+| Item           | Behaviour                                                                                                   |
+| -------------- | ----------------------------------------------------------------------------------------------------------- |
+| Package        | `vue-i18n` in `@vaccin-delivery/pwa` only (not API / not exporter runtime)                                  |
+| Locales        | `nl` (default), `en` (runtime missing-key fallback), `zh`, `es`                                             |
+| Catalogs       | Committed `packages/pwa/src/locales/{nl,en,zh,es}.json` (Vite-bundled; **generated**, not hand-edited)      |
+| Bootstrap      | Auth restore → `app.use(i18n)` → `app.use(router)` → mount                                                  |
+| Resolution     | 1) `localStorage['vaccin-delivery:locale']` 2) normalized `navigator.languages` / `language` 3) `nl`        |
+| Browser tags   | `nl-BE`→`nl`, `en-US`→`en`, `zh-Hans`→`zh`, `es-MX`→`es`, etc.; unsupported → `nl`                          |
+| Persistence    | Explicit user choice only (`vaccin-delivery:locale`); no page reload on switch                              |
+| Selector       | `CommonLanguageSelector` in app shell header + auth layout (Nuxt UI)                                        |
+| Formatting map | `nl`→`nl-BE`, `en`→`en-GB`, `es`→`es-ES`, `zh`→`zh-CN` (representative screens; full date migration in 23C) |
+
+**Two fallback layers (do not confuse):**
+
+1. **Export-time** (Phase 23A): blank locale cell → Sheet **Default** column when generating JSON.
+2. **Runtime** (Phase 23B): missing key in the active locale → English catalog (`fallbackLocale: 'en'`).
+
+Export-time still requires equal key sets across locales. Runtime fallback is a safety net, not an excuse for incomplete catalogs.
+
+**Translated in 23B:** global shell (brand, nav, logout, language label, common loading/error), login view, ADMIN dashboard heading, APOTHEKER orders heading, BEZORGER today-route heading. Remaining screens: **Phase 23C**.
+
+No Google credentials or Sheets calls in the PWA bundle, CI, or Docker image.
+
+### Exporter (Phase 23A)
 
 ### Spreadsheet schema
 
@@ -1851,6 +1874,8 @@ Teacher-compatible preferred headers (one tab per locale):
 
 - `en` tab: `Key | Default | en`
 - `nl` tab: `Key | Default | nl`
+- `zh` tab: `Key | Default | zh`
+- `es` tab: `Key | Default | es`
 
 Legacy alias still accepted: `Key | Default | Translation`. Unrelated third-column
 headers (e.g. `Value`, wrong locale code) are rejected.
@@ -1873,10 +1898,10 @@ belongs in Phase 23B.
 
 Placeholder multiset checks use the **effective** exported strings.
 
-Tabs: **`nl`** and **`en`** only. Completely empty rows are ignored. Duplicate
-keys, unequal key sets, and invalid keys still fail. Both locale JSON files are
-written together or not at all. Output is UTF-8, 2-space JSON with locale
-wrappers (`{ "nl": { "common.save": "…" } }`), alphabetical keys, trailing
+Tabs: **`nl`**, **`en`**, **`zh`**, **`es`**. Completely empty rows are ignored.
+Duplicate keys, unequal key sets, and invalid keys still fail. All four locale
+JSON files are written together or not at all. Output is UTF-8, 2-space JSON with
+locale wrappers (`{ "nl": { "common.save": "…" } }`), alphabetical keys, trailing
 newline, and **effective values only** (no fallback metadata in JSON).
 
 Key pattern: one or more segments of `[A-Za-z0-9_-]` separated by dots
@@ -1908,20 +1933,42 @@ Overrides may be absolute or package-root-relative
 3. Create an OAuth client of type **Desktop app**.
 4. Download the client JSON as `packages/i18n-export/credentials.json`
    (gitignored — never commit).
-5. Create a spreadsheet with worksheets named `nl` and `en`. Prefer headers
-   `Key | Default | nl` and `Key | Default | en` (teacher-compatible). The legacy
-   third header `Translation` is also accepted.
+5. Create a spreadsheet with worksheets named `nl`, `en`, `zh`, and `es`. Prefer
+   headers `Key | Default | {locale}` (teacher-compatible). The legacy third
+   header `Translation` is also accepted.
 6. Share the sheet with the Google account that will authorize the exporter.
 7. Copy `.env.example` → `packages/i18n-export/.env` and set
    `GOOGLE_SHEETS_SPREADSHEET_ID` (never commit `.env` or spreadsheet IDs you
    want private).
 
-### First authorization + export
+### OAuth scopes and reauthorization
+
+`npm run export:i18n` authenticates in **readonly** mode and only calls Sheets
+`values.get`. It accepts a cached token with either
+`spreadsheets.readonly` or the broader `spreadsheets` scope (superset).
+
+OAuth scopes are fixed at consent time — refreshing does **not** widen them.
+The exporter never silently deletes `token.json` merely to change scopes.
+
+If authorization fails or you need a fresh consent flow:
+
+1. Verify `packages/i18n-export/token.json` is listed in `.gitignore`.
+2. **Manually delete** only `packages/i18n-export/token.json` (do not commit it;
+   do not delete `credentials.json` unless rotating the OAuth client).
+3. Re-run `npm run export:i18n` and complete the browser consent flow.
+
+Never log or commit access tokens, refresh tokens, or client secrets.
+
+### Day-to-day translation workflow
+
+1. Edit strings in the Google Sheet (`nl` / `en` / `zh` / `es` tabs).
+2. From the monorepo root, regenerate catalogs:
 
 ```bash
-# from monorepo root
 npm run export:i18n
 ```
+
+3. Commit the updated `packages/pwa/src/locales/*.json` with your change.
 
 On first run, a browser window opens for Google OAuth. A refresh token is stored
 in `packages/i18n-export/token.json` (gitignored, mode `0600` where supported).
@@ -1929,35 +1976,38 @@ Later runs reuse the token; invalid/expired caches fall back to a new browser
 login. If Google does not return a `refresh_token`, revoke prior consent for the
 OAuth client and re-run so offline access is granted.
 
-**Do not run a live export in CI.** Commit the generated
-`packages/pwa/src/locales/*.json` after a successful local export — those files
-are the runtime/build source of truth once Phase 23B wires `vue-i18n`.
+**Do not run a live export in CI.** Commit the generated locale JSON after a
+successful local export — those files are runtime artifacts, not a second
+editable translation source.
 
 ### Commands
 
-| Command                  | Purpose                                       |
-| ------------------------ | --------------------------------------------- |
-| `npm run export:i18n`    | Authenticate, validate, write locale JSON     |
-| `npm run lint:i18n`      | ESLint for the exporter package               |
-| `npm run typecheck:i18n` | TypeScript check                              |
-| `npm run test:i18n`      | Offline unit tests (mocked Sheets; no Google) |
+| Command                  | Purpose                                              |
+| ------------------------ | ---------------------------------------------------- |
+| `npm run export:i18n`    | Authenticate (readonly), validate, write locale JSON |
+| `npm run lint:i18n`      | ESLint for the exporter package                      |
+| `npm run typecheck:i18n` | TypeScript check                                     |
+| `npm run test:i18n`      | Offline unit tests (mocked Sheets; no Google)        |
 
 ### Security notes
 
 - Never commit `credentials.json`, `token.json`, or `packages/i18n-export/.env`.
 - Never log client secrets, access tokens, refresh tokens, or full credential JSON.
 - Google packages live only in `@vaccin-delivery/i18n-export` — not in the PWA or API.
-- Failed validation writes **no** locale files (no partial nl/en updates).
+- Failed validation writes **no** locale files (no partial locale updates).
+- Normal export never writes to Google Sheets. CI/Docker/tests never call Google.
 
 ### Phase 23 status
 
-| Item                        | Status                       |
-| --------------------------- | ---------------------------- |
-| Sheets exporter foundation  | Implemented (23A)            |
-| Runtime `vue-i18n`          | Not started (23B)            |
-| `useLanguage` / switcher    | Not started (23B)            |
-| UI string migration         | Not started (23B)            |
-| FRONT-018 fully implemented | No — waiting on runtime i18n |
+| Item                        | Status                                  |
+| --------------------------- | --------------------------------------- |
+| Sheets exporter foundation  | Implemented (23A)                       |
+| Runtime `vue-i18n`          | Implemented (23B)                       |
+| `useLanguage` / switcher    | Implemented (23B)                       |
+| Limited shell + role sample | Implemented (23B)                       |
+| Sheet → catalog sync        | Established (edit Sheet, then export)   |
+| Full UI string migration    | Not started (23C)                       |
+| FRONT-018 fully implemented | No — partial until most screens migrate |
 
 ## API security foundation (Phase 22)
 

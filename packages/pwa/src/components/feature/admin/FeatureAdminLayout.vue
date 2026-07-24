@@ -1,5 +1,5 @@
 <template>
-  <CommonAppShell title="Administratie" :nav-links="adminNavLinks">
+  <CommonAppShell :title="t('shell.admin.title')" :nav-links="adminNavLinks">
     <template #header-actions>
       <UButton
         to="/admin/notifications"
@@ -7,7 +7,7 @@
         variant="ghost"
         color="neutral"
       >
-        Meldingen
+        {{ t('navigation.admin.notifications') }}
         <UBadge v-if="hasUnread" color="warning" variant="solid" class="ml-1">
           {{ unreadCount }}
         </UBadge>
@@ -18,23 +18,26 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted, onUnmounted } from 'vue'
+import { computed, onMounted, onUnmounted } from 'vue'
+import { useI18n } from 'vue-i18n'
 
 import CommonAppShell, {
   type AppShellLink,
 } from '@/components/common/CommonAppShell.vue'
 import { useAdminNotifications } from '@/composables/useAdminNotifications'
 
-const adminNavLinks: AppShellLink[] = [
-  { label: 'Dashboard', to: '/admin' },
-  { label: 'Bestellingen', to: '/admin/orders' },
-  { label: 'Routeplanning', to: '/admin/route-planning' },
-  { label: 'Routetemplates', to: '/admin/route-templates' },
-  { label: 'Vaccins', to: '/admin/vaccines' },
-  { label: 'Voorraad', to: '/admin/stock' },
-  { label: 'Instellingen', to: '/admin/settings' },
-  { label: 'Profiel', to: '/profile' },
-]
+const { t } = useI18n()
+
+const adminNavLinks = computed<AppShellLink[]>(() => [
+  { label: t('navigation.admin.dashboard'), to: '/admin' },
+  { label: t('navigation.admin.orders'), to: '/admin/orders' },
+  { label: t('navigation.admin.routePlanning'), to: '/admin/route-planning' },
+  { label: t('navigation.admin.routeTemplates'), to: '/admin/route-templates' },
+  { label: t('navigation.admin.vaccines'), to: '/admin/vaccines' },
+  { label: t('navigation.admin.stock'), to: '/admin/stock' },
+  { label: t('navigation.admin.settings'), to: '/admin/settings' },
+  { label: t('navigation.admin.profile'), to: '/profile' },
+])
 
 const {
   unreadCount,

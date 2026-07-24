@@ -16,6 +16,7 @@ import {
 import { useCurrentUser } from './composables/useCurrentUser'
 import { useFirebase } from './composables/useFirebase'
 import { useNotifications } from './composables/useNotifications'
+import { bootstrapI18n } from './i18n'
 import router from './router'
 
 import '@/assets/main.css'
@@ -72,6 +73,9 @@ void (async () => {
     }
   } finally {
     authReady.value = true
+    // Teacher order: i18n before router. Auth restoration already ran above.
+    const i18n = await bootstrapI18n()
+    app.use(i18n)
     app.use(router)
     app.use(ui)
     app.mount('#app')

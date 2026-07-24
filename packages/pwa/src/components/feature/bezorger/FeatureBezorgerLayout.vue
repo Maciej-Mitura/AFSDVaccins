@@ -1,18 +1,26 @@
 <template>
-  <CommonAppShell title="Bezorger" :nav-links="bezorgerNavLinks">
+  <CommonAppShell
+    :title="t('shell.bezorger.title')"
+    :nav-links="bezorgerNavLinks"
+  >
     <RouterView />
   </CommonAppShell>
 </template>
 
 <script setup lang="ts">
+import { computed } from 'vue'
+import { useI18n } from 'vue-i18n'
+
 import CommonAppShell, {
   type AppShellLink,
 } from '@/components/common/CommonAppShell.vue'
 
-const bezorgerNavLinks: AppShellLink[] = [
-  { label: 'Dashboard', to: '/bezorger' },
-  { label: 'Route vandaag', to: '/bezorger/today' },
-  { label: 'Voorbeeld morgen', to: '/bezorger/tomorrow' },
-  { label: 'Profiel', to: '/profile' },
-]
+const { t } = useI18n()
+
+const bezorgerNavLinks = computed<AppShellLink[]>(() => [
+  { label: t('navigation.bezorger.dashboard'), to: '/bezorger' },
+  { label: t('navigation.bezorger.today'), to: '/bezorger/today' },
+  { label: t('navigation.bezorger.tomorrow'), to: '/bezorger/tomorrow' },
+  { label: t('navigation.bezorger.profile'), to: '/profile' },
+])
 </script>

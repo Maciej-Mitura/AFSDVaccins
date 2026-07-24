@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref } from 'vue'
+import { useI18n } from 'vue-i18n'
 
 import CommonEmptyState from '@/components/common/CommonEmptyState.vue'
 import CommonErrorState from '@/components/common/CommonErrorState.vue'
@@ -8,6 +9,7 @@ import { RouteStatus, useDeliveryRoutes } from '@/composables/useDeliveryRoutes'
 import { useOnlineStatus } from '@/composables/useOnlineStatus'
 import { useRealtimeConnection } from '@/composables/useRealtimeConnection'
 
+const { t } = useI18n()
 const {
   myTodayRoute,
   loading,
@@ -91,7 +93,9 @@ onUnmounted(() => {
 <template>
   <div class="mx-auto max-w-lg space-y-4 px-1">
     <div>
-      <h1 class="text-2xl font-semibold">Route van vandaag</h1>
+      <h1 class="text-2xl font-semibold">
+        {{ t('bezorger.route.today.title') }}
+      </h1>
       <p class="mt-1 text-sm text-muted">
         Stops met adressen en dosissen zoals bij generatie vastgelegd.
       </p>

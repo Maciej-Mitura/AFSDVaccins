@@ -2570,24 +2570,26 @@ feat(api): add rate limiting, caching, and GraphQL depth guards
 
 ### Implementation progress
 
-| Sub-scope                                           | Status                                                                      |
-| --------------------------------------------------- | --------------------------------------------------------------------------- |
-| **23A** Sheets exporter (`packages/i18n-export`)    | **Implemented** — OAuth Desktop auth, nl/en validation, offline tests, docs |
-| **23B+** Runtime `vue-i18n`, switcher, UI migration | **Not started** — do not begin until explicitly requested                   |
+| Sub-scope                                        | Status                                                                          |
+| ------------------------------------------------ | ------------------------------------------------------------------------------- |
+| **23A** Sheets exporter (`packages/i18n-export`) | **Implemented** — OAuth Desktop auth, nl/en/zh/es validation, offline tests     |
+| **23B** Runtime `vue-i18n`, switcher, sample UI  | **Implemented** — four locales, shell + login + one flow per role; Sheet is SoT |
+| **23C** Remaining UI string migration            | **Not started** — do not begin until explicitly requested                       |
 
-Phase 23 as a whole is **not** complete until runtime i18n and string migration land.
+Phase 23 as a whole is **not** complete until remaining string migration (23C) lands.
+FRONT-018 stays **partially implemented** until most screens use catalogs.
 
 ### Exact scope
 
-- `vue-i18n` runtime; locale switcher _(pending 23B)_
-- Dutch + English message catalogs _(JSON produced by exporter after manual first export)_
+- `vue-i18n` runtime; locale switcher _(23B done)_
+- Dutch + English (+ zh/es) message catalogs _(JSON generated from Sheet)_
 - `packages/i18n-export` Sheets exporter (student-owned, not copied) _(23A done)_
-- Migrate existing user-visible strings _(pending 23B)_
-- Missing-key policy + tests _(pending 23B)_
+- Migrate existing user-visible strings _(23B sample done; remainder 23C)_
+- Missing-key policy + tests _(23B done)_
 
 ### Explicit out-of-scope
 
-- zh/es unless time; deployment; domain features
+- Full date/number formatting migration (beyond representative screens); deployment; domain features
 
 ### Backend / GraphQL / DB
 
@@ -2595,12 +2597,14 @@ Phase 23 as a whole is **not** complete until runtime i18n and string migration 
 
 ### Frontend
 
-- `useLanguage` (or equivalent), locale JSON under `packages/pwa/src/locales/`
-- Persist locale preference (localStorage and/or user profile)
+- `useLanguage`, `packages/pwa/src/i18n/*`, locale JSON under `packages/pwa/src/locales/`
+- Persist locale preference (`vaccin-delivery:locale`)
 
 ### External / manual steps
 
 - Google OAuth desktop client + Sheet setup (see README — i18n exporter; enhancement-planning §7)
+- Edit translations in the Google Sheet; regenerate with `npm run export:i18n` (readonly; local/dev only)
+- Do not hand-merge keys into locale JSON; Google Sheet remains the editable source of truth
 
 ### Env
 
@@ -2608,14 +2612,15 @@ Phase 23 as a whole is **not** complete until runtime i18n and string migration 
 
 ### Tests / CI
 
-- Exporter unit tests offline (23A); missing-key safety; locale switch unit; Playwright language switch (23B+)
+- Exporter unit tests offline (23A); locale resolution/loader/`setLocale`; Playwright language switch (23B)
 - CI uses committed JSON (no live Sheets)
 
 ### Manual acceptance
 
 - [x] Exporter documented; credentials not committed
-- [ ] First successful local `npm run export:i18n` produces committed `packages/pwa/src/locales/{nl,en}.json`
-- [ ] Switch NL↔EN updates shell + one flow per role _(23B)_
+- [x] Committed `packages/pwa/src/locales/{nl,en,zh,es}.json`
+- [x] Switch NL↔EN (and ES/ZH) updates shell + one flow per role _(23B)_
+- [ ] Remaining screens migrated _(23C)_
 
 ### Rollback
 
@@ -2624,7 +2629,7 @@ Phase 23 as a whole is **not** complete until runtime i18n and string migration 
 ### Recommended commit message
 
 ```
-feat(i18n-export): add Google Sheets translation exporter foundation
+feat(pwa): add runtime vue-i18n foundation with locale switcher
 ```
 
 ---

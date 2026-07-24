@@ -1,5 +1,8 @@
 <template>
-  <CommonAppShell title="Apotheker" :nav-links="apothekerNavLinks">
+  <CommonAppShell
+    :title="t('shell.apotheker.title')"
+    :nav-links="apothekerNavLinks"
+  >
     <template #header-actions>
       <CommonNotificationBell />
     </template>
@@ -8,7 +11,8 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted, onUnmounted } from 'vue'
+import { computed, onMounted, onUnmounted } from 'vue'
+import { useI18n } from 'vue-i18n'
 
 import CommonAppShell, {
   type AppShellLink,
@@ -17,13 +21,15 @@ import CommonNotificationBell from '@/components/common/CommonNotificationBell.v
 import { useNotifications } from '@/composables/useNotifications'
 import { useOrders } from '@/composables/useOrders'
 
-const apothekerNavLinks: AppShellLink[] = [
-  { label: 'Dashboard', to: '/apotheker' },
-  { label: 'Vaccins', to: '/apotheker/vaccines' },
-  { label: 'Nieuwe bestelling', to: '/apotheker/orders/new' },
-  { label: 'Mijn bestellingen', to: '/apotheker/orders' },
-  { label: 'Profiel', to: '/profile' },
-]
+const { t } = useI18n()
+
+const apothekerNavLinks = computed<AppShellLink[]>(() => [
+  { label: t('navigation.apotheker.dashboard'), to: '/apotheker' },
+  { label: t('navigation.apotheker.vaccines'), to: '/apotheker/vaccines' },
+  { label: t('navigation.apotheker.newOrder'), to: '/apotheker/orders/new' },
+  { label: t('navigation.apotheker.orders'), to: '/apotheker/orders' },
+  { label: t('navigation.apotheker.profile'), to: '/profile' },
+])
 
 const {
   loadUnreadCount,

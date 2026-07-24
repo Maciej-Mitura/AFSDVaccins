@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted } from 'vue'
 import { useQuery } from '@vue/apollo-composable'
+import { useI18n } from 'vue-i18n'
 
 import { UserRole } from '@vaccin-delivery/types'
 
@@ -15,6 +16,7 @@ import { useAdminOperationsFeed } from '@/composables/useAdminOperationsFeed'
 import { useCurrentUser } from '@/composables/useCurrentUser'
 import { useOrders } from '@/composables/useOrders'
 
+const { t } = useI18n()
 const { currentUser, loading: userLoading } = useCurrentUser()
 
 const {
@@ -161,7 +163,7 @@ onUnmounted(() => {
 
     <UCard>
       <template #header>
-        <h2 class="text-lg font-semibold">Admin dashboard</h2>
+        <h2 class="text-lg font-semibold">{{ t('admin.dashboard.title') }}</h2>
       </template>
 
       <CommonLoadingSkeleton v-if="userLoading" />

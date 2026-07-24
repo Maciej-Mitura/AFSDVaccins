@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { onMounted, onUnmounted, ref } from 'vue'
+import { useI18n } from 'vue-i18n'
 
 import { OrderStatus } from '@vaccin-delivery/types'
 
@@ -11,6 +12,7 @@ import { registerReconnectHandler } from '@/composables/useGraphQL'
 import { useNotifications } from '@/composables/useNotifications'
 import { useOrders } from '@/composables/useOrders'
 
+const { t } = useI18n()
 const {
   myOrders,
   loading,
@@ -101,8 +103,10 @@ async function onCancel(id: string) {
     <UCard>
       <template #header>
         <div class="flex flex-wrap items-center justify-between gap-3">
-          <h2 class="text-lg font-semibold">Mijn bestellingen</h2>
-          <UButton to="/apotheker/orders/new" size="sm">Nieuwe bestelling</UButton>
+          <h2 class="text-lg font-semibold">{{ t('apotheker.orders.title') }}</h2>
+          <UButton to="/apotheker/orders/new" size="sm">{{
+            t('apotheker.orders.new')
+          }}</UButton>
         </div>
       </template>
 

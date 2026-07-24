@@ -16,10 +16,8 @@ test.describe('APOTHEKER journey', () => {
       page.getByRole('heading', { name: 'Nieuwe bestelling' }),
     ).toBeVisible()
 
-    const vaccineTrigger = page.getByRole('combobox').or(
-      page.getByText('Selecteer vaccin'),
-    )
-    await vaccineTrigger.first().click()
+    // Prefer vaccine placeholder text — shell language USelect is also a combobox.
+    await page.getByText('Selecteer vaccin').click()
     await page.getByRole('option', { name: 'Playwright Flu' }).click()
     await page.getByLabel('Aantal').fill('2')
     await page.getByRole('button', { name: 'Regel toevoegen' }).click()

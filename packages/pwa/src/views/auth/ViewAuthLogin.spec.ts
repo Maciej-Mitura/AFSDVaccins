@@ -40,6 +40,10 @@ vi.mock('@/composables/useCurrentUser', () => ({
   }),
 }))
 
+import { createTestI18n } from '@/i18n/test-utils'
+import { __resetAppI18nForTests } from '@/i18n'
+import { __resetLocaleLoaderForTests } from '@/i18n/locale-loader'
+
 describe('ViewAuthLogin offline UX', () => {
   beforeEach(() => {
     Object.defineProperty(navigator, 'onLine', {
@@ -47,22 +51,22 @@ describe('ViewAuthLogin offline UX', () => {
       get: () => true,
     })
     __resetOnlineStatusForTests()
+    __resetLocaleLoaderForTests()
+    __resetAppI18nForTests()
     loginMock.mockReset()
   })
 
   afterEach(() => {
     __resetOnlineStatusForTests()
+    __resetLocaleLoaderForTests()
+    __resetAppI18nForTests()
   })
 
-  it('shows offline explanation and disables submit while offline', async () => {
-    Object.defineProperty(navigator, 'onLine', {
-      configurable: true,
-      get: () => false,
-    })
-    __resetOnlineStatusForTests()
-
-    const wrapper = mount(ViewAuthLogin, {
+  function mountLogin() {
+    const i18n = createTestI18n('nl')
+    return mount(ViewAuthLogin, {
       global: {
+        plugins: [i18n],
         stubs: {
           RouterLink: {
             template: '<a><slot /></a>',
@@ -70,10 +74,12 @@ describe('ViewAuthLogin offline UX', () => {
           UCard: { template: '<div><slot name="header" /><slot /></div>' },
           UAlert: {
             props: ['title'],
-            template:
-              '<div data-testid="alert">{{ title }}<slot /></div>',
+            template: '<div data-testid="alert">{{ title }}<slot /></div>',
           },
-          UForm: { template: '<form @submit.prevent="$emit(\'submit\', { data: { email: \'a@b.c\', password: \'password1\' } })"><slot /></form>' },
+          UForm: {
+            template:
+              "<form @submit.prevent=\"$emit('submit', { data: { email: 'a@b.c', password: 'password1' } })\"><slot /></form>",
+          },
           UFormField: { template: '<div><slot /></div>' },
           UInput: {
             props: ['modelValue'],
@@ -89,6 +95,16 @@ describe('ViewAuthLogin offline UX', () => {
         },
       },
     })
+  }
+
+  it('shows offline explanation and disables submit while offline', async () => {
+    Object.defineProperty(navigator, 'onLine', {
+      configurable: true,
+      get: () => false,
+    })
+    __resetOnlineStatusForTests()
+
+    const wrapper = mountLogin()
 
     await nextTick()
 
@@ -111,33 +127,7 @@ describe('ViewAuthLogin offline UX', () => {
     })
     __resetOnlineStatusForTests()
 
-    const wrapper = mount(ViewAuthLogin, {
-      global: {
-        stubs: {
-          RouterLink: {
-            template: '<a><slot /></a>',
-          },
-          UCard: { template: '<div><slot name="header" /><slot /></div>' },
-          UAlert: {
-            props: ['title'],
-            template: '<div>{{ title }}</div>',
-          },
-          UForm: { template: '<form><slot /></form>' },
-          UFormField: { template: '<div><slot /></div>' },
-          UInput: {
-            props: ['modelValue'],
-            emits: ['update:modelValue'],
-            template:
-              '<input :value="modelValue" @input="$emit(\'update:modelValue\', ($event.target).value)" />',
-          },
-          UButton: {
-            props: ['disabled'],
-            template:
-              '<button data-testid="login-submit" :disabled="disabled"><slot /></button>',
-          },
-        },
-      },
-    })
+    const wrapper = mountLogin()
 
     const emailInput = wrapper.findAll('input')[0]
     await emailInput.setValue('apotheker@example.com')
