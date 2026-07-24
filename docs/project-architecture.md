@@ -1131,6 +1131,8 @@ PORT=3000
 URL_FRONTEND=http://localhost:5173
 DB_HOST=mongodb://mongo:27017/vaccin-delivery
 GOOGLE_APPLICATION_CREDENTIALS=/run/secrets/firebase-sa.json
+# Railway / PaaS alternative (higher precedence): FIREBASE_SERVICE_ACCOUNT_JSON
+# TRUST_PROXY=1 on Railway (one hop); leave unset locally
 NODE_ENV=development
 ```
 
@@ -1151,11 +1153,12 @@ VITE_FIREBASE_APP_ID=your-app-id
 
 #### Sensitive — never commit
 
-| Secret                                                 | Handling                                                                 |
-| ------------------------------------------------------ | ------------------------------------------------------------------------ |
-| Firebase Admin **service-account JSON** (private keys) | `GOOGLE_APPLICATION_CREDENTIALS` path; Docker secret mount; `.gitignore` |
-| GitHub tokens / CI secrets                             | GitHub Actions secrets only                                              |
-| Production MongoDB credentials                         | Env / Compose secrets                                                    |
+| Secret                                                 | Handling                                                                                                                              |
+| ------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------- |
+| Firebase Admin **service-account JSON** (private keys) | `FIREBASE_SERVICE_ACCOUNT_JSON` (Railway) or `GOOGLE_APPLICATION_CREDENTIALS` path (local/Compose); Docker secret mount; `.gitignore` |
+| Public deployment runbook                              | [`docs/deployment.md`](./deployment.md) — Atlas + Railway + Firebase Hosting (Phase 24)                                               |
+| GitHub tokens / CI secrets                             | GitHub Actions secrets only                                                                                                           |
+| Production MongoDB credentials                         | Env / Compose secrets                                                                                                                 |
 
 Provide `firebase-service-account.json.example` with dummy structure only.
 

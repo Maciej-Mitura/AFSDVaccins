@@ -18,6 +18,7 @@ import { UserModule } from '../user/user.module'
 import { Vaccine } from '../vaccine/vaccine.entity'
 import { VaccineModule } from '../vaccine/vaccine.module'
 import { SeedFirebaseProvisioningService } from './seed-firebase-provisioning.service'
+import { BootstrapSafetyService } from './bootstrap.safety'
 import { SeedSafetyService } from './seed.safety'
 import { SeedService } from './seed.service'
 
@@ -44,9 +45,10 @@ import { SeedService } from './seed.service'
   ],
   providers: [
     SeedSafetyService,
+    BootstrapSafetyService,
     SeedFirebaseProvisioningService,
     SeedService,
   ],
-  exports: [SeedService, SeedSafetyService],
+  exports: [SeedService, SeedSafetyService, BootstrapSafetyService],
 })
 export class SeedModule {}

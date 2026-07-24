@@ -16,6 +16,7 @@ import { VaccineStockRepository } from '../stock/vaccine-stock.repository'
 import { UserRole } from '../user/user-role.enum'
 import { SeedFirebaseProvisioningService } from './seed-firebase-provisioning.service'
 import { SEED_ORDER_IDS } from './seed.constants'
+import { BootstrapSafetyService } from './bootstrap.safety'
 import { SeedSafetyService } from './seed.safety'
 import { SeedService } from './seed.service'
 
@@ -30,6 +31,16 @@ describe('SeedService', () => {
         .fn()
         .mockReturnValue('owner@example.com'),
     } as unknown as SeedSafetyService
+
+    const bootstrapSafetyService = {
+      assertBootstrapAllowed: jest.fn(),
+      logBootstrapTargetConfirmation: jest.fn(),
+      requireDemoPassword: jest.fn().mockReturnValue('demo-password'),
+      requireTeacherAdminPassword: jest.fn().mockReturnValue('teacher-password'),
+      requirePersonalAdminEmail: jest
+        .fn()
+        .mockReturnValue('owner@example.com'),
+    } as unknown as BootstrapSafetyService
 
     const firebaseProvisioning = {
       ensureFirebaseUser: jest.fn().mockImplementation(async (account: {
@@ -202,6 +213,7 @@ describe('SeedService', () => {
 
     const service = new SeedService(
       seedSafetyService,
+      bootstrapSafetyService,
       firebaseProvisioning,
       settingsService,
       routeGenerationService,

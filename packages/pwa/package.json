@@ -10,6 +10,7 @@
   "scripts": {
     "dev": "vite",
     "build": "vue-tsc --build && vite build",
+    "build:production": "node --experimental-strip-types ./scripts/validate-production-env.mjs && vue-tsc --build && vite build",
     "preview": "vite preview",
     "preview:e2e": "vite preview --host 127.0.0.1 --port 4174 --strictPort",
     "build:e2e": "vite build",

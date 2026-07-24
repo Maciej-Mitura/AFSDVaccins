@@ -2651,13 +2651,21 @@ feat(pwa): complete Phase 23C UI string migration and i18n helpers
 | **Requirement IDs** | DEVOPS-007 (Tier A), DEVOPS-010, API-011/015/017, DOC-003                                                              |
 | **Prerequisites**   | Phase 22; Phase 23 preferred                                                                                           |
 
+### Sub-phases
+
+| Sub-phase | Status               | Notes                                                                                                         |
+| --------- | -------------------- | ------------------------------------------------------------------------------------------------------------- |
+| **24A**   | Complete             | Architecture: Firebase Hosting + Railway (1 replica, Serverless off) + Atlas M0                               |
+| **24B**   | Complete (repo prep) | Credential/env/bootstrap/Hosting config + [`docs/deployment.md`](./deployment.md). **Not publicly deployed.** |
+| **24C+**  | Pending              | Manual provider create → deploy → verify; then optional CI deploy workflow                                    |
+
 ### Exact scope
 
 - Choose primary hosting (mixed managed recommended) + fallback VPS
 - Deploy API + PWA + Mongo (Atlas or equiv.)
 - Configure CORS, WS URL, Firebase authorized domains
 - Secrets in platform store; example files updated
-- CI deploy workflow (manual approval OK)
+- CI deploy workflow (manual approval OK) — **only after** manual success
 - Public health checks
 
 ### Explicit out-of-scope
@@ -2666,37 +2674,40 @@ feat(pwa): complete Phase 23C UI string migration and i18n helpers
 
 ### Backend / frontend / infra
 
-- Production env validation; possibly Redis PubSub if multi-instance
-- PWA production `VITE_*` URLs
+- Production env validation; possibly Redis PubSub if multi-instance (**not** for 24B — keep one replica)
+- PWA production `VITE_*` URLs (`npm run build:pwa:production`)
 - Compose retained for local presentation
+- One-off bootstrap: `ALLOW_DATABASE_BOOTSTRAP` + `CONFIRM_DATABASE_BOOTSTRAP=BOOTSTRAP_PUBLIC_DEMO_DATABASE`
 
 ### Authorization / realtime / security
 
 - Re-verify WS auth through public proxy
-- No seed in production boot; document operator seed path if needed for demo env
+- No seed in production boot; operator bootstrap path documented in `docs/deployment.md`
+- `TRUST_PROXY=1` on Railway; `FIREBASE_SERVICE_ACCOUNT_JSON` for Admin SDK
 
 ### Env vars
 
-- Public URLs, DB URI, Firebase SA, optional Redis
+- Public URLs, Atlas URI, Firebase SA (env JSON or file path), no Redis required at one replica
 
 ### Tests
 
-- Public health; WS smoke; Firebase login smoke; PWA installability
+- Offline `npm run validate:production-readiness`; credential/trust-proxy/bootstrap gate unit tests
+- Public health; WS smoke; Firebase login smoke; PWA installability — **after** manual deploy (24C+)
 
 ### Manual acceptance
 
 - [ ] Third party can open public URL and login with demo account (demo env)
 - [ ] Subscriptions work without refresh
-- [ ] Rollback path documented
+- [ ] Rollback path documented (`docs/deployment.md` §O)
 
 ### Rollback
 
-- Redeploy previous image/revision; DNS back to prior host
+- Redeploy previous image/revision; Hosting prior version; see runbook
 
 ### Recommended commit message
 
 ```
-ci(deploy): add public environment deployment pipeline
+feat(deploy): prepare Firebase Hosting, Railway, and Atlas readiness
 ```
 
 ---
@@ -3057,14 +3068,14 @@ docs: finalize submission dossier and presentation rehearsal
 
 # Final roadmap decision (Phase 21)
 
-| Question                   | Answer                                                                |
-| -------------------------- | --------------------------------------------------------------------- |
-| Phases 0–20 complete?      | **Yes** on `develop` @ `f3e4d07`                                      |
-| Phase 21 complete when?    | Audit docs merged; validation commands green; no feature code changed |
-| Phase 22 complete when?    | Security foundation merged; unit + E2E security suites green          |
-| Phase 23 complete when?    | 23A + 23B + 23C landed; FRONT-018 implemented (es/zh Default caveat)  |
-| Next implementation phase? | **Phase 24** — only when explicitly requested                         |
-| Tier C mandatory?          | **No** — defer if time-constrained                                    |
+| Question                   | Answer                                                                                                         |
+| -------------------------- | -------------------------------------------------------------------------------------------------------------- |
+| Phases 0–20 complete?      | **Yes** on `develop` @ `f3e4d07`                                                                               |
+| Phase 21 complete when?    | Audit docs merged; validation commands green; no feature code changed                                          |
+| Phase 22 complete when?    | Security foundation merged; unit + E2E security suites green                                                   |
+| Phase 23 complete when?    | 23A + 23B + 23C landed; FRONT-018 implemented (es/zh Default caveat)                                           |
+| Next implementation phase? | **Phase 24C+** — manual public deploy per `docs/deployment.md` (24A/24B complete; do not start 25 until asked) |
+| Tier C mandatory?          | **No** — defer if time-constrained                                                                             |
 
 ---
 

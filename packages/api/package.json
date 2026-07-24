@@ -19,7 +19,9 @@
     "test:e2e:security": "cross-env NODE_ENV=test jest --config ./jest-e2e-security.json --runInBand --forceExit",
     "test:e2e:pwa:stack": "npm run build && cross-env NODE_ENV=test node dist/playwright-e2e/start-api.js",
     "seed:database:all": "nest build && node dist/cli.js",
-    "seed:database:cli": "node dist/cli.js"
+    "seed:database:cli": "node dist/cli.js",
+    "bootstrap:database:demo": "nest build && node dist/bootstrap-cli.js",
+    "bootstrap:database:demo:cli": "node dist/bootstrap-cli.js"
   },
   "dependencies": {
     "@apollo/server": "^4.12.2",

@@ -49,7 +49,9 @@ describe('PWA safety and configuration', () => {
 
   it('normal router navigation does not resolve to /offline.html while online', () => {
     // Must not use offline.html as the Workbox NavigationRoute document.
-    expect(viteConfig).not.toMatch(/navigateFallback:\s*['"]\/offline\.html['"]/)
+    expect(viteConfig).not.toMatch(
+      /navigateFallback:\s*['"]\/offline\.html['"]/,
+    )
     expect(viteConfig).toMatch(/navigateFallback:\s*['"]\/index\.html['"]/)
     expect(viteConfig).toContain("handler: 'NetworkOnly'")
     expect(viteConfig).toContain("fallbackURL: '/offline.html'")
@@ -60,9 +62,7 @@ describe('PWA safety and configuration', () => {
 
   it('GraphQL endpoints are not runtime cached', () => {
     expect(viteConfig).not.toMatch(/urlPattern:.*graphql/i)
-    expect(viteConfig).not.toMatch(
-      /cacheName:\s*['"][^'"]*graphql[^'"]*['"]/i,
-    )
+    expect(viteConfig).not.toMatch(/cacheName:\s*['"][^'"]*graphql[^'"]*['"]/i)
     // Navigation NetworkOnly must not target GraphQL documents as a cache.
     expect(viteConfig).toContain("handler: 'NetworkOnly'")
     expect(viteConfig).not.toContain('NetworkFirst')
@@ -154,5 +154,25 @@ describe('PWA safety and configuration', () => {
     expect(sw).not.toContain('createHandlerBoundToURL("/offline.html")')
     expect(sw).not.toContain("createHandlerBoundToURL('/offline.html')")
     expect(sw).not.toMatch(/identitytoolkit|securetoken\.google/i)
+  })
+
+  it('Firebase Hosting config mirrors nginx cache and SPA rules', () => {
+    const hostingPath = join(pwaRoot, '..', '..', 'firebase.json')
+    expect(existsSync(hostingPath)).toBe(true)
+    const hosting = JSON.parse(readFileSync(hostingPath, 'utf8'))
+    expect(hosting.hosting.public).toBe('packages/pwa/dist')
+    expect(hosting.functions).toBeUndefined()
+    const headers = hosting.hosting.headers as Array<{
+      source: string
+      headers: Array<{ key: string; value: string }>
+    }>
+    const cacheFor = (source: string) =>
+      headers
+        .find(h => h.source === source)
+        ?.headers.find(x => x.key === 'Cache-Control')?.value
+    expect(cacheFor('/index.html')).toMatch(/no-cache|no-store/)
+    expect(cacheFor('/sw.js')).toMatch(/no-cache|no-store/)
+    expect(cacheFor('/offline.html')).toMatch(/no-cache|no-store/)
+    expect(cacheFor('/assets/**')).toMatch(/immutable/)
   })
 })

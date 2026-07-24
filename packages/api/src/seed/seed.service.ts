@@ -40,6 +40,7 @@ import {
   SEED_VACCINES,
   seedOrderObjectId,
 } from './seed.constants'
+import { BootstrapSafetyService } from './bootstrap.safety'
 import { SeedSafetyService } from './seed.safety'
 
 export type SeedCounters = {
@@ -78,6 +79,7 @@ export class SeedService {
 
   constructor(
     private readonly seedSafetyService: SeedSafetyService,
+    private readonly bootstrapSafetyService: BootstrapSafetyService,
     private readonly firebaseProvisioning: SeedFirebaseProvisioningService,
     private readonly settingsService: SettingsService,
     private readonly routeGenerationService: RouteGenerationService,
@@ -99,12 +101,38 @@ export class SeedService {
     private readonly routeTemplateRepository: MongoRepository<RouteTemplate>,
   ) {}
 
+  /** Development seed CLI — requires NODE_ENV=development + ALLOW_DATABASE_SEED. */
   async run(): Promise<SeedCounters> {
     this.seedSafetyService.assertSeedAllowed()
     this.seedSafetyService.logSeedTargetConfirmation()
-    const demoPassword = this.seedSafetyService.requireDemoPassword()
-    const teacherPassword = this.seedSafetyService.requireTeacherAdminPassword()
-    const personalAdminEmail = this.seedSafetyService.requirePersonalAdminEmail()
+    return this.executeSeeding({
+      demoPassword: this.seedSafetyService.requireDemoPassword(),
+      teacherPassword: this.seedSafetyService.requireTeacherAdminPassword(),
+      personalAdminEmail: this.seedSafetyService.requirePersonalAdminEmail(),
+    })
+  }
+
+  /**
+   * One-off production/demo bootstrap CLI.
+   * Requires ALLOW_DATABASE_BOOTSTRAP + CONFIRM_DATABASE_BOOTSTRAP; does not
+   * require NODE_ENV=development. Never called from API startup.
+   */
+  async runBootstrap(): Promise<SeedCounters> {
+    this.bootstrapSafetyService.assertBootstrapAllowed()
+    this.bootstrapSafetyService.logBootstrapTargetConfirmation()
+    return this.executeSeeding({
+      demoPassword: this.bootstrapSafetyService.requireDemoPassword(),
+      teacherPassword: this.bootstrapSafetyService.requireTeacherAdminPassword(),
+      personalAdminEmail: this.bootstrapSafetyService.requirePersonalAdminEmail(),
+    })
+  }
+
+  private async executeSeeding(credentials: {
+    demoPassword: string
+    teacherPassword: string
+    personalAdminEmail: string
+  }): Promise<SeedCounters> {
+    const { demoPassword, teacherPassword, personalAdminEmail } = credentials
 
     const counters = this.emptyCounters()
     const accounts = resolveSeedAccounts({

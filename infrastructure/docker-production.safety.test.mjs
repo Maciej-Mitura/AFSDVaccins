@@ -74,6 +74,8 @@ describe('production Docker safety', () => {
     assert.match(example, /SEED_PERSONAL_ADMIN_FIREBASE_UID=/)
     assert.match(example, /SEED_TEACHER_ADMIN_PASSWORD=/)
     assert.match(example, /SEED_DEMO_PASSWORD=/)
+    assert.match(example, /ALLOW_DATABASE_BOOTSTRAP/)
+    assert.match(example, /BOOTSTRAP_PUBLIC_DEMO_DATABASE/)
   })
 
   it('PWA Dockerfile refuses enabled VITE_E2E_AUTH_BYPASS', () => {

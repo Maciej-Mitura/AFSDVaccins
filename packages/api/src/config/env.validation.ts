@@ -5,6 +5,10 @@ import {
   assertBodyLimitWithinPolicy,
   isValidBodyLimitSyntax,
 } from './body-limit'
+import { parseTrustProxy } from './trust-proxy'
+
+export const DATABASE_BOOTSTRAP_CONFIRMATION_PHRASE =
+  'BOOTSTRAP_PUBLIC_DEMO_DATABASE'
 
 export const envValidationSchema = Joi.object({
   NODE_ENV: Joi.string()
@@ -21,11 +25,46 @@ export const envValidationSchema = Joi.object({
     }),
   DB_NAME: Joi.string().min(1).required(),
   GOOGLE_APPLICATION_CREDENTIALS: Joi.string().min(1).optional(),
+  /**
+   * Railway / PaaS Firebase Admin credential (raw JSON or base64 JSON).
+   * Validated at Firebase init time — never log this value.
+   */
+  FIREBASE_SERVICE_ACCOUNT_JSON: Joi.string().min(1).optional(),
+  /**
+   * Express trust proxy. Only unset/false/0 (off) or 1 (one hop) are allowed.
+   * Railway single-service recommendation: TRUST_PROXY=1.
+   */
+  TRUST_PROXY: Joi.any()
+    .default(false)
+    .custom((value: unknown, helpers) => {
+      try {
+        return parseTrustProxy(value)
+      } catch {
+        return helpers.error('any.invalid')
+      }
+    })
+    .messages({
+      'any.invalid':
+        'TRUST_PROXY must be unset/false/0 (disabled) or 1 (trust one proxy hop)',
+    }),
   /** Explicit opt-in for the development seed CLI (never default-on). */
   ALLOW_DATABASE_SEED: Joi.boolean()
     .truthy('true')
     .falsy('false')
     .default(false),
+  /**
+   * Explicit opt-in for the one-off production/demo bootstrap CLI.
+   * Never used by API startup or Docker CMD.
+   */
+  ALLOW_DATABASE_BOOTSTRAP: Joi.boolean()
+    .truthy('true')
+    .falsy('false')
+    .default(false),
+  /**
+   * Must equal DATABASE_BOOTSTRAP_CONFIRMATION_PHRASE when bootstrapping.
+   * Enforced by BootstrapSafetyService (not Joi alone).
+   */
+  CONFIRM_DATABASE_BOOTSTRAP: Joi.string().allow('').optional(),
   /**
    * Playwright / browser E2E only: accept deterministic Bearer tokens.
    * Requires NODE_ENV=test as well (enforced in FirebaseService).
@@ -94,7 +133,11 @@ export type EnvConfig = {
   DB_HOST: string
   DB_NAME: string
   GOOGLE_APPLICATION_CREDENTIALS?: string
+  FIREBASE_SERVICE_ACCOUNT_JSON?: string
+  TRUST_PROXY: false | 1
   ALLOW_DATABASE_SEED: boolean
+  ALLOW_DATABASE_BOOTSTRAP: boolean
+  CONFIRM_DATABASE_BOOTSTRAP?: string
   ALLOW_E2E_AUTH_BYPASS: boolean
   SEED_DEMO_PASSWORD?: string
   SEED_TEACHER_ADMIN_PASSWORD?: string

@@ -59,8 +59,15 @@ export function configureApiApp(
   const isProduction = nodeEnv === 'production'
   const frontendUrl = configService.get('URL_FRONTEND', { infer: true })
   const jsonBodyLimit = configService.get('API_JSON_BODY_LIMIT', { infer: true })
+  const trustProxy = configService.get('TRUST_PROXY', { infer: true })
   // Fail fast if config somehow bypassed Joi (defense in depth).
   assertBodyLimitWithinPolicy(jsonBodyLimit)
+
+  // Controlled trust proxy (Railway: TRUST_PROXY=1). Local default remains off.
+  const expressApp = app.getHttpAdapter().getInstance() as {
+    set: (setting: string, value: unknown) => void
+  }
+  expressApp.set('trust proxy', trustProxy)
 
   // Helmet before routes (Express middleware order).
   app.use(
@@ -149,9 +156,9 @@ export function configureApiApp(
 
   if (options.enableListenLogging !== false) {
     Logger.log(
-      `API security bootstrap: Helmet=on bodyLimit=${jsonBodyLimit} (express parsers) graphiql=${
-        isProduction ? 'off' : 'on'
-      }`,
+      `API security bootstrap: Helmet=on bodyLimit=${jsonBodyLimit} (express parsers) trustProxy=${String(
+        trustProxy,
+      )} graphiql=${isProduction ? 'off' : 'on'}`,
     )
   }
 }

@@ -102,6 +102,50 @@ describe('envValidationSchema', () => {
     ).toBe(false)
   })
 
+  it('accepts mongodb+srv Atlas-style DB_HOST', () => {
+    const result = envValidationSchema.validate({
+      NODE_ENV: 'production',
+      PORT: 3000,
+      URL_FRONTEND: 'https://example.web.app',
+      DB_HOST: 'mongodb+srv://user:pass@cluster0.example.mongodb.net/',
+      DB_NAME: 'vaccin-delivery-demo',
+      TRUST_PROXY: '1',
+    })
+
+    expect(result.error).toBeUndefined()
+    expect((result.value as { TRUST_PROXY: false | 1 }).TRUST_PROXY).toBe(1)
+  })
+
+  it('rejects TRUST_PROXY=true', () => {
+    const result = envValidationSchema.validate({
+      NODE_ENV: 'production',
+      PORT: 3000,
+      URL_FRONTEND: 'https://example.web.app',
+      DB_HOST: 'mongodb://localhost:27017',
+      DB_NAME: 'vaccin-delivery',
+      TRUST_PROXY: 'true',
+    })
+
+    expect(result.error).toBeDefined()
+  })
+
+  it('defaults TRUST_PROXY and ALLOW_DATABASE_BOOTSTRAP to false', () => {
+    const result = envValidationSchema.validate({
+      NODE_ENV: 'development',
+      PORT: 3000,
+      URL_FRONTEND: 'http://localhost:5173',
+      DB_HOST: 'mongodb://localhost:27017',
+      DB_NAME: 'vaccin-delivery',
+    })
+
+    expect(result.error).toBeUndefined()
+    expect((result.value as { TRUST_PROXY: false | 1 }).TRUST_PROXY).toBe(false)
+    expect(
+      (result.value as { ALLOW_DATABASE_BOOTSTRAP: boolean })
+        .ALLOW_DATABASE_BOOTSTRAP,
+    ).toBe(false)
+  })
+
   it('accepts seed-related optional variables', () => {
     const result = envValidationSchema.validate({
       NODE_ENV: 'development',
@@ -136,6 +180,17 @@ describe('buildMongoUrl', () => {
       buildMongoUrl('mongodb://localhost:27017/', 'vaccin-delivery'),
     ).toBe('mongodb://localhost:27017/vaccin-delivery')
   })
+
+  it('combines mongodb+srv host and database name', () => {
+    expect(
+      buildMongoUrl(
+        'mongodb+srv://user:pass@cluster0.example.mongodb.net/',
+        'vaccin-delivery-demo',
+      ),
+    ).toBe(
+      'mongodb+srv://user:pass@cluster0.example.mongodb.net/vaccin-delivery-demo',
+    )
+  })
 })
 
 describe('safeMongoHostname', () => {
@@ -144,6 +199,11 @@ describe('safeMongoHostname', () => {
     expect(
       safeMongoHostname('mongodb://user:secret@mongo:27017/vaccin-delivery'),
     ).toBe('mongo')
+    expect(
+      safeMongoHostname(
+        'mongodb+srv://user:secret@cluster0.example.mongodb.net/',
+      ),
+    ).toBe('cluster0.example.mongodb.net')
     expect(safeMongoHostname('not-a-url')).toBe('unparsed')
   })
 })

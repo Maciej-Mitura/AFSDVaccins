@@ -1,11 +1,12 @@
 import { Injectable, Logger } from '@nestjs/common'
-import { App, applicationDefault, initializeApp } from 'firebase-admin/app'
+import { App, initializeApp } from 'firebase-admin/app'
 import { Auth, DecodedIdToken, getAuth } from 'firebase-admin/auth'
 
 import {
   isE2eAuthBypassEnabled,
   verifyE2eBypassToken,
 } from './e2e-auth-bypass'
+import { resolveFirebaseAdminCredential } from './firebase-credentials'
 
 const skipFirebaseInit =
   process.argv.includes('--generate-schema-only') ||
@@ -22,17 +23,15 @@ export class FirebaseService {
       return
     }
 
-    if (!process.env.GOOGLE_APPLICATION_CREDENTIALS) {
-      throw new Error(
-        'GOOGLE_APPLICATION_CREDENTIALS is required when Firebase Admin is enabled',
-      )
-    }
+    const resolved = resolveFirebaseAdminCredential(process.env)
 
     this.firebaseApp = initializeApp({
-      credential: applicationDefault(),
+      credential: resolved.credential,
     })
     this.auth = getAuth(this.firebaseApp)
-    this.logger.log('Firebase Admin SDK initialized')
+    this.logger.log(
+      `Firebase Admin SDK initialized (credential source: ${resolved.source})`,
+    )
   }
 
   getAuth(): Auth {

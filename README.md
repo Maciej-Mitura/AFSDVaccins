@@ -7,6 +7,14 @@ screens.
 
 ## Current status
 
+**Phase 24B complete (repository preparation)** — production deployment readiness
+for Firebase Hosting (PWA) + Railway (API) + MongoDB Atlas. Manual runbook:
+[`docs/deployment.md`](docs/deployment.md). **No public resources deployed yet.**
+DEVOPS-007 remains **incomplete** until a verified public URL exists (Phase 24C+).
+
+**Phase 24A complete** — architecture decision: Firebase Hosting + Railway
+(single replica, Serverless off) + Atlas M0; first deploy is manual.
+
 **Phase 23 complete (23A + 23B + 23C)** — teacher-aligned i18n path for **FRONT-018**.
 Supported locales: **nl** (default), **en** (runtime missing-key fallback), **zh**, **es**.
 Google Sheet is the editable source of truth → `npm run export:i18n` → committed
@@ -36,8 +44,8 @@ text until translators fill those Sheet columns.
 
 **Phases 0–20** remain complete (domain, PWA, Docker, CI green @ `f3e4d07`).
 
-**Next phase:** Phase 24 — public deployment. Do not start until explicitly
-requested.
+**Next:** Phase 24C+ — manual provider setup and public deploy verification
+(see `docs/deployment.md`). Do **not** start Phase 25 until explicitly requested.
 
 ## Planned stack
 
@@ -94,6 +102,8 @@ npm run build:pwa
 ```
 
 Root `typecheck:pwa` and `build:pwa` run `generate:graphql` automatically.
+Production Hosting builds use `npm run build:pwa:production` (HTTPS/WSS + Firebase
+validation). Public deploy steps: [`docs/deployment.md`](docs/deployment.md).
 
 PWA GraphQL documents live in `packages/pwa/src/assets/graphql/`. Import
 generated types from `@vaccin-delivery/types` — do not hand-write response types.
@@ -108,6 +118,7 @@ Approved project documentation lives in `docs/`:
 - `enhancement-planning.md` — Phase 21+ stack audit, gaps, tiers, deps
 - `enhancement-domain-model.md` — proposed entities for phases 25–31
 - `requirements-matrix.md` — requirement traceability + Phase 21 status audit
+- `deployment.md` — Phase 24 manual public deploy runbook (Atlas + Railway + Hosting)
 - `description.md` — official assignment and rubric
 
 Agent rules: `AGENTS.md` at the repository root.
@@ -1807,6 +1818,18 @@ Before writes, the CLI prints only safe confirmation values:
 It does **not** print credentials or full connection strings. Seed creates
 indexes/singletons via development `synchronize` for that one-off process only.
 The Phase 15 production refusal gate is unchanged.
+
+For the **public** Atlas + Railway demo, use the dedicated bootstrap instead
+(does not require `NODE_ENV=development`):
+
+```bash
+ALLOW_DATABASE_BOOTSTRAP=true
+CONFIRM_DATABASE_BOOTSTRAP=BOOTSTRAP_PUBLIC_DEMO_DATABASE
+npm run bootstrap:database:demo
+```
+
+See [`docs/deployment.md`](docs/deployment.md). Remove bootstrap-only variables
+after success.
 
 ### Stopping and volumes
 
