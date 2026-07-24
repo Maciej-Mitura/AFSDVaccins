@@ -2,11 +2,11 @@ import { Logger, Module } from '@nestjs/common'
 import { ConfigModule, ConfigService } from '@nestjs/config'
 import { TypeOrmModule } from '@nestjs/typeorm'
 
+import { envValidationSchema } from '../config/env.validation'
 import {
-  buildMongoUrl,
-  envValidationSchema,
-  safeMongoHostname,
-} from '../config/env.validation'
+  buildTypeOrmMongoOptions,
+  safeMongoScheme,
+} from '../config/mongo-connection'
 import { SeedModule } from './seed.module'
 
 /**
@@ -34,24 +34,19 @@ import { SeedModule } from './seed.module'
         const dbHost = configService.get<string>('DB_HOST')
         const dbName = configService.get<string>('DB_NAME')
 
-        if (!dbHost || !dbName) {
-          throw new Error('MongoDB configuration is missing (DB_HOST, DB_NAME)')
-        }
+        const options = buildTypeOrmMongoOptions({
+          dbHost: dbHost ?? '',
+          dbName: dbName ?? '',
+          synchronize: true,
+        })
 
-        const url = buildMongoUrl(dbHost, dbName)
-        Logger.log(
-          `Bootstrap connecting to MongoDB host ${safeMongoHostname(dbHost)} (database: ${dbName})`,
-        )
+        Logger.log(`MongoDB selected database: ${options.database}`)
+        Logger.log(`MongoDB host scheme: ${safeMongoScheme(dbHost ?? '')}`)
         Logger.log(
           'Bootstrap TypeORM synchronize=true (CLI only — creates/reconciles indexes)',
         )
 
-        return {
-          type: 'mongodb' as const,
-          url,
-          synchronize: true,
-          autoLoadEntities: true,
-        }
+        return options
       },
     }),
     SeedModule,

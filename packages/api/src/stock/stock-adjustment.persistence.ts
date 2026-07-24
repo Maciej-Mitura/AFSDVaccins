@@ -2,6 +2,7 @@ import { Injectable, Logger, OnModuleInit } from '@nestjs/common'
 import { InjectRepository } from '@nestjs/typeorm'
 import { MongoRepository } from 'typeorm'
 
+import { isMongoNamespaceNotFound } from '../config/mongo-connection'
 import { StockAdjustment } from './stock-adjustment.entity'
 
 export const STOCK_ADJUSTMENT_IDEMPOTENCY_INDEX_NAME =
@@ -74,7 +75,21 @@ export class StockAdjustmentPersistenceService implements OnModuleInit {
   }
 
   async dropLegacyIdempotencyKeyIndexes(): Promise<void> {
-    const indexes = (await this.stockAdjustmentRepository.collectionIndexes()) as MongoCollectionIndex[]
+    let indexes: MongoCollectionIndex[]
+
+    try {
+      indexes = (await this.stockAdjustmentRepository.collectionIndexes()) as MongoCollectionIndex[]
+    } catch (error) {
+      // Empty Atlas DB: collection does not exist yet — listIndexes → NamespaceNotFound.
+      // Other Mongo errors (auth, network, malformed indexes) remain fatal.
+      if (isMongoNamespaceNotFound(error)) {
+        this.logger.log(
+          'stock_adjustments collection not present yet; skipping legacy index inspection',
+        )
+        return
+      }
+      throw error
+    }
 
     for (const index of indexes) {
       if (index.name === '_id_') {

@@ -160,9 +160,17 @@ export type EnvConfig = {
   API_JSON_BODY_LIMIT: string
 }
 
+/**
+ * Insert DB_NAME into the Mongo URI path while preserving query params.
+ * Atlas SRV URIs commonly look like:
+ *   mongodb+srv://user:pass@cluster.mongodb.net/?retryWrites=true&w=majority
+ * Naive `${host}/${dbName}` would append after `?` and leave no database path
+ * (Mongo driver then defaults to `test`).
+ */
 export const buildMongoUrl = (dbHost: string, dbName: string): string => {
-  const normalizedHost = dbHost.endsWith('/') ? dbHost.slice(0, -1) : dbHost
-  return `${normalizedHost}/${dbName}`
+  const parsed = new URL(dbHost)
+  parsed.pathname = `/${dbName}`
+  return parsed.toString()
 }
 
 /** Extract hostname only — never return credentials or full connection URLs. */

@@ -191,6 +191,20 @@ describe('buildMongoUrl', () => {
       'mongodb+srv://user:pass@cluster0.example.mongodb.net/vaccin-delivery-demo',
     )
   })
+
+  it('inserts DB_NAME before Atlas query params (no silent test fallback)', () => {
+    const url = buildMongoUrl(
+      'mongodb+srv://user:pass@cluster0.example.mongodb.net/?retryWrites=true&w=majority',
+      'vaccin_delivery',
+    )
+    const parsed = new URL(url)
+
+    expect(parsed.pathname).toBe('/vaccin_delivery')
+    expect(parsed.searchParams.get('retryWrites')).toBe('true')
+    expect(parsed.searchParams.get('w')).toBe('majority')
+    expect(parsed.pathname).not.toBe('/test')
+    expect(url).not.toMatch(/\?[^#]*\/vaccin_delivery/)
+  })
 })
 
 describe('safeMongoHostname', () => {

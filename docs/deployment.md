@@ -55,11 +55,11 @@ Validate with `npm run build:pwa:production` (HTTPS + WSS required; rejects `rep
 
 ### API runtime — secrets
 
-| Variable                         | Required      | Safe example                                      | Destination     | Restart? |
-| -------------------------------- | ------------- | ------------------------------------------------- | --------------- | -------- |
-| `DB_HOST`                        | yes           | `mongodb+srv://<user>:<password>@<cluster-host>/` | Railway secret  | restart  |
-| `FIREBASE_SERVICE_ACCOUNT_JSON`  | yes (Railway) | raw SA JSON **or** base64 JSON                    | Railway secret  | restart  |
-| `GOOGLE_APPLICATION_CREDENTIALS` | local/Compose | file path to mounted SA JSON                      | local / Compose | restart  |
+| Variable                         | Required      | Safe example                                     | Destination     | Restart? |
+| -------------------------------- | ------------- | ------------------------------------------------ | --------------- | -------- |
+| `DB_HOST`                        | yes           | `mongodb+srv://…@…/?retryWrites=true&w=majority` | Railway secret  | restart  |
+| `FIREBASE_SERVICE_ACCOUNT_JSON`  | yes (Railway) | raw SA JSON **or** base64 JSON                   | Railway secret  | restart  |
+| `GOOGLE_APPLICATION_CREDENTIALS` | local/Compose | file path to mounted SA JSON                     | local / Compose | restart  |
 
 **Credential precedence:** `FIREBASE_SERVICE_ACCOUNT_JSON` → `GOOGLE_APPLICATION_CREDENTIALS` → safe startup failure. A malformed env JSON does **not** fall back to the file path.
 
@@ -98,6 +98,23 @@ After bootstrap: delete/unset bootstrap gates and passwords from Railway (or the
 
 Every step below is **manual**. This phase does not run provider CLIs for you.
 
+### Correct Railway + Atlas order (summary)
+
+1. **Create Atlas** (cluster, DB user, network access).
+2. **Configure** Railway `DB_HOST` (Atlas `mongodb+srv` URI) and `DB_NAME` (the app database name — collections need not exist yet).
+3. **Deploy the API** — normal production startup tolerates an empty database (no collections yet). Do **not** wait for bootstrap before the first healthy deploy.
+4. **Run the explicit one-off bootstrap** (`npm run bootstrap:database:demo`) with the bootstrap gates set.
+5. **Verify** Atlas collections and indexes under `DB_NAME` (not `test`).
+6. **Restart / re-check** API `/health` if needed after bootstrap.
+
+`DB_HOST` may omit a database path and may include query params, for example:
+
+```text
+mongodb+srv://<user>:<password>@<cluster-host>/?retryWrites=true&w=majority
+```
+
+The API always selects the database from **`DB_NAME`** (never hardcodes `vaccin_delivery` or `test`). Do not put `/test` (or any other DB name) in the URI path and expect it to win over `DB_NAME`.
+
 ### A. Push and verify CI
 
 1. Ensure `develop` is clean and pushed.
@@ -112,12 +129,15 @@ Every step below is **manual**. This phase does not run provider CLIs for you.
 4. Example shape (placeholders only):
 
    ```text
-   DB_HOST=mongodb+srv://<user>:<password>@<cluster-host>/
+   DB_HOST=mongodb+srv://<user>:<password>@<cluster-host>/?retryWrites=true&w=majority
    DB_NAME=vaccin-delivery-demo
    ```
 
+   A trailing path with no database name (`…mongodb.net/` or `…mongodb.net/?…`) is fine. **`DB_NAME` is authoritative.**
+
 5. Configure Network Access (IP allowlist). For the **exam public demo only**, temporary `0.0.0.0/0` is an accepted deliberate tradeoff — document it and prefer tightening later. Never expose MongoDB from Docker/Railway ports.
 6. Do **not** put the real URI in Git.
+7. An empty Atlas database (no collections) is **expected** before bootstrap.
 
 ### C. Create Railway project / API service
 
@@ -138,7 +158,7 @@ Set at least:
 ```text
 NODE_ENV=production
 URL_FRONTEND=https://placeholder-until-pwa-deployed.web.app
-DB_HOST=mongodb+srv://<user>:<password>@<cluster-host>/
+DB_HOST=mongodb+srv://<user>:<password>@<cluster-host>/?retryWrites=true&w=majority
 DB_NAME=vaccin-delivery-demo
 TRUST_PROXY=1
 FIREBASE_SERVICE_ACCOUNT_JSON=<raw JSON or base64 JSON>
@@ -148,15 +168,18 @@ FIREBASE_SERVICE_ACCOUNT_JSON=<raw JSON or base64 JSON>
 
 Optional: throttle/cache/GraphQL/body-limit overrides from `packages/api/.env.example`.
 
-### E. Deploy API and verify `/health`
+Do **not** set `ALLOW_DATABASE_BOOTSTRAP` / `CONFIRM_DATABASE_BOOTSTRAP` on the long-running API service.
+
+### E. Deploy API and verify `/health` (empty DB is OK)
 
 1. Trigger a Railway deploy from the chosen commit.
 2. Open `https://<railway-host>/health` and confirm a healthy response.
 3. Confirm GraphiQL is **not** available in production.
+4. Empty Atlas (no collections under `DB_NAME`) must **not** crash API startup. Domain data and full index reconciliation still come from the explicit bootstrap in step F.
 
 ### F. Run the one-off demo bootstrap
 
-From a trusted machine with network access to Atlas (and Firebase Admin), using **rotated** passwords:
+From a trusted machine with network access to Atlas (and Firebase Admin), **or** a Railway one-off / ephemeral run that is **not** the long-running API health-check path, using **rotated** passwords:
 
 ```bash
 # After building the API (or using an image with dist/ present)
@@ -165,7 +188,7 @@ cd packages/api   # or use root workspace script
 # Example — set secrets in the shell / Railway one-off run, never commit them:
 export NODE_ENV=production
 export URL_FRONTEND=https://placeholder-until-pwa-deployed.web.app
-export DB_HOST='mongodb+srv://<user>:<password>@<cluster-host>/'
+export DB_HOST='mongodb+srv://<user>:<password>@<cluster-host>/?retryWrites=true&w=majority'
 export DB_NAME=vaccin-delivery-demo
 export FIREBASE_SERVICE_ACCOUNT_JSON='...'   # or GOOGLE_APPLICATION_CREDENTIALS=...
 export ALLOW_DATABASE_BOOTSTRAP=true
@@ -182,12 +205,16 @@ Root convenience: `npm run bootstrap:database:demo`.
 
 The CLI:
 
+- connects using **`DB_NAME`** (same builder as the API — not `test`);
 - enables TypeORM `synchronize` **only for this process** (creates/reconciles indexes);
+- creates required collections through its data operations;
 - seeds demo/reference data idempotently;
 - reconciles Firebase Auth + application users;
 - prints **created/updated/skipped counts only** (no passwords).
 
-Re-running is safe (idempotent). It never runs from API startup or Railway deploy.
+Re-running is safe (idempotent). It never runs from API startup or the normal Railway deploy `CMD`.
+
+After bootstrap, in Atlas confirm collections/indexes exist under **`DB_NAME`** (for example `vaccin-delivery-demo`), not under `test`. Re-check API `/health` if the service was restarted.
 
 ### G. Remove bootstrap-only secrets / gates
 

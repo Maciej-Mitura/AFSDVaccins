@@ -107,4 +107,47 @@ describe('StockAdjustmentPersistenceService', () => {
     expect(repository.dropCollectionIndex).not.toHaveBeenCalled()
     expect(repository.createCollectionIndex).toHaveBeenCalledTimes(1)
   })
+
+  it('treats NamespaceNotFound from stock_adjustments index inspection as nonfatal', async () => {
+    repository.updateMany.mockResolvedValue({ modifiedCount: 0 })
+    repository.collectionIndexes.mockRejectedValue({
+      code: 26,
+      codeName: 'NamespaceNotFound',
+      message: 'ns does not exist: vaccin_delivery.stock_adjustments',
+    })
+
+    await expect(
+      service.initializeStockAdjustmentPersistence(),
+    ).resolves.toBeUndefined()
+
+    expect(repository.dropCollectionIndex).not.toHaveBeenCalled()
+    expect(repository.createCollectionIndex).toHaveBeenCalledWith(
+      STOCK_ADJUSTMENT_IDEMPOTENCY_PARTIAL_INDEX.key,
+      expect.objectContaining({
+        name: STOCK_ADJUSTMENT_IDEMPOTENCY_INDEX_NAME,
+        unique: true,
+        partialFilterExpression: {
+          idempotencyKey: { $type: 'string' },
+        },
+      }),
+    )
+  })
+
+  it('keeps other Mongo errors from index inspection fatal', async () => {
+    repository.updateMany.mockResolvedValue({ modifiedCount: 0 })
+    repository.collectionIndexes.mockRejectedValue({
+      code: 13,
+      codeName: 'Unauthorized',
+      message: 'not authorized',
+    })
+
+    await expect(
+      service.initializeStockAdjustmentPersistence(),
+    ).rejects.toMatchObject({
+      code: 13,
+      codeName: 'Unauthorized',
+    })
+
+    expect(repository.createCollectionIndex).not.toHaveBeenCalled()
+  })
 })

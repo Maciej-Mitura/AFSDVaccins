@@ -2,7 +2,11 @@ import { Logger, Module } from '@nestjs/common'
 import { ConfigModule, ConfigService } from '@nestjs/config'
 import { TypeOrmModule } from '@nestjs/typeorm'
 
-import { buildMongoUrl, envValidationSchema, safeMongoHostname } from '../config/env.validation'
+import { envValidationSchema } from '../config/env.validation'
+import {
+  buildTypeOrmMongoOptions,
+  safeMongoScheme,
+} from '../config/mongo-connection'
 import { SeedModule } from './seed.module'
 
 /**
@@ -28,21 +32,16 @@ import { SeedModule } from './seed.module'
         const dbHost = configService.get<string>('DB_HOST')
         const dbName = configService.get<string>('DB_NAME')
 
-        if (!dbHost || !dbName) {
-          throw new Error('MongoDB configuration is missing (DB_HOST, DB_NAME)')
-        }
-
-        const url = buildMongoUrl(dbHost, dbName)
-        Logger.log(
-          `Seed connecting to MongoDB host ${safeMongoHostname(dbHost)} (database: ${dbName})`,
-        )
-
-        return {
-          type: 'mongodb' as const,
-          url,
+        const options = buildTypeOrmMongoOptions({
+          dbHost: dbHost ?? '',
+          dbName: dbName ?? '',
           synchronize: nodeEnv === 'development',
-          autoLoadEntities: true,
-        }
+        })
+
+        Logger.log(`MongoDB selected database: ${options.database}`)
+        Logger.log(`MongoDB host scheme: ${safeMongoScheme(dbHost ?? '')}`)
+
+        return options
       },
     }),
     SeedModule,

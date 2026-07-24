@@ -4,12 +4,11 @@ import { GraphQLModule } from '@nestjs/graphql'
 import { ApolloDriver, ApolloDriverConfig } from '@nestjs/apollo'
 import { TypeOrmModule } from '@nestjs/typeorm'
 import { join } from 'node:path'
+import { EnvConfig, envValidationSchema } from './config/env.validation'
 import {
-  buildMongoUrl,
-  EnvConfig,
-  envValidationSchema,
-  safeMongoHostname,
-} from './config/env.validation'
+  buildTypeOrmMongoOptions,
+  safeMongoScheme,
+} from './config/mongo-connection'
 import { AuthenticationModule } from './authentication/authentication.module'
 import { GraphqlWsContextExtra } from './authentication/firebase.types'
 import {
@@ -127,25 +126,19 @@ const databaseImports = isSchemaGeneration
           const dbHost = configService.get<string>('DB_HOST')
           const dbName = configService.get<string>('DB_NAME')
 
-          if (!dbHost || !dbName) {
-            throw new Error(
-              'MongoDB configuration is missing (DB_HOST, DB_NAME)',
-            )
-          }
-
-          const url = buildMongoUrl(dbHost, dbName)
-          Logger.log(
-            `Connecting to MongoDB host ${safeMongoHostname(dbHost)} (database: ${dbName})`,
-          )
-
           // synchronize in development and isolated GraphQL E2E (NODE_ENV=test).
           // E2E bootstraps must assert DB_NAME contains a test marker before connect.
-          return {
-            type: 'mongodb' as const,
-            url,
+          // Production keeps synchronize false — empty Atlas is tolerated until bootstrap.
+          const options = buildTypeOrmMongoOptions({
+            dbHost: dbHost ?? '',
+            dbName: dbName ?? '',
             synchronize: nodeEnv === 'development' || nodeEnv === 'test',
-            autoLoadEntities: true,
-          }
+          })
+
+          Logger.log(`MongoDB selected database: ${options.database}`)
+          Logger.log(`MongoDB host scheme: ${safeMongoScheme(dbHost ?? '')}`)
+
+          return options
         },
       }),
     ]
