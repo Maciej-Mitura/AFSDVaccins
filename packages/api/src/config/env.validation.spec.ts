@@ -4,6 +4,13 @@ import {
   safeMongoHostname,
 } from './env.validation'
 
+/** Placeholder Azure storage env for production validation cases (not real secrets). */
+const PRODUCTION_AZURE_STORAGE = {
+  AZURE_STORAGE_CONNECTION_STRING:
+    'DefaultEndpointsProtocol=https;AccountName=example;AccountKey=dGVzdA==;EndpointSuffix=core.windows.net',
+  AZURE_STORAGE_CONTAINER_NAME: 'vaccine-images',
+} as const
+
 describe('envValidationSchema', () => {
   it('accepts valid development configuration', () => {
     const result = envValidationSchema.validate({
@@ -117,6 +124,7 @@ describe('envValidationSchema', () => {
       DB_HOST: 'mongodb+srv://user:pass@cluster0.example.mongodb.net/',
       DB_NAME: 'vaccin-delivery-demo',
       TRUST_PROXY: '1',
+      ...PRODUCTION_AZURE_STORAGE,
     })
 
     expect(result.error).toBeUndefined()
@@ -226,6 +234,7 @@ describe('envValidationSchema', () => {
       DB_HOST: 'mongodb://localhost:27017',
       DB_NAME: 'vaccin-delivery',
       TRUST_PROXY: '1',
+      ...PRODUCTION_AZURE_STORAGE,
     })
 
     expect(result.error).toBeUndefined()
@@ -237,6 +246,80 @@ describe('envValidationSchema', () => {
       (result.value as { VACCINE_IMAGE_STORAGE_PROVIDER: string })
         .VACCINE_IMAGE_STORAGE_PROVIDER,
     ).toBe('azure')
+    expect(
+      (result.value as { AZURE_STORAGE_READ_URL_TTL_SECONDS: number })
+        .AZURE_STORAGE_READ_URL_TTL_SECONDS,
+    ).toBe(900)
+  })
+
+  it('requires Azure storage variables only when storage provider is azure', () => {
+    const fakeMode = envValidationSchema.validate({
+      NODE_ENV: 'development',
+      PORT: 3000,
+      URL_FRONTEND: 'http://localhost:5173',
+      DB_HOST: 'mongodb://localhost:27017',
+      DB_NAME: 'vaccin-delivery',
+      VACCINE_IMAGE_STORAGE_PROVIDER: 'fake',
+    })
+    expect(fakeMode.error).toBeUndefined()
+
+    const azureMissing = envValidationSchema.validate({
+      NODE_ENV: 'development',
+      PORT: 3000,
+      URL_FRONTEND: 'http://localhost:5173',
+      DB_HOST: 'mongodb://localhost:27017',
+      DB_NAME: 'vaccin-delivery',
+      VACCINE_IMAGE_STORAGE_PROVIDER: 'azure',
+    })
+    expect(azureMissing.error).toBeDefined()
+    expect(azureMissing.error?.message).toMatch(
+      /AZURE_STORAGE_CONNECTION_STRING|AZURE_STORAGE_CONTAINER_NAME/,
+    )
+
+    const azureComplete = envValidationSchema.validate({
+      NODE_ENV: 'development',
+      PORT: 3000,
+      URL_FRONTEND: 'http://localhost:5173',
+      DB_HOST: 'mongodb://localhost:27017',
+      DB_NAME: 'vaccin-delivery',
+      VACCINE_IMAGE_STORAGE_PROVIDER: 'azure',
+      ...PRODUCTION_AZURE_STORAGE,
+    })
+    expect(azureComplete.error).toBeUndefined()
+  })
+
+  it('rejects invalid Azure read URL TTL values', () => {
+    const tooLow = envValidationSchema.validate({
+      NODE_ENV: 'development',
+      PORT: 3000,
+      URL_FRONTEND: 'http://localhost:5173',
+      DB_HOST: 'mongodb://localhost:27017',
+      DB_NAME: 'vaccin-delivery',
+      AZURE_STORAGE_READ_URL_TTL_SECONDS: 30,
+    })
+    expect(tooLow.error).toBeDefined()
+
+    const tooHigh = envValidationSchema.validate({
+      NODE_ENV: 'development',
+      PORT: 3000,
+      URL_FRONTEND: 'http://localhost:5173',
+      DB_HOST: 'mongodb://localhost:27017',
+      DB_NAME: 'vaccin-delivery',
+      AZURE_STORAGE_READ_URL_TTL_SECONDS: 5000,
+    })
+    expect(tooHigh.error).toBeDefined()
+  })
+
+  it('requires Azure storage variables in production even when omitted from input', () => {
+    const result = envValidationSchema.validate({
+      NODE_ENV: 'production',
+      PORT: 3000,
+      URL_FRONTEND: 'https://example.web.app',
+      DB_HOST: 'mongodb://localhost:27017',
+      DB_NAME: 'vaccin-delivery',
+      TRUST_PROXY: '1',
+    })
+    expect(result.error).toBeDefined()
   })
 })
 

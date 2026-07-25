@@ -143,6 +143,43 @@ export const envValidationSchema = Joi.object({
     then: Joi.string().valid('azure').default('azure'),
     otherwise: Joi.string().valid('fake', 'azure').default('fake'),
   }),
+
+  /**
+   * Azure Blob connection string (AccountName + AccountKey required for SAS).
+   * Required when VACCINE_IMAGE_STORAGE_PROVIDER=azure (including production default).
+   * Never log this value.
+   */
+  AZURE_STORAGE_CONNECTION_STRING: Joi.when('VACCINE_IMAGE_STORAGE_PROVIDER', {
+    is: 'azure',
+    then: Joi.string().min(1).required(),
+    otherwise: Joi.when('NODE_ENV', {
+      is: 'production',
+      then: Joi.string().min(1).required(),
+      otherwise: Joi.string().allow('').optional(),
+    }),
+  }),
+  /**
+   * Private blob container for vaccine images (e.g. vaccine-images).
+   * Required when storage provider is azure.
+   */
+  AZURE_STORAGE_CONTAINER_NAME: Joi.when('VACCINE_IMAGE_STORAGE_PROVIDER', {
+    is: 'azure',
+    then: Joi.string().min(1).required(),
+    otherwise: Joi.when('NODE_ENV', {
+      is: 'production',
+      then: Joi.string().min(1).required(),
+      otherwise: Joi.string().allow('').optional(),
+    }),
+  }),
+  /**
+   * Short-lived read SAS TTL in seconds (bounded 60–3600; default 900).
+   * Used by the Azure storage provider only; fake storage ignores this.
+   */
+  AZURE_STORAGE_READ_URL_TTL_SECONDS: Joi.number()
+    .integer()
+    .min(60)
+    .max(3600)
+    .default(900),
 })
 
 export type EnvConfig = {
@@ -179,6 +216,9 @@ export type EnvConfig = {
   API_JSON_BODY_LIMIT: string
   VACCINE_IMAGE_ANALYSIS_PROVIDER: 'fake' | 'azure'
   VACCINE_IMAGE_STORAGE_PROVIDER: 'fake' | 'azure'
+  AZURE_STORAGE_CONNECTION_STRING?: string
+  AZURE_STORAGE_CONTAINER_NAME?: string
+  AZURE_STORAGE_READ_URL_TTL_SECONDS: number
 }
 
 /**

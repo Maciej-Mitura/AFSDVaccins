@@ -1,6 +1,7 @@
 import { FakeVaccineImageAnalysisProvider } from './fake-vaccine-image-analysis.provider'
 import { FakeVaccineImageStorageProvider } from './fake-vaccine-image-storage.provider'
 import { VaccineImageAiProvider } from './vaccine-image-ai-provider.enum'
+import { VaccineImageBlobNotFoundException } from './vaccine-image-storage.exceptions'
 import { VaccineImageStorageProviderId } from './vaccine-image-storage-provider.enum'
 
 describe('FakeVaccineImageAnalysisProvider', () => {
@@ -60,8 +61,8 @@ describe('FakeVaccineImageStorageProvider', () => {
 
     await provider.delete(storageKey)
     expect(provider.has(storageKey)).toBe(false)
-    await expect(provider.createReadUrl({ storageKey })).rejects.toThrow(
-      /unknown storageKey/,
+    await expect(provider.createReadUrl({ storageKey })).rejects.toBeInstanceOf(
+      VaccineImageBlobNotFoundException,
     )
   })
 })

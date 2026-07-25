@@ -2,10 +2,10 @@ import { Module } from '@nestjs/common'
 import { ConfigModule, ConfigService } from '@nestjs/config'
 
 import { EnvConfig } from '../../config/env.validation'
+import { AzureVaccineImageStorageProvider } from './azure-vaccine-image-storage.provider'
 import { FakeVaccineImageAnalysisProvider } from './fake-vaccine-image-analysis.provider'
 import { FakeVaccineImageStorageProvider } from './fake-vaccine-image-storage.provider'
 import { UnimplementedAzureVaccineImageAnalysisProvider } from './unimplemented-azure-vaccine-image-analysis.provider'
-import { UnimplementedAzureVaccineImageStorageProvider } from './unimplemented-azure-vaccine-image-storage.provider'
 import { VACCINE_IMAGE_ANALYSIS_PROVIDER } from './vaccine-image-analysis.provider'
 import { VaccineImageFieldsResolver } from './vaccine-image-fields.resolver'
 import { resolveVaccineImageProviderMode } from './vaccine-image-provider.selection'
@@ -50,9 +50,23 @@ const storageProvider = {
       nodeEnv,
     )
 
-    return mode === 'fake'
-      ? new FakeVaccineImageStorageProvider()
-      : new UnimplementedAzureVaccineImageStorageProvider()
+    if (mode === 'fake') {
+      return new FakeVaccineImageStorageProvider()
+    }
+
+    return AzureVaccineImageStorageProvider.fromConfig({
+      connectionString: configService.getOrThrow(
+        'AZURE_STORAGE_CONNECTION_STRING',
+        { infer: true },
+      ),
+      containerName: configService.getOrThrow('AZURE_STORAGE_CONTAINER_NAME', {
+        infer: true,
+      }),
+      readUrlTtlSeconds: configService.get(
+        'AZURE_STORAGE_READ_URL_TTL_SECONDS',
+        { infer: true },
+      ),
+    })
   },
 }
 
