@@ -32,6 +32,7 @@ import {
 } from './delivery-date.util'
 import { CreateOrderInput } from './dto/create-order.input'
 import { OrderFilterInput } from './dto/order-filter.input'
+import { OrderDeliveryMethod } from './order-delivery-method.enum'
 import {
   DailyLimitExceededException,
   InvalidOrderQuantityException,
@@ -569,6 +570,11 @@ export class OrderService {
       }
 
       if (!wasAlreadyDelivered) {
+        const deliveredAt = this.clock.now()
+        order.deliveredAt = deliveredAt
+        order.deliveredByUserId = admin._id.toString()
+        order.deliveryMethod = OrderDeliveryMethod.ADMIN
+        // ADMIN path never sets deliveryConfirmationEventId (QR provenance).
         this.appendStatusHistory(
           order,
           previousStatus,
@@ -711,6 +717,102 @@ export class OrderService {
   }
 
   async publishPlannedOrderUpdates(orders: Order[]): Promise<void> {
+    for (const order of orders) {
+      await this.orderEventsService.publishOrderStatusChanged(order)
+    }
+  }
+
+  /**
+   * Marks stop orders DELIVERED for QR confirmation (Phase 26D).
+   *
+   * Idempotent for the same `confirmationEventId`: already-DELIVERED orders that
+   * carry this event id are returned as completed without re-decrementing stock.
+   * Unrelated DELIVERED orders (ADMIN / other event / legacy) throw.
+   *
+   * Does **not** emit PubSub or create delivered notifications — the confirm
+   * service publishes only after stop finalisation.
+   */
+  async markDeliveredForQrConfirmation(
+    actor: User,
+    orderIds: readonly string[],
+    confirmationEventId: string,
+  ): Promise<Order[]> {
+    const savedOrders: Order[] = []
+    const uniqueIds = [...new Set(orderIds.map(String))]
+    const courierUserId = actor._id.toString()
+
+    for (const orderId of uniqueIds) {
+      const order = await this.requireNormalizedById(orderId)
+
+      if (
+        order.status === OrderStatus.DELIVERED &&
+        order.deliveryConfirmationEventId === confirmationEventId
+      ) {
+        savedOrders.push(order)
+        continue
+      }
+
+      if (order.status === OrderStatus.DELIVERED) {
+        throw new InvalidOrderStatusTransitionException(
+          order.status,
+          OrderStatus.DELIVERED,
+        )
+      }
+
+      if (!canTransitionOrderStatus(order.status, OrderStatus.DELIVERED)) {
+        throw new InvalidOrderStatusTransitionException(
+          order.status,
+          OrderStatus.DELIVERED,
+        )
+      }
+
+      if (
+        order.status !== OrderStatus.PENDING &&
+        order.status !== OrderStatus.PLANNED
+      ) {
+        throw new InvalidOrderStatusTransitionException(
+          order.status,
+          OrderStatus.DELIVERED,
+        )
+      }
+
+      const decrementResult = await this.stockService.applyDeliveryDecrement(
+        actor,
+        order.id,
+        order.orderLines,
+      )
+
+      const previousStatus = order.status
+      const deliveredAt = this.clock.now()
+      order.status = OrderStatus.DELIVERED
+      order.deliveredAt = deliveredAt
+      order.deliveredByUserId = courierUserId
+      order.deliveryMethod = OrderDeliveryMethod.QR
+      order.deliveryConfirmationEventId = confirmationEventId
+
+      if (!decrementResult.alreadyProcessed) {
+        order.stockDecrementedAt = deliveredAt
+      } else if (!order.stockDecrementedAt) {
+        order.stockDecrementedAt = deliveredAt
+      }
+
+      this.appendStatusHistory(
+        order,
+        previousStatus,
+        OrderStatus.DELIVERED,
+        courierUserId,
+        'Confirmed delivered via QR',
+      )
+
+      const saved = await this.orderRepository.save(order)
+      savedOrders.push(saved)
+    }
+
+    return savedOrders
+  }
+
+  /** PubSub fan-out for orders delivered by QR confirm (after stop finalisation). */
+  async publishQrDeliveredOrderUpdates(orders: Order[]): Promise<void> {
     for (const order of orders) {
       await this.orderEventsService.publishOrderStatusChanged(order)
     }

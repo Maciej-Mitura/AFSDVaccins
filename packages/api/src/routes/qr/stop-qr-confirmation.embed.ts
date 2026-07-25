@@ -14,12 +14,9 @@ import { Column } from 'typeorm'
  *   does **not** remint, consume, or clear the token.
  * - Scan/preview (26C): courier validates token + ownership; does **not** consume
  *   or clear `encodedToken`; repeated previews allowed while unconsumed.
- * - Successful delivery confirmation (26D): marks consumed; validation rejects
- *   consumed stops even if an old QR image still exists.
- * - After consumption, authorised token retrieval must not return an active QR.
- * - Whether `encodedToken` is cleared after consume may be deferred to Phase 26D;
- *   intended policy: treat consumed confirmation as inactive regardless, and
- *   prefer clearing/rotating the bearer material when the consume path lands.
+ * - Delivery confirmation (26D): claim PROCESSING (token remains verifiable) →
+ *   deliver orders → finalise COMPLETED (consume, clear `encodedToken`, write proof).
+ * - After COMPLETED, authorised token retrieval must not return an active QR.
  *
  * `encodedToken` is a bearer credential — never log, never put in PubSub/audit,
  * never expose on ordinary DeliveryRoute/DeliveryStop GraphQL fields.

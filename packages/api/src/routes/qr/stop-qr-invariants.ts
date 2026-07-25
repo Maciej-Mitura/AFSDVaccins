@@ -73,13 +73,6 @@ function assertQrConfirmationShape(confirmation: StopQrConfirmation): void {
     )
   }
 
-  if (!hasText(confirmation.encodedToken) || !confirmation.encodedToken.includes('.')) {
-    throw new StopQrInvariantViolationException(
-      'qrConfirmation.encodedToken must be a non-empty signed token.',
-      'STOP_QR_INVALID_ENCODED_TOKEN',
-    )
-  }
-
   if (!(confirmation.issuedAt instanceof Date) || Number.isNaN(confirmation.issuedAt.getTime())) {
     throw new StopQrInvariantViolationException(
       'qrConfirmation.issuedAt must be a valid Date.',
@@ -103,6 +96,27 @@ function assertQrConfirmationShape(confirmation: StopQrConfirmation): void {
     throw new StopQrInvariantViolationException(
       'qrConfirmation.consumedAt must be a valid Date when set.',
       'STOP_QR_INVALID_CONSUMED_AT',
+    )
+  }
+
+  // Unconsumed: bearer token required. Consumed (26D): encodedToken may be cleared.
+  if (!hasConsumedAt) {
+    if (
+      !hasText(confirmation.encodedToken) ||
+      !confirmation.encodedToken.includes('.')
+    ) {
+      throw new StopQrInvariantViolationException(
+        'qrConfirmation.encodedToken must be a non-empty signed token.',
+        'STOP_QR_INVALID_ENCODED_TOKEN',
+      )
+    }
+  } else if (
+    hasText(confirmation.encodedToken) &&
+    !confirmation.encodedToken.includes('.')
+  ) {
+    throw new StopQrInvariantViolationException(
+      'qrConfirmation.encodedToken must be cleared or remain a signed token after consume.',
+      'STOP_QR_INVALID_ENCODED_TOKEN',
     )
   }
 }

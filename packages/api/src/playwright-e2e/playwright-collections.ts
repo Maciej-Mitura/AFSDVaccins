@@ -6,6 +6,7 @@ import { ApothekerProfile } from '../profile/apotheker/apotheker-profile.entity'
 import { BezorgerProfile } from '../profile/bezorger/bezorger-profile.entity'
 import { RouteTemplate } from '../route-templates/route-template.entity'
 import { DeliveryRoute } from '../routes/delivery-route.entity'
+import { DeliveryQrConfirmAuditEvent } from '../routes/qr/delivery-qr-confirm-audit.entity'
 import { ApplicationSettings } from '../settings/settings.entity'
 import { StockAdjustment } from '../stock/stock-adjustment.entity'
 import { User } from '../user/user.entity'
@@ -17,6 +18,7 @@ const E2E_DB_NAME_MARKERS = ['_test', 'e2e'] as const
 const PLAYWRIGHT_ENTITIES = [
   Notification,
   DeliveryRoute,
+  DeliveryQrConfirmAuditEvent,
   RouteTemplate,
   Order,
   StockAdjustment,

@@ -3045,6 +3045,98 @@ feat(delivery): add Phase 26C courier QR scan preview API
 
 ---
 
+# Phase 26D — Atomic QR delivery confirmation
+
+## Phase metadata
+
+| Field             | Value                                                                                            |
+| ----------------- | ------------------------------------------------------------------------------------------------ |
+| **Objective**     | Courier confirms delivery after preview: consume QR, write proof, deliver stop orders atomically |
+| **Prerequisites** | Phase 26C (courier scan preview)                                                                 |
+| **Requirement**   | Explicit “Mark as delivered” confirmation only — preview remains read-only                       |
+
+### Exact scope
+
+- Authenticated REST `POST /delivery-routes/qr/confirm` with JSON `{ token }`
+- BEZORGER-only; same assigned-courier ownership as preview
+- Full server-side revalidation (never trusts a prior preview)
+- Atomic stop claim (CAS) + order `DELIVERED` + stock decrement idempotency
+- Resumable `confirmationProcess` (`PROCESSING` → `COMPLETED`) so crash mid-flight is recoverable
+- Order provenance: `deliveryMethod`, `deliveryConfirmationEventId`, `deliveredAt`, `deliveredByUserId`
+- Focused audit `DELIVERY_STOP_CONFIRMED_BY_QR` (exactly one per success)
+- Route + order PubSub only after **finalisation**
+- Strict identity throttle: **10** confirmations / 10 minutes per courier
+- Clear `encodedToken` only on COMPLETED finalisation
+
+### Explicit out-of-scope
+
+- Camera / PWA scanning UI (Phase 26E)
+- Push notifications, geolocation, offline support
+- Auto-completing the route when all stops are delivered
+
+### Business rules
+
+- Preview and confirmation are **separate** steps
+- Confirmation **revalidates** token, ownership, route status, QR state, and order integrity
+- Confirmation is **resumable** on standalone Mongo (PROCESSING claim → idempotent orders → COMPLETED finalisation)
+- Token becomes **one-time consumed** only after all stop orders are DELIVERED
+- Stop order is unrestricted (any stop, any sequence)
+- Multiple orders on a stop confirm together as a complete set
+- Internet is required; token never in URL/query/logs
+- Route stays `IN_PROGRESS` until existing `updateRouteStatus(…, COMPLETED)`
+
+### Consistency strategy
+
+1. Validate all preconditions with ordinary reads (never trust a prior preview)
+2. CAS **PROCESSING** claim on the stop (`confirmationProcess`) — do **not** consume QR / write proof yet; keep `encodedToken` verifiable
+3. Deliver associated orders idempotently under a stable `confirmationEventId` (stock keys + order provenance); already-DELIVERED with the same event id count as done
+4. Verify the complete stop order set is DELIVERED for that event id
+5. CAS **finalise**: `consumedAt` / `consumedByUserId`, clear `encodedToken`, write `deliveryProof`, mark process COMPLETED
+6. Write one audit row keyed by `confirmationEventId` (unique index)
+7. Emit redacted route + order PubSub only after finalisation
+
+**Crash recovery:** retry with the same QR token by the assigned courier resumes the PROCESSING claim, finishes remaining orders, then finalises. Stale PROCESSING claims (default 60s) may be reclaimed while preserving `confirmationEventId`.
+
+**Concurrency:** exactly one PROCESSING claim / event id; peers get `DELIVERY_QR_CONFIRMATION_IN_PROGRESS` or join the same actor resume; after COMPLETED, replay is `CONSUMED` / `STOP_ALREADY_DELIVERED`.
+
+**Order provenance:** unrelated ADMIN/legacy DELIVERED orders on the stop fail integrity; ADMIN `updateOrderStatus(DELIVERED)` sets `deliveryMethod=ADMIN` without a QR event id.
+
+### API
+
+```
+POST /delivery-routes/qr/confirm
+Authorization: Bearer <Firebase ID token>
+Roles: BEZORGER
+Body: { "token": "<opaque signed QR token>" }
+```
+
+### Error codes
+
+| Code                                   | Meaning                                       |
+| -------------------------------------- | --------------------------------------------- |
+| `DELIVERY_QR_TOKEN_REQUIRED`           | Missing / blank token                         |
+| `DELIVERY_QR_TOKEN_INVALID`            | Malformed, tampered, or crypto failure        |
+| `DELIVERY_QR_VERSION_UNSUPPORTED`      | Unsupported token version                     |
+| `DELIVERY_QR_ROUTE_NOT_FOUND`          | Route missing after valid claims              |
+| `DELIVERY_QR_FORBIDDEN`                | Not the assigned courier                      |
+| `DELIVERY_QR_ROUTE_NOT_STARTED`        | Route still `ASSIGNED`                        |
+| `DELIVERY_QR_ROUTE_INACTIVE`           | Route `COMPLETED` / `CANCELLED`               |
+| `DELIVERY_QR_STOP_NOT_FOUND`           | Stop missing on route                         |
+| `DELIVERY_QR_CONSUMED`                 | QR already consumed (HTTP 409 on confirm)     |
+| `DELIVERY_QR_STOP_ALREADY_DELIVERED`   | Stop already has delivery proof (HTTP 409)    |
+| `DELIVERY_QR_ORDER_INTEGRITY_ERROR`    | Incomplete or invalid associated orders       |
+| `DELIVERY_QR_CONFIRMATION_CONFLICT`    | Lost concurrent confirmation race (HTTP 409)  |
+| `DELIVERY_QR_CONFIRMATION_IN_PROGRESS` | Another PROCESSING claim is active (HTTP 409) |
+| `DELIVERY_QR_CONFIRMATION_FAILED`      | Persistence unit of work failed               |
+
+### Recommended commit message
+
+```
+feat(delivery): add Phase 26D atomic QR delivery confirmation
+```
+
+---
+
 # Phase 27 — QR proof of delivery and manifest export
 
 ## Phase metadata

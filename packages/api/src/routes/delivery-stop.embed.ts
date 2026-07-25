@@ -3,8 +3,10 @@ import { Column } from 'typeorm'
 
 import { Address } from '../profile/address.type'
 import { OrderLineSnapshot } from './order-line-snapshot.embed'
+import { StopConfirmationProcess } from './qr/stop-confirmation-process.embed'
 import { StopDeliveryProof } from './qr/stop-delivery-proof.embed'
 import { StopQrConfirmation } from './qr/stop-qr-confirmation.embed'
+
 
 @ObjectType('DeliveryStop')
 export class DeliveryStop {
@@ -62,7 +64,15 @@ export class DeliveryStop {
   /**
    * Persistence-only delivery proof after successful QR confirmation.
    * Never expose the full object via GraphQL — use deliveredAt ResolveField.
+   * Written only when confirmationProcess reaches COMPLETED.
    */
   @Column({ nullable: true })
   deliveryProof?: StopDeliveryProof | null
+
+  /**
+   * Persistence-only in-flight / completed confirmation process (Phase 26D).
+   * Never GraphQL-exposed. PROCESSING keeps the QR token verifiable for resume.
+   */
+  @Column({ nullable: true })
+  confirmationProcess?: StopConfirmationProcess | null
 }

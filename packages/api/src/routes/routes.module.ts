@@ -4,6 +4,10 @@ import { AuthenticationModule } from '../authentication/authentication.module'
 import { PubSubModule } from '../common/pubsub/pubsub.module'
 import { CLOCK, SystemClock } from '../order/clock.provider'
 import { UserModule } from '../user/user.module'
+import { DeliveryQrConfirmAuditEvent } from './qr/delivery-qr-confirm-audit.entity'
+import { DeliveryQrConfirmAuditService } from './qr/delivery-qr-confirm-audit.service'
+import { DeliveryQrConfirmController } from './qr/delivery-qr-confirm.controller'
+import { DeliveryQrConfirmService } from './qr/delivery-qr-confirm.service'
 import { DeliveryQrPreviewController } from './qr/delivery-qr-preview.controller'
 import { DeliveryQrPreviewService } from './qr/delivery-qr-preview.service'
 import { DeliveryStopQrController } from './qr/delivery-stop-qr.controller'
@@ -15,6 +19,7 @@ import { RoutePreviewService } from './route-preview.service'
 import { RoutesCoreModule } from './routes-core.module'
 import { RoutesResolver } from './routes.resolver'
 import { RoutesService } from './routes.service'
+import { TypeOrmModule } from '@nestjs/typeorm'
 
 const isSchemaGeneration =
   process.argv.includes('--generate-schema-only') ||
@@ -75,16 +80,50 @@ const deliveryQrPreviewServiceProvider = isSchemaGeneration
     }
   : DeliveryQrPreviewService
 
+const deliveryQrConfirmServiceProvider = isSchemaGeneration
+  ? {
+      provide: DeliveryQrConfirmService,
+      useValue: {
+        confirmForCourier: () => Promise.resolve(null),
+      },
+    }
+  : DeliveryQrConfirmService
+
+const deliveryQrConfirmAuditServiceProvider = isSchemaGeneration
+  ? {
+      provide: DeliveryQrConfirmAuditService,
+      useValue: {
+        record: () => Promise.resolve(),
+      },
+    }
+  : DeliveryQrConfirmAuditService
+
+const confirmAuditPersistence = isSchemaGeneration
+  ? []
+  : [TypeOrmModule.forFeature([DeliveryQrConfirmAuditEvent])]
+
 @Module({
-  imports: [AuthenticationModule, UserModule, PubSubModule, RoutesCoreModule],
+  imports: [
+    AuthenticationModule,
+    UserModule,
+    PubSubModule,
+    RoutesCoreModule,
+    ...confirmAuditPersistence,
+  ],
   controllers: isSchemaGeneration
     ? []
-    : [DeliveryQrPreviewController, DeliveryStopQrController],
+    : [
+        DeliveryQrPreviewController,
+        DeliveryQrConfirmController,
+        DeliveryStopQrController,
+      ],
   providers: [
     routePreviewServiceProvider,
     routesServiceProvider,
     deliveryStopQrRetrievalServiceProvider,
     deliveryQrPreviewServiceProvider,
+    deliveryQrConfirmServiceProvider,
+    deliveryQrConfirmAuditServiceProvider,
     DeliveryStopQrImageService,
     RoutesResolver,
     DeliveryStopQrFieldsResolver,

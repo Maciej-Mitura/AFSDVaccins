@@ -67,6 +67,28 @@ export class Order {
   @Field(() => Date, { nullable: true })
   stockDecrementedAt?: Date | null
 
+  /** When the order became DELIVERED (ADMIN or QR). Persistence-only. */
+  @Column({ nullable: true })
+  deliveredAt?: Date | null
+
+  /** User who marked the order delivered (ADMIN or courier). Persistence-only. */
+  @Column({ nullable: true })
+  deliveredByUserId?: string | null
+
+  /**
+   * Delivery channel provenance (`ADMIN` | `QR`). Persistence-only.
+   * Legacy DELIVERED rows may omit this field.
+   */
+  @Column({ nullable: true })
+  deliveryMethod?: string | null
+
+  /**
+   * QR confirmationEventId when delivered via Phase 26D. Persistence-only.
+   * Null for ADMIN / legacy deliveries — QR resume rejects unrelated DELIVERED.
+   */
+  @Column({ nullable: true })
+  deliveryConfirmationEventId?: string | null
+
   @Column()
   @Field()
   deliveryDate!: string

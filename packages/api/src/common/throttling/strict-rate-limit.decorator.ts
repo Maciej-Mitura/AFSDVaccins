@@ -47,3 +47,19 @@ export function DeliveryQrPreviewThrottle(): MethodDecorator {
     },
   })
 }
+
+/**
+ * Courier QR confirmation throttle: 10 attempts per 10 minutes per identity.
+ * Stricter than preview. Never key on token contents.
+ */
+export const DELIVERY_QR_CONFIRM_THROTTLE_LIMIT = 10
+export const DELIVERY_QR_CONFIRM_THROTTLE_TTL_MS = 600_000
+
+export function DeliveryQrConfirmThrottle(): MethodDecorator {
+  return Throttle({
+    [THROTTLER_STRICT]: {
+      limit: DELIVERY_QR_CONFIRM_THROTTLE_LIMIT,
+      ttl: DELIVERY_QR_CONFIRM_THROTTLE_TTL_MS,
+    },
+  })
+}

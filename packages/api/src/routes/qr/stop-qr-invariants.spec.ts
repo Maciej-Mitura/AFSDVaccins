@@ -165,6 +165,23 @@ describe('stop QR invariants', () => {
     )
   })
 
+  it('accepts cleared encodedToken after consume (Phase 26D)', () => {
+    expect(() =>
+      assertStopQrInvariants(
+        {
+          orderIds: [ORDER_A, ORDER_B],
+          apothekerProfileId: PROFILE,
+          qrConfirmation: {
+            ...consumedConfirmation(),
+            encodedToken: '',
+          },
+          deliveryProof: validProof(),
+        },
+        { assignedCourierUserId: COURIER },
+      ),
+    ).not.toThrow()
+  })
+
   it('rejects empty nonce hashes and unsupported token versions', () => {
     expect(() =>
       assertStopQrInvariants({
