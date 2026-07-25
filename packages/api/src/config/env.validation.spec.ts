@@ -173,6 +173,71 @@ describe('envValidationSchema', () => {
       (result.value as { ALLOW_DATABASE_SEED: boolean }).ALLOW_DATABASE_SEED,
     ).toBe(true)
   })
+
+  it('defaults vaccine image providers to fake outside production', () => {
+    const result = envValidationSchema.validate({
+      NODE_ENV: 'development',
+      PORT: 3000,
+      URL_FRONTEND: 'http://localhost:5173',
+      DB_HOST: 'mongodb://localhost:27017',
+      DB_NAME: 'vaccin-delivery',
+    })
+
+    expect(result.error).toBeUndefined()
+    expect(
+      (result.value as { VACCINE_IMAGE_ANALYSIS_PROVIDER: string })
+        .VACCINE_IMAGE_ANALYSIS_PROVIDER,
+    ).toBe('fake')
+    expect(
+      (result.value as { VACCINE_IMAGE_STORAGE_PROVIDER: string })
+        .VACCINE_IMAGE_STORAGE_PROVIDER,
+    ).toBe('fake')
+  })
+
+  it('rejects fake vaccine image providers in production', () => {
+    const analysis = envValidationSchema.validate({
+      NODE_ENV: 'production',
+      PORT: 3000,
+      URL_FRONTEND: 'https://example.web.app',
+      DB_HOST: 'mongodb://localhost:27017',
+      DB_NAME: 'vaccin-delivery',
+      TRUST_PROXY: '1',
+      VACCINE_IMAGE_ANALYSIS_PROVIDER: 'fake',
+    })
+    expect(analysis.error).toBeDefined()
+
+    const storage = envValidationSchema.validate({
+      NODE_ENV: 'production',
+      PORT: 3000,
+      URL_FRONTEND: 'https://example.web.app',
+      DB_HOST: 'mongodb://localhost:27017',
+      DB_NAME: 'vaccin-delivery',
+      TRUST_PROXY: '1',
+      VACCINE_IMAGE_STORAGE_PROVIDER: 'fake',
+    })
+    expect(storage.error).toBeDefined()
+  })
+
+  it('defaults vaccine image providers to azure in production', () => {
+    const result = envValidationSchema.validate({
+      NODE_ENV: 'production',
+      PORT: 3000,
+      URL_FRONTEND: 'https://example.web.app',
+      DB_HOST: 'mongodb://localhost:27017',
+      DB_NAME: 'vaccin-delivery',
+      TRUST_PROXY: '1',
+    })
+
+    expect(result.error).toBeUndefined()
+    expect(
+      (result.value as { VACCINE_IMAGE_ANALYSIS_PROVIDER: string })
+        .VACCINE_IMAGE_ANALYSIS_PROVIDER,
+    ).toBe('azure')
+    expect(
+      (result.value as { VACCINE_IMAGE_STORAGE_PROVIDER: string })
+        .VACCINE_IMAGE_STORAGE_PROVIDER,
+    ).toBe('azure')
+  })
 })
 
 describe('buildMongoUrl', () => {

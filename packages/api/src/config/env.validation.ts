@@ -124,6 +124,25 @@ export const envValidationSchema = Joi.object({
     .messages({
       'any.invalid': `API_JSON_BODY_LIMIT must be a positive size like 100kb or 1mb (max ${API_JSON_BODY_LIMIT_MAX_BYTES} bytes)`,
     }),
+
+  /**
+   * Vaccine image analysis backend: `fake` (local/tests) or `azure` (production target).
+   * Fake is rejected when NODE_ENV=production.
+   */
+  VACCINE_IMAGE_ANALYSIS_PROVIDER: Joi.when('NODE_ENV', {
+    is: 'production',
+    then: Joi.string().valid('azure').default('azure'),
+    otherwise: Joi.string().valid('fake', 'azure').default('fake'),
+  }),
+  /**
+   * Vaccine image binary storage backend: `fake` (local/tests) or `azure` (production target).
+   * Fake is rejected when NODE_ENV=production.
+   */
+  VACCINE_IMAGE_STORAGE_PROVIDER: Joi.when('NODE_ENV', {
+    is: 'production',
+    then: Joi.string().valid('azure').default('azure'),
+    otherwise: Joi.string().valid('fake', 'azure').default('fake'),
+  }),
 })
 
 export type EnvConfig = {
@@ -158,6 +177,8 @@ export type EnvConfig = {
   GRAPHQL_MAX_DEPTH: number
   GRAPHQL_MAX_COMPLEXITY: number
   API_JSON_BODY_LIMIT: string
+  VACCINE_IMAGE_ANALYSIS_PROVIDER: 'fake' | 'azure'
+  VACCINE_IMAGE_STORAGE_PROVIDER: 'fake' | 'azure'
 }
 
 /**

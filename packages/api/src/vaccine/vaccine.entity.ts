@@ -8,6 +8,8 @@ import {
   UpdateDateColumn,
 } from 'typeorm'
 
+import { VaccineImage } from './image/vaccine-image.embed'
+
 @Entity('vaccines')
 @ObjectType('Vaccine')
 export class Vaccine {
@@ -46,6 +48,14 @@ export class Vaccine {
   @Column({ default: true })
   @Field()
   active!: boolean
+
+  /**
+   * Optional catalogue image metadata (zero or one). Absent on legacy documents.
+   * Binary bytes are never stored in MongoDB.
+   */
+  @Column({ nullable: true })
+  @Field(() => VaccineImage, { nullable: true })
+  image?: VaccineImage | null
 
   @CreateDateColumn()
   @Field()
