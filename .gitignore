@@ -22,6 +22,7 @@ firebase-service-account.json
 *.pem
 *.p12
 .firebaserc
+.firebase*
 
 # Google Sheets i18n exporter (dev-only; never commit secrets/tokens)
 packages/i18n-export/credentials.json
