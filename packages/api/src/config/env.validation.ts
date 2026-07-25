@@ -221,6 +221,20 @@ export const envValidationSchema = Joi.object({
     .min(1000)
     .max(30_000)
     .default(10_000),
+
+  // ---- Phase 26A delivery QR signing (backend-only; never log) ----
+  /**
+   * HMAC-SHA-256 signing secret for delivery-stop QR tokens.
+   * Required in development and production (min 32 characters).
+   * In NODE_ENV=test, omit to use the explicit test-only injected default in the
+   * token module, or set a deterministic secret explicitly.
+   * Never expose to GraphQL or the PWA. Never reuse Firebase/Azure credentials.
+   */
+  DELIVERY_QR_SIGNING_SECRET: Joi.when('NODE_ENV', {
+    is: 'test',
+    then: Joi.string().min(32).allow('').optional(),
+    otherwise: Joi.string().min(32).required(),
+  }),
 })
 
 export type EnvConfig = {
@@ -263,6 +277,7 @@ export type EnvConfig = {
   AZURE_VISION_ENDPOINT?: string
   AZURE_VISION_KEY?: string
   AZURE_VISION_TIMEOUT_MS: number
+  DELIVERY_QR_SIGNING_SECRET?: string
 }
 
 /**

@@ -6,6 +6,7 @@ import {
   PUB_SUB,
 } from '../common/pubsub/pubsub.constants'
 import { DeliveryRoute } from './delivery-route.entity'
+import { redactDeliveryRouteForEvents } from './qr/redact-delivery-route-for-events'
 
 @Injectable()
 export class DeliveryRouteEventsService {
@@ -13,7 +14,7 @@ export class DeliveryRouteEventsService {
 
   async publishBezorgerRouteUpdated(route: DeliveryRoute): Promise<void> {
     await this.pubSub.publish(BEZORGER_ROUTE_UPDATED_EVENT, {
-      bezorgerRouteUpdates: route,
+      bezorgerRouteUpdates: redactDeliveryRouteForEvents(route),
     })
   }
 }

@@ -2808,18 +2808,95 @@ feat(ai): validate vaccine images via Azure with audited overrides
 
 ---
 
+# Phase 26A — Secure QR delivery-confirmation foundation
+
+## Phase metadata
+
+| Field             | Value                                                                                                                          |
+| ----------------- | ------------------------------------------------------------------------------------------------------------------------------ |
+| **Objective**     | Persist per-stop QR confirmation + delivery-proof shape on generated routes; HMAC-signed token service; no scan/UI/consume yet |
+| **Prerequisites** | Stable `DeliveryRoute` generation and execution; Phase 22 env validation patterns                                              |
+| **Requirement**   | Front-loads roadmap Phase 27 QR work with a persistence + crypto foundation only                                               |
+
+### Exact scope
+
+- Embed `qrConfirmation` + `deliveryProof` on generated `DeliveryStop` only (never on `RouteTemplate`)
+- At generation: mint HMAC token immediately; persist `nonceHash` + `encodedToken`; discard plaintext nonce
+- Provider-neutral HMAC-SHA-256 token service (`v`, `routeId`, `stopId`, `nonce`)
+- `DELIVERY_QR_SIGNING_SECRET` (backend-only, min 32 chars, required outside tests)
+- Initialise fresh QR state on every newly generated stop
+- Safe GraphQL readiness fields: `qrAvailable`, `qrConsumed`, `deliveredAt` (+ optional `stopId`)
+- `encodedToken` is a bearer credential: persistence-only; redacted from PubSub; not on ordinary GraphQL
+- Invariant helpers for consume/proof consistency (consume mutation deferred)
+
+### Explicit out-of-scope
+
+- QR image (PNG/SVG) generation
+- Camera / scan UI
+- Delivery-preview endpoint
+- Narrow pharmacy/ADMIN token retrieval (Phase 26B)
+- Consuming QR / marking stop or orders delivered via QR
+- Push notifications, geolocation, UI cleanup
+- Automatic production backfill of legacy routes at startup
+
+### Business rules (locked for later sub-phases)
+
+- One QR token per **generated** route stop (a stop may hold multiple orders)
+- Scan ≠ deliver: scan/preview does **not** consume or clear `encodedToken`
+- Successful confirmation consumes the QR and atomically delivers stop + associated orders
+- After consumption, token retrieval must not return an active QR; validation rejects consumed stops even if an old QR image still exists
+- Whether `encodedToken` is cleared after consume may be deferred to Phase 26D (intended: inactive after consume; prefer clear/rotate when consume lands)
+- Stops may be completed in any order
+- QR valid only while route is `IN_PROGRESS`; invalid after successful delivery
+- Online only; geolocation postponed (retain `recipientCity` on proof for later coarse notify)
+
+### Legacy-route policy
+
+**C — newly generated routes only.** Pre-26A `DeliveryRoute` documents without `qrConfirmation` remain readable (`qrAvailable=false`) and unavailable for QR retrieval. No startup mutation/backfill. An explicit ADMIN backfill/command may be added in a later sub-phase if needed.
+
+### Token format
+
+- Wire: `<base64url(json)>.<base64url(hmac-sha256)>`
+- Claims: `{ v: 1, routeId, stopId, nonce }` only
+- Persisted as `qrConfirmation.encodedToken` + `qrConfirmation.nonceHash` (plaintext nonce never stored)
+- Unsupported `v` rejected centrally by `HmacDeliveryQrTokenService`
+
+### Env
+
+```
+DELIVERY_QR_SIGNING_SECRET=<≥32 cryptographically random characters>
+```
+
+Never log; never expose to PWA/GraphQL; placeholder only in `.env.example`.
+
+### Tests
+
+- Token payload bounds, HMAC integrity, tamper/version/malformed rejection
+- Nonce uniqueness; per-stop / per-route isolation; templates unchanged
+- Invariants; legacy readability; production secret required; no startup backfill
+- Existing route generation / execution suites remain green
+
+### Recommended commit message
+
+```
+feat(delivery): add Phase 26A QR confirmation persistence and HMAC token foundation
+```
+
+---
+
 # Phase 27 — QR proof of delivery and manifest export
 
 ## Phase metadata
 
-| Field             | Value                                                                                                     |
-| ----------------- | --------------------------------------------------------------------------------------------------------- |
-| **Objective**     | Signed/opaque QR tokens, expiry/nonce, idempotent confirm, delivery-proof audit, PDF/CSV manifest export  |
-| **Prerequisites** | Phase 22 (security limits); Phase 24 (public HTTPS preferred for demo QR); core delivery mutations stable |
+| Field             | Value                                                                                                       |
+| ----------------- | ----------------------------------------------------------------------------------------------------------- |
+| **Objective**     | Signed/opaque QR tokens, expiry/nonce, idempotent confirm, delivery-proof audit, PDF/CSV manifest export    |
+| **Prerequisites** | Phase 26A (stop QR persistence + HMAC token service); Phase 22; Phase 24 (public HTTPS preferred for demos) |
 
 ### Exact scope
 
-- `DeliveryProof`; issue/verify mutations
+- Pharmacy-facing token issuance / QR encoding
+- Scan preview + confirm-delivered consume mutation (atomic stop + orders)
 - Manifest CSV + PDF export
 - Keep existing mark-delivered as fallback path or bridge via QR verify
 

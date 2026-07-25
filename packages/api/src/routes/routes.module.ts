@@ -4,6 +4,7 @@ import { AuthenticationModule } from '../authentication/authentication.module'
 import { PubSubModule } from '../common/pubsub/pubsub.module'
 import { CLOCK, SystemClock } from '../order/clock.provider'
 import { UserModule } from '../user/user.module'
+import { DeliveryStopQrFieldsResolver } from './qr/delivery-stop-qr-fields.resolver'
 import { RoutePreviewService } from './route-preview.service'
 import { RoutesCoreModule } from './routes-core.module'
 import { RoutesResolver } from './routes.resolver'
@@ -55,6 +56,7 @@ const routesServiceProvider = isSchemaGeneration
     routePreviewServiceProvider,
     routesServiceProvider,
     RoutesResolver,
+    DeliveryStopQrFieldsResolver,
     {
       provide: CLOCK,
       useClass: SystemClock,

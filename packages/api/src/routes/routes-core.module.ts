@@ -8,6 +8,7 @@ import { RouteTemplatesCoreModule } from '../route-templates/route-templates-cor
 import { SettingsCoreModule } from '../settings/settings-core.module'
 import { DeliveryRoute } from './delivery-route.entity'
 import { DeliveryRouteEventsService } from './delivery-route-events.service'
+import { DeliveryQrModule } from './qr/delivery-qr.module'
 import { RouteGenerationService } from './route-generation.service'
 
 const isSchemaGeneration =
@@ -40,12 +41,14 @@ const persistenceImports = isSchemaGeneration
     OrderCoreModule,
     RouteTemplatesCoreModule,
     SettingsCoreModule,
+    DeliveryQrModule,
     ...persistenceImports,
   ],
   providers: [routeGenerationServiceProvider, DeliveryRouteEventsService],
   exports: [
     RouteGenerationService,
     DeliveryRouteEventsService,
+    DeliveryQrModule,
     ProfileCoreModule,
     OrderCoreModule,
     RouteTemplatesCoreModule,

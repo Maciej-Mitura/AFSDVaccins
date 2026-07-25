@@ -20,6 +20,9 @@ module.exports = async function e2eGlobalSetup() {
   process.env.DB_HOST = dbHost
   process.env.DB_NAME = dbName
   process.env.ALLOW_DATABASE_SEED = 'false'
+  process.env.DELIVERY_QR_SIGNING_SECRET =
+    process.env.DELIVERY_QR_SIGNING_SECRET ??
+    'test-only-delivery-qr-signing-secret-32b!'
   delete process.env.GOOGLE_APPLICATION_CREDENTIALS
   delete process.env.GENERATE_SCHEMA_ONLY
 

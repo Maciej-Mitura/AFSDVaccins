@@ -43,6 +43,7 @@ describe('production Docker safety', () => {
     assert.match(compose, /NODE_ENV:\s*production/)
     assert.match(compose, /ALLOW_DATABASE_SEED:\s*'false'/)
     assert.match(compose, /ALLOW_E2E_AUTH_BYPASS:\s*'false'/)
+    assert.match(compose, /DELIVERY_QR_SIGNING_SECRET/)
     assert.match(compose, /vaccin-delivery-mongo-prod-data/)
     assert.match(compose, /vaccin-delivery-production-demo/)
     assert.doesNotMatch(compose, /VITE_E2E_AUTH_BYPASS:\s*['"]?true/)

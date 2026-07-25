@@ -23,6 +23,11 @@ if (existsSync(runtimePath)) {
 
 process.env.DB_NAME = process.env.DB_NAME ?? 'vaccin_delivery_e2e_test'
 
+// Phase 26A — deterministic test signing secret (explicit injection; never production).
+process.env.DELIVERY_QR_SIGNING_SECRET =
+  process.env.DELIVERY_QR_SIGNING_SECRET ??
+  'test-only-delivery-qr-signing-secret-32b!'
+
 if (!process.env.DB_HOST) {
   throw new Error(
     'E2E DB_HOST missing — jest globalSetup did not write .e2e-mongo-runtime.json',

@@ -9,7 +9,7 @@
     "start:dev": "nest start --watch",
     "start:prod": "node dist/main.js",
     "build": "nest build",
-    "generate:schema": "nest build && cross-env GENERATE_SCHEMA_ONLY=true NODE_ENV=test PORT=3000 URL_FRONTEND=http://localhost:5173 DB_HOST=mongodb://localhost:27017 DB_NAME=vaccin-delivery node dist/main.js --generate-schema-only",
+    "generate:schema": "nest build && cross-env GENERATE_SCHEMA_ONLY=true NODE_ENV=test PORT=3000 URL_FRONTEND=http://localhost:5173 DB_HOST=mongodb://localhost:27017 DB_NAME=vaccin-delivery DELIVERY_QR_SIGNING_SECRET=test-only-delivery-qr-signing-secret-32b! node dist/main.js --generate-schema-only",
     "lint": "eslint \"{src,test}/**/*.ts\"",
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "test": "jest",

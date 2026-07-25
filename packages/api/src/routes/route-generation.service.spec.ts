@@ -21,6 +21,14 @@ import {
   InvalidDeliveryDateException,
   RouteTemplateInactiveException,
 } from './exceptions/delivery-route.exceptions'
+import {
+  DELIVERY_QR_RANDOM_SOURCE,
+  DELIVERY_QR_TEST_SIGNING_SECRET,
+  DELIVERY_QR_TOKEN_SERVICE,
+} from './qr/delivery-qr.constants'
+import type { DeliveryQrRandomSource } from './qr/delivery-qr-nonce.util'
+import { HmacDeliveryQrTokenService } from './qr/hmac-delivery-qr-token.service'
+import { verifyPersistedStopQrToken } from './qr/verify-persisted-stop-qr-token'
 import { RouteGenerationService } from './route-generation.service'
 import { RouteStatus } from './route-status.enum'
 
@@ -50,6 +58,11 @@ describe('RouteGenerationService', () => {
   let deliveryRouteEventsService: jest.Mocked<
     Pick<DeliveryRouteEventsService, 'publishBezorgerRouteUpdated'>
   >
+  let deliveryQrRandomSource: DeliveryQrRandomSource
+  let randomCounter = 0
+  const deliveryQrTokenService = new HmacDeliveryQrTokenService(
+    DELIVERY_QR_TEST_SIGNING_SECRET,
+  )
 
   const admin: User = {
     _id: '507f1f77bcf86cd799439012',
@@ -143,10 +156,34 @@ describe('RouteGenerationService', () => {
   }
 
   beforeEach(async () => {
+    randomCounter = 0
+    deliveryQrRandomSource = {
+      randomBytes: size => {
+        const buffer = Buffer.alloc(size, 0)
+        buffer.writeUInt32BE(randomCounter, 0)
+        randomCounter += 1
+        return buffer
+      },
+      randomStopId: () => {
+        const id = `generated-stop-${randomCounter}`
+        randomCounter += 1
+        return id
+      },
+    }
+
     routeRepository = {
       findOne: jest.fn().mockResolvedValue(null),
       save: jest.fn().mockImplementation((route: DeliveryRoute) => {
-        const id = route._id ?? '807f1f77bcf86cd799439099'
+        const rawId = route._id ?? '807f1f77bcf86cd799439099'
+        const id =
+          typeof rawId === 'object' &&
+          rawId !== null &&
+          'toHexString' in rawId &&
+          typeof (rawId as { toHexString: () => string }).toHexString ===
+            'function'
+            ? (rawId as { toHexString: () => string }).toHexString()
+            : String(rawId)
+
         return Promise.resolve({
           ...route,
           _id: id,
@@ -255,6 +292,14 @@ describe('RouteGenerationService', () => {
           provide: DeliveryRouteEventsService,
           useValue: deliveryRouteEventsService,
         },
+        {
+          provide: DELIVERY_QR_RANDOM_SOURCE,
+          useValue: deliveryQrRandomSource,
+        },
+        {
+          provide: DELIVERY_QR_TOKEN_SERVICE,
+          useValue: deliveryQrTokenService,
+        },
       ],
     }).compile()
 
@@ -282,6 +327,22 @@ describe('RouteGenerationService', () => {
       orderCount: 1,
       totalQuantity: 10,
     })
+    expect(route.stops[0].stopId).toEqual(expect.any(String))
+    expect(route.stops[0].qrConfirmation).toMatchObject({
+      tokenVersion: 1,
+      consumedAt: null,
+      consumedByUserId: null,
+    })
+    expect(route.stops[0].qrConfirmation?.nonceHash).toMatch(/^[a-f0-9]{64}$/i)
+    expect(route.stops[0].qrConfirmation?.encodedToken).toContain('.')
+    expect(route.stops[0]).not.toHaveProperty('nonce')
+    expect(JSON.stringify(route.stops[0])).not.toMatch(/"nonce":/)
+    verifyPersistedStopQrToken(
+      deliveryQrTokenService,
+      route.stops[0].qrConfirmation!,
+      { routeId: route.id, stopId: route.stops[0].stopId },
+    )
+    expect(route.stops[0].deliveryProof).toBeNull()
     expect(route.stops[0].address.street).toBe('Apotheek A Street')
     expect(route.stops[0].lines[0]).toMatchObject({
       vaccineName: 'Influenza',
@@ -289,6 +350,14 @@ describe('RouteGenerationService', () => {
     })
     expect(route.skippedApothekerProfileIds).toEqual([pharmacyBId])
     expect(route.statusHistory[0].toStatus).toBe(RouteStatus.ASSIGNED)
+    // Single complete insert — no incomplete shell write.
+    expect(routeRepository.save).toHaveBeenCalledTimes(1)
+    const persisted = routeRepository.save.mock.calls[0][0] as DeliveryRoute
+    expect(persisted.stops).toHaveLength(1)
+    expect(persisted.stops[0].qrConfirmation?.encodedToken).toContain('.')
+    expect(persisted.stops[0].qrConfirmation?.nonceHash).toMatch(
+      /^[a-f0-9]{64}$/i,
+    )
     expect(orderService.planOrdersForGeneratedRoute).toHaveBeenCalledWith(
       admin,
       [orderAId],
@@ -494,10 +563,101 @@ describe('RouteGenerationService', () => {
       service.generateDeliveryRoute(admin, templateId, deliveryDate),
     ).rejects.toThrow('db write failed')
 
+    expect(routeRepository.save).toHaveBeenCalledTimes(1)
     expect(orderService.publishPlannedOrderUpdates).not.toHaveBeenCalled()
     expect(
       deliveryRouteEventsService.publishBezorgerRouteUpdated,
     ).not.toHaveBeenCalled()
+  })
+
+  it('leaves no incomplete route when QR token minting fails before save', async () => {
+    const failingTokenService = {
+      sign: () => {
+        throw new Error('signing failed')
+      },
+      verify: jest.fn(),
+    }
+
+    const moduleWithFailingSigner: TestingModule = await Test.createTestingModule(
+      {
+        providers: [
+          RouteGenerationService,
+          {
+            provide: getRepositoryToken(DeliveryRoute),
+            useValue: routeRepository,
+          },
+          {
+            provide: RouteTemplatesService,
+            useValue: routeTemplatesService,
+          },
+          {
+            provide: ApothekerProfileService,
+            useValue: apothekerProfileService,
+          },
+          {
+            provide: BezorgerProfileService,
+            useValue: bezorgerProfileService,
+          },
+          { provide: OrderService, useValue: orderService },
+          {
+            provide: SettingsService,
+            useValue: {
+              getApplicationSettings: () =>
+                Promise.resolve({ timezone: 'Europe/Brussels' }),
+            },
+          },
+          {
+            provide: DeliveryRouteEventsService,
+            useValue: deliveryRouteEventsService,
+          },
+          {
+            provide: DELIVERY_QR_RANDOM_SOURCE,
+            useValue: deliveryQrRandomSource,
+          },
+          {
+            provide: DELIVERY_QR_TOKEN_SERVICE,
+            useValue: failingTokenService,
+          },
+        ],
+      },
+    ).compile()
+
+    const failingService = moduleWithFailingSigner.get(RouteGenerationService)
+
+    await expect(
+      failingService.generateDeliveryRoute(admin, templateId, deliveryDate),
+    ).rejects.toThrow('signing failed')
+
+    expect(routeRepository.save).not.toHaveBeenCalled()
+    expect(orderService.planOrdersForGeneratedRoute).not.toHaveBeenCalled()
+    expect(orderService.publishPlannedOrderUpdates).not.toHaveBeenCalled()
+  })
+
+  it('persists a newly generated route only after stops and QR metadata are complete', async () => {
+    const route = await service.generateDeliveryRoute(
+      admin,
+      templateId,
+      deliveryDate,
+    )
+
+    expect(routeRepository.save).toHaveBeenCalledTimes(1)
+    const persisted = routeRepository.save.mock.calls[0][0] as DeliveryRoute
+    expect(persisted.stops.every(stop => stop.qrConfirmation != null)).toBe(
+      true,
+    )
+    expect(
+      persisted.stops.every(
+        stop =>
+          typeof stop.qrConfirmation?.encodedToken === 'string' &&
+          typeof stop.qrConfirmation?.nonceHash === 'string',
+      ),
+    ).toBe(true)
+    expect(String(persisted._id).length).toBeGreaterThan(0)
+    verifyPersistedStopQrToken(
+      deliveryQrTokenService,
+      route.stops[0].qrConfirmation!,
+      { routeId: String(route.id), stopId: route.stops[0].stopId },
+    )
   })
 
   it('publishes order updates only after successful route persistence', async () => {
@@ -519,5 +679,77 @@ describe('RouteGenerationService', () => {
     await service.generateDeliveryRoute(admin, templateId, deliveryDate)
 
     expect(publishOrderOrder).toEqual(['orders', 'route'])
+  })
+
+  it('assigns a unique stopId, nonceHash, and encodedToken to every generated stop', async () => {
+    orderService.findQualifyingOrdersForRoute.mockImplementation(
+      (params: { apothekerUserId: string; deliveryDate: string }) => {
+        if (params.apothekerUserId === pharmacyAUserId) {
+          return Promise.resolve([
+            makeOrder(orderAId, pharmacyAUserId, OrderStatus.PENDING),
+          ])
+        }
+
+        return Promise.resolve([
+          makeOrder(
+            '707f1f77bcf86cd799439032',
+            pharmacyBUserId,
+            OrderStatus.PENDING,
+          ),
+        ])
+      },
+    )
+
+    const route = await service.generateDeliveryRoute(
+      admin,
+      templateId,
+      deliveryDate,
+    )
+
+    expect(route.stops).toHaveLength(2)
+    expect(route.stops[0].stopId).not.toBe(route.stops[1].stopId)
+    expect(route.stops[0].qrConfirmation?.nonceHash).not.toBe(
+      route.stops[1].qrConfirmation?.nonceHash,
+    )
+    expect(route.stops[0].qrConfirmation?.encodedToken).not.toBe(
+      route.stops[1].qrConfirmation?.encodedToken,
+    )
+  })
+
+  it('never reuses stop nonces or encoded tokens across separately generated routes', async () => {
+    const first = await service.generateDeliveryRoute(
+      admin,
+      templateId,
+      deliveryDate,
+    )
+
+    routeRepository.findOne.mockResolvedValue(null)
+    const second = await service.generateDeliveryRoute(
+      admin,
+      templateId,
+      '2026-07-17',
+    )
+
+    expect(first.stops[0].qrConfirmation?.nonceHash).not.toBe(
+      second.stops[0].qrConfirmation?.nonceHash,
+    )
+    expect(first.stops[0].qrConfirmation?.encodedToken).not.toBe(
+      second.stops[0].qrConfirmation?.encodedToken,
+    )
+    expect(first.stops[0].stopId).not.toBe(second.stops[0].stopId)
+  })
+
+  it('leaves RouteTemplate stops unchanged (no QR state written back)', async () => {
+    const templateBefore = makeTemplate()
+    routeTemplatesService.findRouteTemplateById.mockResolvedValue(templateBefore)
+
+    await service.generateDeliveryRoute(admin, templateId, deliveryDate)
+
+    expect(templateBefore.stops).toEqual([
+      { apothekerProfileId: pharmacyAId, sequence: 1 },
+      { apothekerProfileId: pharmacyBId, sequence: 2 },
+    ])
+    expect(templateBefore.stops[0]).not.toHaveProperty('qrConfirmation')
+    expect(templateBefore.stops[0]).not.toHaveProperty('stopId')
   })
 })

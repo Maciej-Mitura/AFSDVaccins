@@ -69,6 +69,8 @@ services:
       AZURE_VISION_ENDPOINT: ${AZURE_VISION_ENDPOINT:-}
       AZURE_VISION_KEY: ${AZURE_VISION_KEY:-}
       AZURE_VISION_TIMEOUT_MS: ${AZURE_VISION_TIMEOUT_MS:-10000}
+      # Phase 26A — delivery QR HMAC signing (required in production; never log)
+      DELIVERY_QR_SIGNING_SECRET: ${DELIVERY_QR_SIGNING_SECRET:?Set DELIVERY_QR_SIGNING_SECRET in infrastructure/.env.prod}
       # Seed and Playwright bypass must stay off on the long-running API.
       ALLOW_DATABASE_SEED: 'false'
       ALLOW_E2E_AUTH_BYPASS: 'false'

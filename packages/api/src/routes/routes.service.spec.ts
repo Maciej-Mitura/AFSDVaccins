@@ -13,6 +13,13 @@ import { User } from '../user/user.entity'
 import { UserRole } from '../user/user-role.enum'
 import { DeliveryRoute } from './delivery-route.entity'
 import { DeliveryRouteEventsService } from './delivery-route-events.service'
+import {
+  DELIVERY_QR_RANDOM_SOURCE,
+  DELIVERY_QR_TEST_SIGNING_SECRET,
+  DELIVERY_QR_TOKEN_SERVICE,
+} from './qr/delivery-qr.constants'
+import { systemDeliveryQrRandomSource } from './qr/delivery-qr-nonce.util'
+import { HmacDeliveryQrTokenService } from './qr/hmac-delivery-qr-token.service'
 import { RouteGenerationService } from './route-generation.service'
 import { RoutePreviewService } from './route-preview.service'
 import { RouteStatus } from './route-status.enum'
@@ -262,6 +269,16 @@ describe('RouteGenerationService.findByBezorgerAndDate', () => {
           },
         },
         { provide: DeliveryRouteEventsService, useValue: {} },
+        {
+          provide: DELIVERY_QR_RANDOM_SOURCE,
+          useValue: systemDeliveryQrRandomSource,
+        },
+        {
+          provide: DELIVERY_QR_TOKEN_SERVICE,
+          useValue: new HmacDeliveryQrTokenService(
+            DELIVERY_QR_TEST_SIGNING_SECRET,
+          ),
+        },
       ],
     }).compile()
 

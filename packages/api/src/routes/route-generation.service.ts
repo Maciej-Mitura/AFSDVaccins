@@ -1,5 +1,6 @@
-import { Injectable } from '@nestjs/common'
+import { Inject, Injectable } from '@nestjs/common'
 import { InjectRepository } from '@nestjs/typeorm'
+import { ObjectId } from 'mongodb'
 import { MongoRepository } from 'typeorm'
 
 import { tryParseGraphqlObjectId } from '../common/mongodb/graphql-object-id.util'
@@ -25,8 +26,20 @@ import {
   RouteTemplateInactiveException,
 } from './exceptions/delivery-route.exceptions'
 import { OrderLineSnapshot } from './order-line-snapshot.embed'
+import { createGeneratedStopQrState } from './qr/create-generated-stop-qr-state'
+import {
+  DELIVERY_QR_RANDOM_SOURCE,
+  DELIVERY_QR_TOKEN_SERVICE,
+} from './qr/delivery-qr.constants'
+import type { DeliveryQrRandomSource } from './qr/delivery-qr-nonce.util'
+import type { DeliveryQrTokenService } from './qr/delivery-qr-token.types'
 import { RouteStatus } from './route-status.enum'
 import { RouteStatusHistoryEntry } from './route-status-history.type'
+
+type DeliveryStopDraft = Omit<
+  DeliveryStop,
+  'stopId' | 'qrConfirmation' | 'deliveryProof'
+>
 
 function isDuplicateKeyError(error: unknown): boolean {
   return (
@@ -99,6 +112,10 @@ export class RouteGenerationService {
     private readonly orderService: OrderService,
     private readonly settingsService: SettingsService,
     private readonly deliveryRouteEventsService: DeliveryRouteEventsService,
+    @Inject(DELIVERY_QR_RANDOM_SOURCE)
+    private readonly deliveryQrRandomSource: DeliveryQrRandomSource,
+    @Inject(DELIVERY_QR_TOKEN_SERVICE)
+    private readonly deliveryQrTokenService: DeliveryQrTokenService,
   ) {}
 
   async generateDeliveryRoute(
@@ -128,11 +145,20 @@ export class RouteGenerationService {
       template.bezorgerProfileId,
     )
 
+    const existing = await this.findByBezorgerAndDate(
+      template.bezorgerProfileId,
+      deliveryDate,
+    )
+
+    if (existing) {
+      this.assertRegenerable(existing)
+    }
+
     const orderedTemplateStops = [...(template.stops ?? [])].sort(
       (a, b) => a.sequence - b.sequence,
     )
 
-    const stops: DeliveryStop[] = []
+    const stopDrafts: DeliveryStopDraft[] = []
     const skippedApothekerProfileIds: string[] = []
     const allOrderIds: string[] = []
 
@@ -164,8 +190,8 @@ export class RouteGenerationService {
       const orderIds = qualifyingOrders.map(order => order.id)
       allOrderIds.push(...orderIds)
 
-      stops.push({
-        sequence: stops.length + 1,
+      stopDrafts.push({
+        sequence: stopDrafts.length + 1,
         apothekerProfileId: profile.id,
         apothekerUserId: profile.userId.toString(),
         pharmacyName: profile.pharmacyName,
@@ -177,14 +203,16 @@ export class RouteGenerationService {
       })
     }
 
-    const existing = await this.findByBezorgerAndDate(
-      template.bezorgerProfileId,
-      deliveryDate,
-    )
-
-    if (existing) {
-      this.assertRegenerable(existing)
-    }
+    /**
+     * Pre-assign a Mongo ObjectId in application code so QR tokens can bind to
+     * the final routeId before any write. Persist the complete route in one save
+     * — never insert an incomplete shell merely to obtain an id.
+     */
+    const routeObjectId = existing
+      ? this.resolveExistingRouteObjectId(existing)
+      : new ObjectId()
+    const routeId = routeObjectId.toHexString()
+    const stops = this.attachStopQrState(stopDrafts, routeId)
 
     const changedOrders = await this.orderService.planOrdersForGeneratedRoute(
       admin,
@@ -222,6 +250,7 @@ export class RouteGenerationService {
       saved = await this.deliveryRouteRepository.save(existing)
     } else {
       const route = this.deliveryRouteRepository.create({
+        _id: routeObjectId as unknown as string,
         routeTemplateId: template.id,
         bezorgerProfileId: template.bezorgerProfileId,
         deliveryDate,
@@ -250,8 +279,9 @@ export class RouteGenerationService {
         }
 
         this.assertRegenerable(raced)
+        // Remint tokens bound to the raced document's durable id.
         raced.routeTemplateId = template.id
-        raced.stops = stops
+        raced.stops = this.attachStopQrState(stopDrafts, raced.id.toString())
         raced.skippedApothekerProfileIds = skippedApothekerProfileIds
         raced.status = RouteStatus.ASSIGNED
         raced.generatedAt = now
@@ -302,6 +332,40 @@ export class RouteGenerationService {
     ])
 
     return byString ?? byObjectId ?? null
+  }
+
+  private resolveExistingRouteObjectId(route: DeliveryRoute): ObjectId {
+    const raw: unknown = route._id ?? route.id
+    if (raw instanceof ObjectId) {
+      return raw
+    }
+
+    const parsed = tryParseGraphqlObjectId(String(raw))
+    if (parsed) {
+      return parsed.objectId
+    }
+
+    return new ObjectId(String(raw))
+  }
+
+  private attachStopQrState(
+    drafts: DeliveryStopDraft[],
+    routeId: string,
+  ): DeliveryStop[] {
+    return drafts.map(draft => {
+      const { stopId, qrConfirmation } = createGeneratedStopQrState({
+        routeId,
+        tokenService: this.deliveryQrTokenService,
+        random: this.deliveryQrRandomSource,
+      })
+
+      return {
+        ...draft,
+        stopId,
+        qrConfirmation,
+        deliveryProof: null,
+      }
+    })
   }
 
   private assertRegenerable(route: DeliveryRoute): void {

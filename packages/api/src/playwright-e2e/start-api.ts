@@ -38,6 +38,9 @@ function applyPlaywrightEnv(dbHost: string): void {
   process.env.URL_FRONTEND = `http://127.0.0.1:${PLAYWRIGHT_PWA_PORT}`
   process.env.DB_HOST = dbHost
   process.env.DB_NAME = PLAYWRIGHT_DB_NAME
+  process.env.DELIVERY_QR_SIGNING_SECRET =
+    process.env.DELIVERY_QR_SIGNING_SECRET ??
+    'test-only-delivery-qr-signing-secret-32b!'
   delete process.env.GOOGLE_APPLICATION_CREDENTIALS
   delete process.env.GENERATE_SCHEMA_ONLY
 }

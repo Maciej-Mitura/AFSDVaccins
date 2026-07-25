@@ -22,14 +22,35 @@ const PRODUCTION_AZURE = {
   ...PRODUCTION_AZURE_VISION,
 } as const
 
+/** Phase 26A placeholder signing secret (not a real secret). */
+const DELIVERY_QR_SIGNING = {
+  DELIVERY_QR_SIGNING_SECRET: 'test-fixture-delivery-qr-signing-secret-32b!',
+} as const
+
+const BASE_DEV = {
+  NODE_ENV: 'development' as const,
+  PORT: 3000,
+  URL_FRONTEND: 'http://localhost:5173',
+  DB_HOST: 'mongodb://localhost:27017',
+  DB_NAME: 'vaccin-delivery',
+  ...DELIVERY_QR_SIGNING,
+}
+
+const BASE_PRODUCTION = {
+  NODE_ENV: 'production' as const,
+  PORT: 3000,
+  URL_FRONTEND: 'https://example.web.app',
+  DB_HOST: 'mongodb://localhost:27017',
+  DB_NAME: 'vaccin-delivery',
+  TRUST_PROXY: '1',
+  ...PRODUCTION_AZURE,
+  ...DELIVERY_QR_SIGNING,
+}
+
 describe('envValidationSchema', () => {
   it('accepts valid development configuration', () => {
     const result = envValidationSchema.validate({
-      NODE_ENV: 'development',
-      PORT: 3000,
-      URL_FRONTEND: 'http://localhost:5173',
-      DB_HOST: 'mongodb://localhost:27017',
-      DB_NAME: 'vaccin-delivery',
+      ...BASE_DEV,
     })
 
     expect(result.error).toBeUndefined()
@@ -42,11 +63,8 @@ describe('envValidationSchema', () => {
 
   it('rejects invalid URL_FRONTEND', () => {
     const result = envValidationSchema.validate({
-      NODE_ENV: 'development',
-      PORT: 3000,
+      ...BASE_DEV,
       URL_FRONTEND: 'not-a-url',
-      DB_HOST: 'mongodb://localhost:27017',
-      DB_NAME: 'vaccin-delivery',
     })
 
     expect(result.error).toBeDefined()
@@ -54,11 +72,8 @@ describe('envValidationSchema', () => {
 
   it('rejects non-mongodb DB_HOST', () => {
     const result = envValidationSchema.validate({
-      NODE_ENV: 'development',
-      PORT: 3000,
-      URL_FRONTEND: 'http://localhost:5173',
+      ...BASE_DEV,
       DB_HOST: 'postgres://localhost:5432',
-      DB_NAME: 'vaccin-delivery',
     })
 
     expect(result.error).toBeDefined()
@@ -71,6 +86,7 @@ describe('envValidationSchema', () => {
       URL_FRONTEND: 'http://localhost:5173',
       DB_HOST: 'mongodb://localhost:27017',
       DB_NAME: 'vaccin-delivery',
+      ...DELIVERY_QR_SIGNING,
     })
 
     expect(result.error).toBeDefined()
@@ -78,11 +94,7 @@ describe('envValidationSchema', () => {
 
   it('defaults ALLOW_DATABASE_SEED and ALLOW_E2E_AUTH_BYPASS to false', () => {
     const result = envValidationSchema.validate({
-      NODE_ENV: 'development',
-      PORT: 3000,
-      URL_FRONTEND: 'http://localhost:5173',
-      DB_HOST: 'mongodb://localhost:27017',
-      DB_NAME: 'vaccin-delivery',
+      ...BASE_DEV,
     })
 
     expect(result.error).toBeUndefined()
@@ -118,6 +130,7 @@ describe('envValidationSchema', () => {
       URL_FRONTEND: 'http://localhost:5173',
       DB_HOST: 'mongodb://localhost:27017',
       DB_NAME: 'vaccin-delivery',
+      ...DELIVERY_QR_SIGNING,
     })
 
     expect(result.error).toBeUndefined()
@@ -129,13 +142,9 @@ describe('envValidationSchema', () => {
 
   it('accepts mongodb+srv Atlas-style DB_HOST', () => {
     const result = envValidationSchema.validate({
-      NODE_ENV: 'production',
-      PORT: 3000,
-      URL_FRONTEND: 'https://example.web.app',
+      ...BASE_PRODUCTION,
       DB_HOST: 'mongodb+srv://user:pass@cluster0.example.mongodb.net/',
       DB_NAME: 'vaccin-delivery-demo',
-      TRUST_PROXY: '1',
-      ...PRODUCTION_AZURE,
     })
 
     expect(result.error).toBeUndefined()
@@ -144,11 +153,7 @@ describe('envValidationSchema', () => {
 
   it('rejects TRUST_PROXY=true', () => {
     const result = envValidationSchema.validate({
-      NODE_ENV: 'production',
-      PORT: 3000,
-      URL_FRONTEND: 'https://example.web.app',
-      DB_HOST: 'mongodb://localhost:27017',
-      DB_NAME: 'vaccin-delivery',
+      ...BASE_PRODUCTION,
       TRUST_PROXY: 'true',
     })
 
@@ -157,11 +162,7 @@ describe('envValidationSchema', () => {
 
   it('defaults TRUST_PROXY and ALLOW_DATABASE_BOOTSTRAP to false', () => {
     const result = envValidationSchema.validate({
-      NODE_ENV: 'development',
-      PORT: 3000,
-      URL_FRONTEND: 'http://localhost:5173',
-      DB_HOST: 'mongodb://localhost:27017',
-      DB_NAME: 'vaccin-delivery',
+      ...BASE_DEV,
     })
 
     expect(result.error).toBeUndefined()
@@ -174,11 +175,7 @@ describe('envValidationSchema', () => {
 
   it('accepts seed-related optional variables', () => {
     const result = envValidationSchema.validate({
-      NODE_ENV: 'development',
-      PORT: 3000,
-      URL_FRONTEND: 'http://localhost:5173',
-      DB_HOST: 'mongodb://localhost:27017',
-      DB_NAME: 'vaccin-delivery',
+      ...BASE_DEV,
       ALLOW_DATABASE_SEED: 'true',
       SEED_DEMO_PASSWORD: 'demo-only',
       SEED_TEACHER_ADMIN_PASSWORD: 'teacher-only',
@@ -195,11 +192,7 @@ describe('envValidationSchema', () => {
 
   it('defaults vaccine image providers to fake outside production', () => {
     const result = envValidationSchema.validate({
-      NODE_ENV: 'development',
-      PORT: 3000,
-      URL_FRONTEND: 'http://localhost:5173',
-      DB_HOST: 'mongodb://localhost:27017',
-      DB_NAME: 'vaccin-delivery',
+      ...BASE_DEV,
     })
 
     expect(result.error).toBeUndefined()
@@ -215,23 +208,13 @@ describe('envValidationSchema', () => {
 
   it('rejects fake vaccine image providers in production', () => {
     const analysis = envValidationSchema.validate({
-      NODE_ENV: 'production',
-      PORT: 3000,
-      URL_FRONTEND: 'https://example.web.app',
-      DB_HOST: 'mongodb://localhost:27017',
-      DB_NAME: 'vaccin-delivery',
-      TRUST_PROXY: '1',
+      ...BASE_PRODUCTION,
       VACCINE_IMAGE_ANALYSIS_PROVIDER: 'fake',
     })
     expect(analysis.error).toBeDefined()
 
     const storage = envValidationSchema.validate({
-      NODE_ENV: 'production',
-      PORT: 3000,
-      URL_FRONTEND: 'https://example.web.app',
-      DB_HOST: 'mongodb://localhost:27017',
-      DB_NAME: 'vaccin-delivery',
-      TRUST_PROXY: '1',
+      ...BASE_PRODUCTION,
       VACCINE_IMAGE_STORAGE_PROVIDER: 'fake',
     })
     expect(storage.error).toBeDefined()
@@ -239,13 +222,7 @@ describe('envValidationSchema', () => {
 
   it('defaults vaccine image providers to azure in production', () => {
     const result = envValidationSchema.validate({
-      NODE_ENV: 'production',
-      PORT: 3000,
-      URL_FRONTEND: 'https://example.web.app',
-      DB_HOST: 'mongodb://localhost:27017',
-      DB_NAME: 'vaccin-delivery',
-      TRUST_PROXY: '1',
-      ...PRODUCTION_AZURE,
+      ...BASE_PRODUCTION,
     })
 
     expect(result.error).toBeUndefined()
@@ -265,21 +242,13 @@ describe('envValidationSchema', () => {
 
   it('requires Azure storage variables only when storage provider is azure', () => {
     const fakeMode = envValidationSchema.validate({
-      NODE_ENV: 'development',
-      PORT: 3000,
-      URL_FRONTEND: 'http://localhost:5173',
-      DB_HOST: 'mongodb://localhost:27017',
-      DB_NAME: 'vaccin-delivery',
+      ...BASE_DEV,
       VACCINE_IMAGE_STORAGE_PROVIDER: 'fake',
     })
     expect(fakeMode.error).toBeUndefined()
 
     const azureMissing = envValidationSchema.validate({
-      NODE_ENV: 'development',
-      PORT: 3000,
-      URL_FRONTEND: 'http://localhost:5173',
-      DB_HOST: 'mongodb://localhost:27017',
-      DB_NAME: 'vaccin-delivery',
+      ...BASE_DEV,
       VACCINE_IMAGE_STORAGE_PROVIDER: 'azure',
     })
     expect(azureMissing.error).toBeDefined()
@@ -288,11 +257,7 @@ describe('envValidationSchema', () => {
     )
 
     const azureComplete = envValidationSchema.validate({
-      NODE_ENV: 'development',
-      PORT: 3000,
-      URL_FRONTEND: 'http://localhost:5173',
-      DB_HOST: 'mongodb://localhost:27017',
-      DB_NAME: 'vaccin-delivery',
+      ...BASE_DEV,
       VACCINE_IMAGE_STORAGE_PROVIDER: 'azure',
       ...PRODUCTION_AZURE_STORAGE,
     })
@@ -301,21 +266,13 @@ describe('envValidationSchema', () => {
 
   it('requires Azure Vision variables only when analysis provider is azure', () => {
     const fakeMode = envValidationSchema.validate({
-      NODE_ENV: 'development',
-      PORT: 3000,
-      URL_FRONTEND: 'http://localhost:5173',
-      DB_HOST: 'mongodb://localhost:27017',
-      DB_NAME: 'vaccin-delivery',
+      ...BASE_DEV,
       VACCINE_IMAGE_ANALYSIS_PROVIDER: 'fake',
     })
     expect(fakeMode.error).toBeUndefined()
 
     const azureMissing = envValidationSchema.validate({
-      NODE_ENV: 'development',
-      PORT: 3000,
-      URL_FRONTEND: 'http://localhost:5173',
-      DB_HOST: 'mongodb://localhost:27017',
-      DB_NAME: 'vaccin-delivery',
+      ...BASE_DEV,
       VACCINE_IMAGE_ANALYSIS_PROVIDER: 'azure',
     })
     expect(azureMissing.error).toBeDefined()
@@ -324,11 +281,7 @@ describe('envValidationSchema', () => {
     )
 
     const httpEndpoint = envValidationSchema.validate({
-      NODE_ENV: 'development',
-      PORT: 3000,
-      URL_FRONTEND: 'http://localhost:5173',
-      DB_HOST: 'mongodb://localhost:27017',
-      DB_NAME: 'vaccin-delivery',
+      ...BASE_DEV,
       VACCINE_IMAGE_ANALYSIS_PROVIDER: 'azure',
       AZURE_VISION_ENDPOINT: 'http://example.cognitiveservices.azure.com',
       AZURE_VISION_KEY: 'example-vision-key',
@@ -336,11 +289,7 @@ describe('envValidationSchema', () => {
     expect(httpEndpoint.error).toBeDefined()
 
     const azureComplete = envValidationSchema.validate({
-      NODE_ENV: 'development',
-      PORT: 3000,
-      URL_FRONTEND: 'http://localhost:5173',
-      DB_HOST: 'mongodb://localhost:27017',
-      DB_NAME: 'vaccin-delivery',
+      ...BASE_DEV,
       VACCINE_IMAGE_ANALYSIS_PROVIDER: 'azure',
       ...PRODUCTION_AZURE_VISION,
     })
@@ -353,21 +302,13 @@ describe('envValidationSchema', () => {
 
   it('rejects invalid Azure Vision timeout values', () => {
     const tooLow = envValidationSchema.validate({
-      NODE_ENV: 'development',
-      PORT: 3000,
-      URL_FRONTEND: 'http://localhost:5173',
-      DB_HOST: 'mongodb://localhost:27017',
-      DB_NAME: 'vaccin-delivery',
+      ...BASE_DEV,
       AZURE_VISION_TIMEOUT_MS: 500,
     })
     expect(tooLow.error).toBeDefined()
 
     const tooHigh = envValidationSchema.validate({
-      NODE_ENV: 'development',
-      PORT: 3000,
-      URL_FRONTEND: 'http://localhost:5173',
-      DB_HOST: 'mongodb://localhost:27017',
-      DB_NAME: 'vaccin-delivery',
+      ...BASE_DEV,
       AZURE_VISION_TIMEOUT_MS: 60_000,
     })
     expect(tooHigh.error).toBeDefined()
@@ -375,21 +316,13 @@ describe('envValidationSchema', () => {
 
   it('rejects invalid Azure read URL TTL values', () => {
     const tooLow = envValidationSchema.validate({
-      NODE_ENV: 'development',
-      PORT: 3000,
-      URL_FRONTEND: 'http://localhost:5173',
-      DB_HOST: 'mongodb://localhost:27017',
-      DB_NAME: 'vaccin-delivery',
+      ...BASE_DEV,
       AZURE_STORAGE_READ_URL_TTL_SECONDS: 30,
     })
     expect(tooLow.error).toBeDefined()
 
     const tooHigh = envValidationSchema.validate({
-      NODE_ENV: 'development',
-      PORT: 3000,
-      URL_FRONTEND: 'http://localhost:5173',
-      DB_HOST: 'mongodb://localhost:27017',
-      DB_NAME: 'vaccin-delivery',
+      ...BASE_DEV,
       AZURE_STORAGE_READ_URL_TTL_SECONDS: 5000,
     })
     expect(tooHigh.error).toBeDefined()
@@ -403,8 +336,53 @@ describe('envValidationSchema', () => {
       DB_HOST: 'mongodb://localhost:27017',
       DB_NAME: 'vaccin-delivery',
       TRUST_PROXY: '1',
+      ...DELIVERY_QR_SIGNING,
     })
     expect(result.error).toBeDefined()
+  })
+
+  it('requires DELIVERY_QR_SIGNING_SECRET in development and production', () => {
+    const development = envValidationSchema.validate({
+      NODE_ENV: 'development',
+      PORT: 3000,
+      URL_FRONTEND: 'http://localhost:5173',
+      DB_HOST: 'mongodb://localhost:27017',
+      DB_NAME: 'vaccin-delivery',
+    })
+    expect(development.error).toBeDefined()
+    expect(development.error?.message).toMatch(/DELIVERY_QR_SIGNING_SECRET/)
+
+    const production = envValidationSchema.validate({
+      NODE_ENV: 'production',
+      PORT: 3000,
+      URL_FRONTEND: 'https://example.web.app',
+      DB_HOST: 'mongodb://localhost:27017',
+      DB_NAME: 'vaccin-delivery',
+      TRUST_PROXY: '1',
+      ...PRODUCTION_AZURE,
+    })
+    expect(production.error).toBeDefined()
+    expect(production.error?.message).toMatch(/DELIVERY_QR_SIGNING_SECRET/)
+  })
+
+  it('rejects weak DELIVERY_QR_SIGNING_SECRET values', () => {
+    const result = envValidationSchema.validate({
+      ...BASE_DEV,
+      DELIVERY_QR_SIGNING_SECRET: 'too-short',
+    })
+    expect(result.error).toBeDefined()
+    expect(result.error?.message).toMatch(/DELIVERY_QR_SIGNING_SECRET/)
+  })
+
+  it('allows omitting DELIVERY_QR_SIGNING_SECRET in test (explicit injection elsewhere)', () => {
+    const result = envValidationSchema.validate({
+      NODE_ENV: 'test',
+      PORT: 3000,
+      URL_FRONTEND: 'http://localhost:5173',
+      DB_HOST: 'mongodb://localhost:27017',
+      DB_NAME: 'vaccin-delivery',
+    })
+    expect(result.error).toBeUndefined()
   })
 })
 
