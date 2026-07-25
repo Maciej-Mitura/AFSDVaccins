@@ -2847,7 +2847,8 @@ feat(ai): validate vaccine images via Azure with audited overrides
 - After consumption, token retrieval must not return an active QR; validation rejects consumed stops even if an old QR image still exists
 - Whether `encodedToken` is cleared after consume may be deferred to Phase 26D (intended: inactive after consume; prefer clear/rotate when consume lands)
 - Stops may be completed in any order
-- QR valid only while route is `IN_PROGRESS`; invalid after successful delivery
+- **Scan/consume** validity: QR valid only while route is `IN_PROGRESS`; invalid after successful delivery (Phase 26C)
+- **Retrieval** (Phase 26B): pharmacy/ADMIN may fetch the QR image while route is `ASSIGNED` or `IN_PROGRESS`
 - Online only; geolocation postponed (retain `recipientCity` on proof for later coarse notify)
 
 ### Legacy-route policy
@@ -2880,6 +2881,96 @@ Never log; never expose to PWA/GraphQL; placeholder only in `.env.example`.
 
 ```
 feat(delivery): add Phase 26A QR confirmation persistence and HMAC token foundation
+```
+
+---
+
+# Phase 26B — Authorised delivery-stop QR retrieval and image generation
+
+## Phase metadata
+
+| Field             | Value                                                                                                              |
+| ----------------- | ------------------------------------------------------------------------------------------------------------------ |
+| **Objective**     | Pharmacy/ADMIN online retrieval of per-stop QR as on-demand SVG; safe metadata query; no scan/consume/delivery yet |
+| **Prerequisites** | Phase 26A (stop QR persistence + HMAC token service)                                                               |
+| **Requirement**   | Front-loads roadmap Phase 27 pharmacy-facing QR issuance with authorised render only                               |
+
+### Exact scope
+
+- Authenticated REST `GET /delivery-routes/:routeId/stops/:stopId/qr` → `image/svg+xml`
+- Safe GraphQL query `deliveryStopQr(routeId, stopId)` for pharmacy/admin metadata + relative `qrImagePath`
+- On-demand SVG generation from persisted `encodedToken` only (no remint, no image persistence)
+- Authorisation: `ADMIN` (any eligible stop) or owning `APOTHEKER` (persisted `apothekerUserId` match)
+- Eligibility: route `ASSIGNED` or `IN_PROGRESS`; unconsumed valid `qrConfirmation`; stop belongs to route
+
+### Explicit out-of-scope
+
+- Camera / scan UI
+- Scan-preview endpoint
+- Consuming QR / marking stop or orders delivered
+- Push notifications, geolocation
+- PWA QR display polish beyond API readiness
+- CDN / Blob / Mongo persistence of rendered images
+
+### Business rules
+
+- **One QR per generated stop** (a stop may hold multiple orders; QR does not vary by order)
+- Pharmacy may retrieve QR **before** the route is `IN_PROGRESS` (allowed while `ASSIGNED`) so the QR can be shown in advance
+- Active retrieval denied after route `COMPLETED` / `CANCELLED`, or after QR consumption
+- Legacy stops without `qrConfirmation` → `DELIVERY_QR_NOT_AVAILABLE`
+- QR contains only the signed opaque delivery token (`encodedToken`); never reminted on GET
+- Rendered SVG is never persisted (Mongo or Blob); generate on demand
+- GET is read-only: no DB mutation, no PubSub, no audit events
+- Scanning and delivery confirmation remain Phase 26C / 26D
+
+### Retrieval eligibility vs later scan validity
+
+Phase 26A noted “QR valid only while `IN_PROGRESS`” for **scan/consume**. Phase 26B **retrieval** explicitly allows `ASSIGNED` and `IN_PROGRESS` so pharmacies can receive the QR digitally in advance. Consume-time validity stays Phase 26C.
+
+### API
+
+**REST**
+
+```
+GET /delivery-routes/:routeId/stops/:stopId/qr
+Authorization: Bearer <Firebase ID token>
+Roles: ADMIN | APOTHEKER (owner only)
+```
+
+Headers:
+
+- `Content-Type: image/svg+xml`
+- `Cache-Control: private, no-store`
+- `X-Content-Type-Options: nosniff`
+- `Content-Disposition: inline; filename="delivery-stop-qr.svg"`
+
+**GraphQL**
+
+```
+deliveryStopQr(routeId: ID!, stopId: ID!): DeliveryStopQr
+```
+
+Safe fields only: `routeId`, `stopId`, `routeDate`, `pharmacyName`, `address`, `orderCount`, `orderIds`, `qrAvailable`, `qrConsumed`, `issuedAt`, `qrImagePath`. Never `encodedToken` / `nonceHash` / nonce / signing claims.
+
+### Error codes
+
+| Code                         | Meaning                                    |
+| ---------------------------- | ------------------------------------------ |
+| `DELIVERY_QR_NOT_FOUND`      | Missing route/stop                         |
+| `DELIVERY_QR_NOT_AVAILABLE`  | Legacy / no QR metadata                    |
+| `DELIVERY_QR_CONSUMED`       | Already consumed                           |
+| `DELIVERY_QR_ROUTE_INACTIVE` | Route COMPLETED or CANCELLED               |
+| `DELIVERY_QR_FORBIDDEN`      | Authenticated but not authorised for stop  |
+| `DELIVERY_QR_INVALID_STATE`  | Malformed / unsupported persisted QR state |
+
+### Package
+
+- `qrcode` (SVG on demand; medium ECC; quiet zone; black/white; no logos; no external service)
+
+### Recommended commit message
+
+```
+feat(delivery): add Phase 26B authorised stop QR retrieval and SVG generation
 ```
 
 ---

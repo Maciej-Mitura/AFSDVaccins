@@ -7,11 +7,13 @@ import { Column } from 'typeorm'
  * Persistence-only: never GraphQL-exposed as an object. Safe readiness is exposed
  * via DeliveryStop ResolveFields (`qrAvailable` / `qrConsumed`).
  *
- * Lifecycle (Phase 26A foundation; consume in 26C+):
+ * Lifecycle (Phase 26A foundation; retrieve in 26B; consume in 26C+):
  * - Generation: create plaintext nonce → persist `nonceHash` + mint `encodedToken`
  *   → discard plaintext nonce (never stored separately).
- * - Scan/preview (26B): does **not** consume or clear `encodedToken`.
- * - Successful delivery confirmation (26C): marks consumed; validation rejects
+ * - Authorised retrieval / SVG render (26B): reads stored `encodedToken` only;
+ *   does **not** remint, consume, or clear the token.
+ * - Scan/preview (26C): does **not** consume or clear `encodedToken`.
+ * - Successful delivery confirmation (26C/26D): marks consumed; validation rejects
  *   consumed stops even if an old QR image still exists.
  * - After consumption, authorised token retrieval must not return an active QR.
  * - Whether `encodedToken` is cleared after consume may be deferred to Phase 26D;

@@ -4,7 +4,11 @@ import { AuthenticationModule } from '../authentication/authentication.module'
 import { PubSubModule } from '../common/pubsub/pubsub.module'
 import { CLOCK, SystemClock } from '../order/clock.provider'
 import { UserModule } from '../user/user.module'
+import { DeliveryStopQrController } from './qr/delivery-stop-qr.controller'
 import { DeliveryStopQrFieldsResolver } from './qr/delivery-stop-qr-fields.resolver'
+import { DeliveryStopQrImageService } from './qr/delivery-stop-qr-image.service'
+import { DeliveryStopQrResolver } from './qr/delivery-stop-qr.resolver'
+import { DeliveryStopQrRetrievalService } from './qr/delivery-stop-qr-retrieval.service'
 import { RoutePreviewService } from './route-preview.service'
 import { RoutesCoreModule } from './routes-core.module'
 import { RoutesResolver } from './routes.resolver'
@@ -50,13 +54,27 @@ const routesServiceProvider = isSchemaGeneration
     }
   : RoutesService
 
+const deliveryStopQrRetrievalServiceProvider = isSchemaGeneration
+  ? {
+      provide: DeliveryStopQrRetrievalService,
+      useValue: {
+        resolveAuthorisedEncodedToken: () => Promise.resolve(null),
+        getSafeStopQrMetadata: () => Promise.resolve(null),
+      },
+    }
+  : DeliveryStopQrRetrievalService
+
 @Module({
   imports: [AuthenticationModule, UserModule, PubSubModule, RoutesCoreModule],
+  controllers: isSchemaGeneration ? [] : [DeliveryStopQrController],
   providers: [
     routePreviewServiceProvider,
     routesServiceProvider,
+    deliveryStopQrRetrievalServiceProvider,
+    DeliveryStopQrImageService,
     RoutesResolver,
     DeliveryStopQrFieldsResolver,
+    DeliveryStopQrResolver,
     {
       provide: CLOCK,
       useClass: SystemClock,
