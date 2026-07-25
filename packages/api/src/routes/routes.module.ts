@@ -4,6 +4,8 @@ import { AuthenticationModule } from '../authentication/authentication.module'
 import { PubSubModule } from '../common/pubsub/pubsub.module'
 import { CLOCK, SystemClock } from '../order/clock.provider'
 import { UserModule } from '../user/user.module'
+import { DeliveryQrPreviewController } from './qr/delivery-qr-preview.controller'
+import { DeliveryQrPreviewService } from './qr/delivery-qr-preview.service'
 import { DeliveryStopQrController } from './qr/delivery-stop-qr.controller'
 import { DeliveryStopQrFieldsResolver } from './qr/delivery-stop-qr-fields.resolver'
 import { DeliveryStopQrImageService } from './qr/delivery-stop-qr-image.service'
@@ -64,13 +66,25 @@ const deliveryStopQrRetrievalServiceProvider = isSchemaGeneration
     }
   : DeliveryStopQrRetrievalService
 
+const deliveryQrPreviewServiceProvider = isSchemaGeneration
+  ? {
+      provide: DeliveryQrPreviewService,
+      useValue: {
+        previewForCourier: () => Promise.resolve(null),
+      },
+    }
+  : DeliveryQrPreviewService
+
 @Module({
   imports: [AuthenticationModule, UserModule, PubSubModule, RoutesCoreModule],
-  controllers: isSchemaGeneration ? [] : [DeliveryStopQrController],
+  controllers: isSchemaGeneration
+    ? []
+    : [DeliveryQrPreviewController, DeliveryStopQrController],
   providers: [
     routePreviewServiceProvider,
     routesServiceProvider,
     deliveryStopQrRetrievalServiceProvider,
+    deliveryQrPreviewServiceProvider,
     DeliveryStopQrImageService,
     RoutesResolver,
     DeliveryStopQrFieldsResolver,

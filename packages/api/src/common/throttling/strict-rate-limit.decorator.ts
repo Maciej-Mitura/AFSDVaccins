@@ -30,3 +30,20 @@ export function VaccineImageUploadThrottle(): MethodDecorator {
     },
   })
 }
+
+/**
+ * Courier QR scan-preview throttle: 20 attempts per 10 minutes per identity.
+ * Stricter sustained budget than ordinary route reads; repeated legitimate
+ * scans before confirmation remain practical. Never key on token contents.
+ */
+export const DELIVERY_QR_PREVIEW_THROTTLE_LIMIT = 20
+export const DELIVERY_QR_PREVIEW_THROTTLE_TTL_MS = 600_000
+
+export function DeliveryQrPreviewThrottle(): MethodDecorator {
+  return Throttle({
+    [THROTTLER_STRICT]: {
+      limit: DELIVERY_QR_PREVIEW_THROTTLE_LIMIT,
+      ttl: DELIVERY_QR_PREVIEW_THROTTLE_TTL_MS,
+    },
+  })
+}

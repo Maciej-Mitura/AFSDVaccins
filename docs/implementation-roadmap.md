@@ -2921,7 +2921,7 @@ feat(delivery): add Phase 26A QR confirmation persistence and HMAC token foundat
 - QR contains only the signed opaque delivery token (`encodedToken`); never reminted on GET
 - Rendered SVG is never persisted (Mongo or Blob); generate on demand
 - GET is read-only: no DB mutation, no PubSub, no audit events
-- Scanning and delivery confirmation remain Phase 26C / 26D
+- Scanning and delivery confirmation remain Phase 26C / 26D / 26E
 
 ### Retrieval eligibility vs later scan validity
 
@@ -2971,6 +2971,76 @@ Safe fields only: `routeId`, `stopId`, `routeDate`, `pharmacyName`, `address`, `
 
 ```
 feat(delivery): add Phase 26B authorised stop QR retrieval and SVG generation
+```
+
+---
+
+# Phase 26C — Courier QR scan validation and delivery preview
+
+## Phase metadata
+
+| Field             | Value                                                                                                                |
+| ----------------- | -------------------------------------------------------------------------------------------------------------------- |
+| **Objective**     | Authenticated BEZORGER scan-preview of a stop QR: validate token, authorise assignment, return safe delivery preview |
+| **Prerequisites** | Phase 26A (persistence + HMAC); Phase 26B (pharmacy/admin retrieval)                                                 |
+| **Requirement**   | Online scan validates and previews only — does not consume, deliver, or change route/stop/order state                |
+
+### Exact scope
+
+- Authenticated REST `POST /delivery-routes/qr/preview` with JSON `{ token }`
+- BEZORGER-only; assigned courier must match `DeliveryRoute.bezorgerProfileId`
+- HMAC + `nonceHash` validation (not sole `encodedToken` string equality)
+- Route must be `IN_PROGRESS` (stricter than 26B retrieval, which allows `ASSIGNED`)
+- Complete-set order integrity (missing / wrong pharmacy / cancelled / delivered → fail whole preview)
+- Safe preview DTO for pharmacy, address, stop sequence, orders, vaccine lines
+- Strict identity throttle: 20 attempts / 10 minutes per courier
+- Read-only: no consume, no DB mutation, no PubSub, no audit events
+
+### Explicit out-of-scope
+
+- Final delivery confirmation / QR consume (Phase 26D)
+- Camera / PWA scanning UI (Phase 26E)
+- Push notifications, geolocation, offline support
+- ADMIN debug preview path (prefer BEZORGER-only)
+
+### Business rules
+
+- Recipient pharmacy displays QR; assigned courier scans online
+- Scan order is unrestricted (any stop, any sequence)
+- Preview is read-only; repeated previews allowed before confirmation
+- After consume (26D), preview rejects consumed / already-delivered stops
+- Associated orders validated as a complete set — no partial preview
+- Internet required; token never in URL/query/logs
+
+### API
+
+```
+POST /delivery-routes/qr/preview
+Authorization: Bearer <Firebase ID token>
+Roles: BEZORGER
+Body: { "token": "<opaque signed QR token>" }
+```
+
+### Error codes
+
+| Code                                 | Meaning                                 |
+| ------------------------------------ | --------------------------------------- |
+| `DELIVERY_QR_TOKEN_REQUIRED`         | Missing / blank token                   |
+| `DELIVERY_QR_TOKEN_INVALID`          | Malformed, tampered, or crypto failure  |
+| `DELIVERY_QR_VERSION_UNSUPPORTED`    | Unsupported token version               |
+| `DELIVERY_QR_ROUTE_NOT_FOUND`        | Route missing after valid claims        |
+| `DELIVERY_QR_FORBIDDEN`              | Not the assigned courier                |
+| `DELIVERY_QR_ROUTE_NOT_STARTED`      | Route still `ASSIGNED`                  |
+| `DELIVERY_QR_ROUTE_INACTIVE`         | Route `COMPLETED` / `CANCELLED`         |
+| `DELIVERY_QR_STOP_NOT_FOUND`         | Stop missing on route                   |
+| `DELIVERY_QR_CONSUMED`               | QR already consumed                     |
+| `DELIVERY_QR_STOP_ALREADY_DELIVERED` | Stop already has delivery proof         |
+| `DELIVERY_QR_ORDER_INTEGRITY_ERROR`  | Incomplete or invalid associated orders |
+
+### Recommended commit message
+
+```
+feat(delivery): add Phase 26C courier QR scan preview API
 ```
 
 ---
