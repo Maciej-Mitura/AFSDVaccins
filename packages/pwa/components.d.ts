@@ -41,5 +41,8 @@ declare module 'vue' {
     USelect: typeof import('./node_modules/@nuxt/ui/dist/runtime/components/Select.vue')['default']
     USkeleton: typeof import('./node_modules/@nuxt/ui/dist/runtime/components/Skeleton.vue')['default']
     UTextarea: typeof import('./node_modules/@nuxt/ui/dist/runtime/components/Textarea.vue')['default']
+    VaccineImageAdminPanel: typeof import('./src/components/vaccines/VaccineImageAdminPanel.vue')['default']
+    VaccineImageStatusDetails: typeof import('./src/components/vaccines/VaccineImageStatusDetails.vue')['default']
+    VaccineImageThumbnail: typeof import('./src/components/vaccines/VaccineImageThumbnail.vue')['default']
   }
 }

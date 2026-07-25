@@ -75,6 +75,14 @@ export {
   notificationReadLabel,
 } from './status-labels'
 export {
+  isVaccineImageBrowseable,
+  vaccineImageValidationStatusLabel,
+  vaccineImageValidationStatusExplanation,
+  vaccineImageUploadOutcomeMessage,
+  formatVaccineImageConfidence,
+  boundVaccineImageTags,
+} from './vaccine-image-status'
+export {
   mapFirebaseAuthError,
   mapUserFacingGraphQLError,
   mapGraphQLError,

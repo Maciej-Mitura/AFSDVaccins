@@ -1,5 +1,22 @@
 import gql from 'graphql-tag'
 
+/** Shared safe VaccineImage selection — never requests blob object keys. */
+export const vaccineImageFieldsSource = gql`
+  fragment VaccineImageFields on VaccineImage {
+    originalFilename
+    mimeType
+    width
+    height
+    validationStatus
+    aiCaption
+    aiConfidence
+    aiTags
+    aiReason
+    uploadedAt
+    imageUrl
+  }
+`
+
 export const vaccinesQuerySource = gql`
   query Vaccines($includeInactive: Boolean = false) {
     vaccines(includeInactive: $includeInactive) {
@@ -12,6 +29,19 @@ export const vaccinesQuerySource = gql`
       active
       createdAt
       updatedAt
+      image {
+        originalFilename
+        mimeType
+        width
+        height
+        validationStatus
+        aiCaption
+        aiConfidence
+        aiTags
+        aiReason
+        uploadedAt
+        imageUrl
+      }
     }
   }
 `
@@ -34,6 +64,19 @@ export const vaccineQuerySource = gql`
       active
       createdAt
       updatedAt
+      image {
+        originalFilename
+        mimeType
+        width
+        height
+        validationStatus
+        aiCaption
+        aiConfidence
+        aiTags
+        aiReason
+        uploadedAt
+        imageUrl
+      }
     }
   }
 `
@@ -56,6 +99,19 @@ export const createVaccineMutationSource = gql`
       active
       createdAt
       updatedAt
+      image {
+        originalFilename
+        mimeType
+        width
+        height
+        validationStatus
+        aiCaption
+        aiConfidence
+        aiTags
+        aiReason
+        uploadedAt
+        imageUrl
+      }
     }
   }
 `
@@ -78,6 +134,19 @@ export const updateVaccineMutationSource = gql`
       active
       createdAt
       updatedAt
+      image {
+        originalFilename
+        mimeType
+        width
+        height
+        validationStatus
+        aiCaption
+        aiConfidence
+        aiTags
+        aiReason
+        uploadedAt
+        imageUrl
+      }
     }
   }
 `

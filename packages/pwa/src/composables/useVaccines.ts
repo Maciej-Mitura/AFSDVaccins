@@ -13,11 +13,13 @@ import {
   type UpdateVaccineMutationVariables,
   type VaccinesQuery,
 } from '@/assets/graphql/vaccine'
+import type { VaccineImageSafePayload } from '@/api/vaccine-image-rest'
 import { mapGraphQLError } from '@/composables/useCurrentUser'
 import useGraphQL from '@/composables/useGraphQL'
 import { translate } from '@/i18n'
 
 export type VaccineListItem = VaccinesQuery['vaccines'][number]
+export type VaccineImageListItem = NonNullable<VaccineListItem['image']>
 
 const vaccines = ref<VaccineListItem[]>([])
 const loading = ref(false)
@@ -160,6 +162,38 @@ export function useVaccines() {
     return extractGraphQLErrorCode(error) === 'VACCINE_NOT_FOUND'
   }
 
+  /**
+   * Patch local catalogue image after REST upload/delete/override.
+   * Discards any previous signed URL for that vaccine.
+   */
+  function patchVaccineImage(
+    vaccineId: string,
+    image: VaccineImageSafePayload | VaccineImageListItem | null,
+  ): void {
+    vaccines.value = vaccines.value.map(vaccine =>
+      vaccine.id === vaccineId
+        ? {
+            ...vaccine,
+            image: image
+              ? {
+                  originalFilename: image.originalFilename,
+                  mimeType: image.mimeType,
+                  width: image.width,
+                  height: image.height,
+                  validationStatus: image.validationStatus as VaccineImageListItem['validationStatus'],
+                  aiCaption: image.aiCaption,
+                  aiConfidence: image.aiConfidence,
+                  aiTags: [...image.aiTags],
+                  aiReason: image.aiReason,
+                  uploadedAt: image.uploadedAt,
+                  imageUrl: image.imageUrl,
+                }
+              : null,
+          }
+        : vaccine,
+    )
+  }
+
   return {
     vaccines,
     activeVaccines,
@@ -169,6 +203,7 @@ export function useVaccines() {
     createVaccine,
     updateVaccine,
     setVaccineActive,
+    patchVaccineImage,
     isVaccineAlreadyExistsError,
     isVaccineNotFoundError,
     mapGraphQLError,

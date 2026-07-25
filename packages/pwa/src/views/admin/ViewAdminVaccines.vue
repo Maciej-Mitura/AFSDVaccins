@@ -8,6 +8,8 @@ import * as z from 'zod'
 import CommonEmptyState from '@/components/common/CommonEmptyState.vue'
 import CommonErrorState from '@/components/common/CommonErrorState.vue'
 import CommonLoadingSkeleton from '@/components/common/CommonLoadingSkeleton.vue'
+import VaccineImageAdminPanel from '@/components/vaccines/VaccineImageAdminPanel.vue'
+import VaccineImageThumbnail from '@/components/vaccines/VaccineImageThumbnail.vue'
 import { useVaccines, type VaccineListItem } from '@/composables/useVaccines'
 import { useOnlineStatus } from '@/composables/useOnlineStatus'
 import { activeInactiveLabel } from '@/i18n'
@@ -28,6 +30,8 @@ const {
 } = useVaccines()
 
 const showForm = ref(false)
+/** After create: optional image step (upload failure does not undo vaccine). */
+const postCreateImageStep = ref(false)
 const editingVaccine = ref<VaccineListItem | null>(null)
 const saving = ref(false)
 const formError = ref<string | null>(null)
@@ -64,14 +68,30 @@ const state = reactive<Partial<VaccineForm>>({
   stockWarningThreshold: 0,
 })
 
-const formTitle = computed(() =>
-  editingVaccine.value ? t('vaccines.editTitle') : t('vaccines.createTitle'),
-)
+const formTitle = computed(() => {
+  if (postCreateImageStep.value) {
+    return t('vaccines.image.postCreateTitle')
+  }
+  return editingVaccine.value
+    ? t('vaccines.editTitle')
+    : t('vaccines.createTitle')
+})
+
+const liveEditingVaccine = computed(() => {
+  if (!editingVaccine.value) {
+    return null
+  }
+  return (
+    vaccines.value.find(v => v.id === editingVaccine.value!.id) ??
+    editingVaccine.value
+  )
+})
 
 void loadVaccines(true)
 
 function resetForm() {
   editingVaccine.value = null
+  postCreateImageStep.value = false
   state.name = undefined
   state.description = undefined
   state.manufacturer = undefined
@@ -86,6 +106,7 @@ function openCreateForm() {
 
 function openEditForm(vaccine: VaccineListItem) {
   editingVaccine.value = vaccine
+  postCreateImageStep.value = false
   state.name = vaccine.name
   state.description = vaccine.description
   state.manufacturer = vaccine.manufacturer
@@ -98,6 +119,11 @@ function openEditForm(vaccine: VaccineListItem) {
 function closeForm() {
   showForm.value = false
   resetForm()
+}
+
+function finishPostCreateStep() {
+  successMessage.value = t('success.vaccines.created')
+  closeForm()
 }
 
 async function onSubmit(event: FormSubmitEvent<VaccineForm>) {
@@ -113,15 +139,15 @@ async function onSubmit(event: FormSubmitEvent<VaccineForm>) {
       stockWarningThreshold: event.data.stockWarningThreshold,
     }
 
-    if (editingVaccine.value) {
+    if (editingVaccine.value && !postCreateImageStep.value) {
       await updateVaccine(editingVaccine.value.id, payload)
       successMessage.value = t('success.vaccines.updated')
+      closeForm()
     } else {
-      await createVaccine(payload)
-      successMessage.value = t('success.vaccines.created')
+      const created = await createVaccine(payload)
+      editingVaccine.value = created
+      postCreateImageStep.value = true
     }
-
-    closeForm()
   } catch (error: unknown) {
     formError.value = isVaccineAlreadyExistsError(error)
       ? t('errors.vaccine.alreadyExists')
@@ -142,6 +168,10 @@ async function toggleActive(vaccine: VaccineListItem) {
   } finally {
     togglingId.value = null
   }
+}
+
+async function refreshSignedUrls(): Promise<void> {
+  await loadVaccines(true)
 }
 </script>
 
@@ -187,34 +217,44 @@ async function toggleActive(vaccine: VaccineListItem) {
         <div
           class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between"
         >
-          <div class="space-y-2 text-sm">
-            <div class="flex flex-wrap items-center gap-2">
-              <h3 class="font-semibold">{{ vaccine.name }}</h3>
-              <UBadge
-                :color="vaccine.active ? 'success' : 'neutral'"
-                variant="subtle"
-              >
-                {{ activeInactiveLabel(vaccine.active) }}
-              </UBadge>
+          <div class="flex min-w-0 flex-1 gap-3">
+            <VaccineImageThumbnail
+              :image="vaccine.image"
+              :vaccine-name="vaccine.name"
+              show-review-indicator
+              :on-url-expired="refreshSignedUrls"
+            />
+            <div class="min-w-0 space-y-2 text-sm">
+              <div class="flex flex-wrap items-center gap-2">
+                <h3 class="font-semibold">{{ vaccine.name }}</h3>
+                <UBadge
+                  :color="vaccine.active ? 'success' : 'neutral'"
+                  variant="subtle"
+                >
+                  {{ activeInactiveLabel(vaccine.active) }}
+                </UBadge>
+              </div>
+              <p>{{ vaccine.description || t('common.noDescription') }}</p>
+              <p>
+                <span class="font-medium"
+                  >{{ t('vaccines.manufacturer') }}:</span
+                >
+                {{ vaccine.manufacturer }}
+              </p>
+              <p>
+                <span class="font-medium">{{ t('vaccines.stock') }}:</span>
+                {{ vaccine.stockQuantity }}
+                <span class="text-muted">{{
+                  t('vaccines.stock.manageHint')
+                }}</span>
+              </p>
+              <p>
+                <span class="font-medium"
+                  >{{ t('vaccines.stockWarningThreshold') }}:</span
+                >
+                {{ vaccine.stockWarningThreshold }}
+              </p>
             </div>
-            <p>{{ vaccine.description || t('common.noDescription') }}</p>
-            <p>
-              <span class="font-medium">{{ t('vaccines.manufacturer') }}:</span>
-              {{ vaccine.manufacturer }}
-            </p>
-            <p>
-              <span class="font-medium">{{ t('vaccines.stock') }}:</span>
-              {{ vaccine.stockQuantity }}
-              <span class="text-muted">{{
-                t('vaccines.stock.manageHint')
-              }}</span>
-            </p>
-            <p>
-              <span class="font-medium"
-                >{{ t('vaccines.stockWarningThreshold') }}:</span
-              >
-              {{ vaccine.stockWarningThreshold }}
-            </p>
           </div>
 
           <div class="flex flex-wrap gap-2">
@@ -237,7 +277,24 @@ async function toggleActive(vaccine: VaccineListItem) {
 
     <UModal v-model:open="showForm" :title="formTitle">
       <template #body>
+        <div v-if="postCreateImageStep && liveEditingVaccine" class="space-y-4">
+          <UAlert
+            color="success"
+            variant="subtle"
+            :title="t('success.vaccines.created')"
+          />
+          <VaccineImageAdminPanel
+            :vaccine-id="liveEditingVaccine.id"
+            :vaccine-name="liveEditingVaccine.name"
+            :image="liveEditingVaccine.image"
+            post-create
+            @done="finishPostCreateStep"
+            @skipped="finishPostCreateStep"
+          />
+        </div>
+
         <UForm
+          v-else
           :schema="schema"
           :state="state"
           class="space-y-4"
@@ -265,6 +322,14 @@ async function toggleActive(vaccine: VaccineListItem) {
               min="0"
             />
           </UFormField>
+
+          <VaccineImageAdminPanel
+            v-if="liveEditingVaccine"
+            :vaccine-id="liveEditingVaccine.id"
+            :vaccine-name="liveEditingVaccine.name"
+            :image="liveEditingVaccine.image"
+            data-testid="vaccine-image-admin-controls"
+          />
 
           <UAlert
             v-if="formError"
