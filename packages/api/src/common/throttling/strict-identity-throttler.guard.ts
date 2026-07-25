@@ -1,4 +1,4 @@
-import { ExecutionContext, Injectable } from '@nestjs/common'
+import { ExecutionContext, HttpException, Injectable } from '@nestjs/common'
 import { GqlExecutionContext } from '@nestjs/graphql'
 import { ThrottlerGuard, ThrottlerLimitDetail } from '@nestjs/throttler'
 import { GraphQLError } from 'graphql'
@@ -70,13 +70,26 @@ export class StrictIdentityThrottlerGuard extends ThrottlerGuard {
   }
 
   protected throwThrottlingException(
-    _context: ExecutionContext,
+    context: ExecutionContext,
     throttlerLimitDetail: ThrottlerLimitDetail,
   ): Promise<void> {
     const retryAfterSeconds = Math.max(
       1,
       Math.ceil(throttlerLimitDetail.timeToBlockExpire || 1),
     )
+
+    if (context.getType<string>() === 'http') {
+      return Promise.reject(
+        new HttpException(
+          {
+            message: RATE_LIMITED_MESSAGE,
+            error: RATE_LIMITED_ERROR_CODE,
+            retryAfterSeconds,
+          },
+          429,
+        ),
+      )
+    }
 
     return Promise.reject(
       new GraphQLError(RATE_LIMITED_MESSAGE, {

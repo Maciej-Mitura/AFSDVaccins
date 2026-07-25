@@ -15,6 +15,13 @@ import {
 import { UserRole } from '../user-role.enum'
 import { UserService } from '../user.service'
 import { ROLES_KEY } from '../decorators/roles.decorator'
+import { User } from '../user.entity'
+import { VerifiedFirebaseIdentity } from '../../authentication/firebase.types'
+
+type AuthedHttpRequest = {
+  user?: VerifiedFirebaseIdentity
+  applicationUser?: User
+}
 
 @Injectable()
 export class RolesGuard implements CanActivate {
@@ -33,11 +40,7 @@ export class RolesGuard implements CanActivate {
       return true
     }
 
-    const gqlContext = getGraphqlRequestContext(context)
-    const normalized = resolveNormalizedGraphqlRequest(gqlContext)
-    syncAuthToRequest(gqlContext, normalized)
-
-    const request = gqlContext.req
+    const request = this.resolveAuthedRequest(context)
 
     if (!request.user?.uid) {
       throw new UnauthorizedException()
@@ -54,5 +57,18 @@ export class RolesGuard implements CanActivate {
     }
 
     return true
+  }
+
+  private resolveAuthedRequest(
+    context: ExecutionContext,
+  ): AuthedHttpRequest {
+    if (context.getType<string>() === 'http') {
+      return context.switchToHttp().getRequest<AuthedHttpRequest>()
+    }
+
+    const gqlContext = getGraphqlRequestContext(context)
+    const normalized = resolveNormalizedGraphqlRequest(gqlContext)
+    syncAuthToRequest(gqlContext, normalized)
+    return gqlContext.req
   }
 }

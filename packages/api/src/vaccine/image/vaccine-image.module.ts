@@ -1,7 +1,13 @@
 import { Module } from '@nestjs/common'
 import { ConfigModule, ConfigService } from '@nestjs/config'
+import { TypeOrmModule } from '@nestjs/typeorm'
 
+import { AuthenticationModule } from '../../authentication/authentication.module'
+import { ApplicationCacheModule } from '../../common/cache/application-cache.module'
 import { EnvConfig } from '../../config/env.validation'
+import { UserModule } from '../../user/user.module'
+import { Vaccine } from '../vaccine.entity'
+import { VaccineCoreModule } from '../vaccine-core.module'
 import {
   AZURE_VISION_TIMEOUT_MS_DEFAULT,
   AzureVaccineImageAnalysisProvider,
@@ -11,7 +17,11 @@ import { FakeVaccineImageAnalysisProvider } from './fake-vaccine-image-analysis.
 import { FakeVaccineImageStorageProvider } from './fake-vaccine-image-storage.provider'
 import { VACCINE_IMAGE_ANALYSIS_PROVIDER } from './vaccine-image-analysis.provider'
 import { VaccineImageAnalysisService } from './vaccine-image-analysis.service'
+import { VaccineImageAuditEvent } from './vaccine-image-audit.entity'
+import { VaccineImageAuditService } from './vaccine-image-audit.service'
+import { VaccineImageController } from './vaccine-image.controller'
 import { VaccineImageFieldsResolver } from './vaccine-image-fields.resolver'
+import { VaccineImageLifecycleService } from './vaccine-image-lifecycle.service'
 import { resolveVaccineImageProviderMode } from './vaccine-image-provider.selection'
 import { VACCINE_IMAGE_STORAGE_PROVIDER } from './vaccine-image-storage.provider'
 import { VaccineImageUrlService } from './vaccine-image-url.service'
@@ -84,20 +94,40 @@ const storageProvider = {
   },
 }
 
+const persistenceImports = isSchemaGeneration
+  ? []
+  : [TypeOrmModule.forFeature([Vaccine, VaccineImageAuditEvent])]
+
+const lifecycleProviders = isSchemaGeneration
+  ? []
+  : [
+      VaccineImageAnalysisService,
+      VaccineImageAuditService,
+      VaccineImageLifecycleService,
+    ]
+
 @Module({
-  imports: [ConfigModule],
+  imports: [
+    ConfigModule,
+    AuthenticationModule,
+    UserModule,
+    ApplicationCacheModule,
+    VaccineCoreModule,
+    ...persistenceImports,
+  ],
+  controllers: isSchemaGeneration ? [] : [VaccineImageController],
   providers: [
     analysisProvider,
     storageProvider,
-    VaccineImageAnalysisService,
     VaccineImageUrlService,
     VaccineImageFieldsResolver,
+    ...lifecycleProviders,
   ],
   exports: [
     VACCINE_IMAGE_ANALYSIS_PROVIDER,
     VACCINE_IMAGE_STORAGE_PROVIDER,
-    VaccineImageAnalysisService,
     VaccineImageUrlService,
+    ...(isSchemaGeneration ? [] : [VaccineImageAnalysisService]),
   ],
 })
 export class VaccineImageModule {}

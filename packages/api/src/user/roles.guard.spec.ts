@@ -148,6 +148,33 @@ describe('RolesGuard', () => {
     ).rejects.toBeInstanceOf(ForbiddenException)
   })
 
+  it('allows matching roles for HTTP REST context', async () => {
+    reflector.getAllAndOverride.mockReturnValue([UserRole.APOTHEKER])
+    userService.requireByFirebaseUid.mockResolvedValue(applicationUser)
+
+    const request: {
+      user?: { uid: string; emailVerified: boolean }
+      applicationUser?: User
+    } = {
+      user: {
+        uid: applicationUser.firebaseUid,
+        emailVerified: true,
+      },
+    }
+
+    const httpContext = {
+      getHandler: () => jest.fn(),
+      getClass: () => class TestClass {},
+      getType: () => 'http',
+      switchToHttp: () => ({ getRequest: () => request }),
+    } as unknown as ExecutionContext
+
+    await expect(guard.canActivate(httpContext)).resolves.toBe(true)
+    expect(userService.requireByFirebaseUid).toHaveBeenCalledWith(
+      applicationUser.firebaseUid,
+    )
+  })
+
   it('passes through when no roles are required', async () => {
     reflector.getAllAndOverride.mockReturnValue(undefined)
 
