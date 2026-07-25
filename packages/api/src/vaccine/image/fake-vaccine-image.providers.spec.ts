@@ -23,7 +23,14 @@ describe('FakeVaccineImageAnalysisProvider', () => {
     expect(first.caption).toBe('fake-caption:vial.png')
     expect(first.captionConfidence).toBeGreaterThanOrEqual(0)
     expect(first.captionConfidence).toBeLessThanOrEqual(1)
-    expect(first.tags).toEqual(['fake', 'image/png', '640x480'])
+    expect(first.tags).toEqual([
+      { name: 'fake', confidence: 1 },
+      { name: 'image/png', confidence: 1 },
+      { name: '640x480', confidence: 1 },
+    ])
+    expect(first.detectedObjects[0]?.name).toBe('vaccine-vial')
+    expect(first.detectedObjects[0]?.confidence).toBeGreaterThanOrEqual(0)
+    expect(first.detectedObjects[0]?.confidence).toBeLessThanOrEqual(1)
     expect(first.analysedAt.toISOString()).toBe('2026-07-25T12:00:00.000Z')
   })
 })

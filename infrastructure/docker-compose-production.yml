@@ -60,12 +60,15 @@ services:
       GRAPHQL_MAX_DEPTH: ${GRAPHQL_MAX_DEPTH:-12}
       GRAPHQL_MAX_COMPLEXITY: ${GRAPHQL_MAX_COMPLEXITY:-500}
       API_JSON_BODY_LIMIT: ${API_JSON_BODY_LIMIT:-1mb}
-      # Phase 25C — Azure Blob (required in production; placeholders in .env.prod.example)
+      # Phase 25C/25D — Azure Blob + Vision (required in production; placeholders in .env.prod.example)
       VACCINE_IMAGE_ANALYSIS_PROVIDER: ${VACCINE_IMAGE_ANALYSIS_PROVIDER:-azure}
       VACCINE_IMAGE_STORAGE_PROVIDER: ${VACCINE_IMAGE_STORAGE_PROVIDER:-azure}
       AZURE_STORAGE_CONNECTION_STRING: ${AZURE_STORAGE_CONNECTION_STRING:-}
       AZURE_STORAGE_CONTAINER_NAME: ${AZURE_STORAGE_CONTAINER_NAME:-vaccine-images}
       AZURE_STORAGE_READ_URL_TTL_SECONDS: ${AZURE_STORAGE_READ_URL_TTL_SECONDS:-900}
+      AZURE_VISION_ENDPOINT: ${AZURE_VISION_ENDPOINT:-}
+      AZURE_VISION_KEY: ${AZURE_VISION_KEY:-}
+      AZURE_VISION_TIMEOUT_MS: ${AZURE_VISION_TIMEOUT_MS:-10000}
       # Seed and Playwright bypass must stay off on the long-running API.
       ALLOW_DATABASE_SEED: 'false'
       ALLOW_E2E_AUTH_BYPASS: 'false'

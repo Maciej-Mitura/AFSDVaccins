@@ -11,6 +11,17 @@ const PRODUCTION_AZURE_STORAGE = {
   AZURE_STORAGE_CONTAINER_NAME: 'vaccine-images',
 } as const
 
+/** Placeholder Azure Vision env for production validation cases (not real secrets). */
+const PRODUCTION_AZURE_VISION = {
+  AZURE_VISION_ENDPOINT: 'https://example.cognitiveservices.azure.com',
+  AZURE_VISION_KEY: 'example-vision-key',
+} as const
+
+const PRODUCTION_AZURE = {
+  ...PRODUCTION_AZURE_STORAGE,
+  ...PRODUCTION_AZURE_VISION,
+} as const
+
 describe('envValidationSchema', () => {
   it('accepts valid development configuration', () => {
     const result = envValidationSchema.validate({
@@ -124,7 +135,7 @@ describe('envValidationSchema', () => {
       DB_HOST: 'mongodb+srv://user:pass@cluster0.example.mongodb.net/',
       DB_NAME: 'vaccin-delivery-demo',
       TRUST_PROXY: '1',
-      ...PRODUCTION_AZURE_STORAGE,
+      ...PRODUCTION_AZURE,
     })
 
     expect(result.error).toBeUndefined()
@@ -234,7 +245,7 @@ describe('envValidationSchema', () => {
       DB_HOST: 'mongodb://localhost:27017',
       DB_NAME: 'vaccin-delivery',
       TRUST_PROXY: '1',
-      ...PRODUCTION_AZURE_STORAGE,
+      ...PRODUCTION_AZURE,
     })
 
     expect(result.error).toBeUndefined()
@@ -286,6 +297,80 @@ describe('envValidationSchema', () => {
       ...PRODUCTION_AZURE_STORAGE,
     })
     expect(azureComplete.error).toBeUndefined()
+  })
+
+  it('requires Azure Vision variables only when analysis provider is azure', () => {
+    const fakeMode = envValidationSchema.validate({
+      NODE_ENV: 'development',
+      PORT: 3000,
+      URL_FRONTEND: 'http://localhost:5173',
+      DB_HOST: 'mongodb://localhost:27017',
+      DB_NAME: 'vaccin-delivery',
+      VACCINE_IMAGE_ANALYSIS_PROVIDER: 'fake',
+    })
+    expect(fakeMode.error).toBeUndefined()
+
+    const azureMissing = envValidationSchema.validate({
+      NODE_ENV: 'development',
+      PORT: 3000,
+      URL_FRONTEND: 'http://localhost:5173',
+      DB_HOST: 'mongodb://localhost:27017',
+      DB_NAME: 'vaccin-delivery',
+      VACCINE_IMAGE_ANALYSIS_PROVIDER: 'azure',
+    })
+    expect(azureMissing.error).toBeDefined()
+    expect(azureMissing.error?.message).toMatch(
+      /AZURE_VISION_ENDPOINT|AZURE_VISION_KEY/,
+    )
+
+    const httpEndpoint = envValidationSchema.validate({
+      NODE_ENV: 'development',
+      PORT: 3000,
+      URL_FRONTEND: 'http://localhost:5173',
+      DB_HOST: 'mongodb://localhost:27017',
+      DB_NAME: 'vaccin-delivery',
+      VACCINE_IMAGE_ANALYSIS_PROVIDER: 'azure',
+      AZURE_VISION_ENDPOINT: 'http://example.cognitiveservices.azure.com',
+      AZURE_VISION_KEY: 'example-vision-key',
+    })
+    expect(httpEndpoint.error).toBeDefined()
+
+    const azureComplete = envValidationSchema.validate({
+      NODE_ENV: 'development',
+      PORT: 3000,
+      URL_FRONTEND: 'http://localhost:5173',
+      DB_HOST: 'mongodb://localhost:27017',
+      DB_NAME: 'vaccin-delivery',
+      VACCINE_IMAGE_ANALYSIS_PROVIDER: 'azure',
+      ...PRODUCTION_AZURE_VISION,
+    })
+    expect(azureComplete.error).toBeUndefined()
+    expect(
+      (azureComplete.value as { AZURE_VISION_TIMEOUT_MS: number })
+        .AZURE_VISION_TIMEOUT_MS,
+    ).toBe(10_000)
+  })
+
+  it('rejects invalid Azure Vision timeout values', () => {
+    const tooLow = envValidationSchema.validate({
+      NODE_ENV: 'development',
+      PORT: 3000,
+      URL_FRONTEND: 'http://localhost:5173',
+      DB_HOST: 'mongodb://localhost:27017',
+      DB_NAME: 'vaccin-delivery',
+      AZURE_VISION_TIMEOUT_MS: 500,
+    })
+    expect(tooLow.error).toBeDefined()
+
+    const tooHigh = envValidationSchema.validate({
+      NODE_ENV: 'development',
+      PORT: 3000,
+      URL_FRONTEND: 'http://localhost:5173',
+      DB_HOST: 'mongodb://localhost:27017',
+      DB_NAME: 'vaccin-delivery',
+      AZURE_VISION_TIMEOUT_MS: 60_000,
+    })
+    expect(tooHigh.error).toBeDefined()
   })
 
   it('rejects invalid Azure read URL TTL values', () => {

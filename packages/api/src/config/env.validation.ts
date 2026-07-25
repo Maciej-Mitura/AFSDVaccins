@@ -180,6 +180,47 @@ export const envValidationSchema = Joi.object({
     .min(60)
     .max(3600)
     .default(900),
+
+  /**
+   * Azure AI Vision Image Analysis 4.0 endpoint (HTTPS only).
+   * Required when VACCINE_IMAGE_ANALYSIS_PROVIDER=azure (including production default).
+   * Never log this value with query credentials (endpoint should be host-only).
+   */
+  AZURE_VISION_ENDPOINT: Joi.when('VACCINE_IMAGE_ANALYSIS_PROVIDER', {
+    is: 'azure',
+    then: Joi.string()
+      .uri({ scheme: ['https'] })
+      .required(),
+    otherwise: Joi.when('NODE_ENV', {
+      is: 'production',
+      then: Joi.string()
+        .uri({ scheme: ['https'] })
+        .required(),
+      otherwise: Joi.string().allow('').optional(),
+    }),
+  }),
+  /**
+   * Azure AI Vision subscription key.
+   * Required when analysis provider is azure. Never log this value.
+   */
+  AZURE_VISION_KEY: Joi.when('VACCINE_IMAGE_ANALYSIS_PROVIDER', {
+    is: 'azure',
+    then: Joi.string().min(1).required(),
+    otherwise: Joi.when('NODE_ENV', {
+      is: 'production',
+      then: Joi.string().min(1).required(),
+      otherwise: Joi.string().allow('').optional(),
+    }),
+  }),
+  /**
+   * Azure Vision HTTP timeout in milliseconds (bounded 1000–30000; default 10000).
+   * Used by the Azure analysis provider only; fake analysis ignores this.
+   */
+  AZURE_VISION_TIMEOUT_MS: Joi.number()
+    .integer()
+    .min(1000)
+    .max(30_000)
+    .default(10_000),
 })
 
 export type EnvConfig = {
@@ -219,6 +260,9 @@ export type EnvConfig = {
   AZURE_STORAGE_CONNECTION_STRING?: string
   AZURE_STORAGE_CONTAINER_NAME?: string
   AZURE_STORAGE_READ_URL_TTL_SECONDS: number
+  AZURE_VISION_ENDPOINT?: string
+  AZURE_VISION_KEY?: string
+  AZURE_VISION_TIMEOUT_MS: number
 }
 
 /**
