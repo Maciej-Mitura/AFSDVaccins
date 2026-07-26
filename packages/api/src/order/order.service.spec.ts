@@ -22,6 +22,7 @@ import {
   WeeklyLimitExceededException,
 } from './exceptions/order.exceptions'
 import { OrderNotificationService } from '../notifications/order-notification.service'
+import { BusinessNotificationProducerService } from '../notifications/business-notification-producer.service'
 import { StockService } from '../stock/stock.service'
 import { OrderEventsService } from './order-events.service'
 import { OrderNormalizationService } from './order-normalization.service'
@@ -52,6 +53,9 @@ describe('OrderService', () => {
       'publishOrderCreated' | 'publishOrderUpdated' | 'publishOrderStatusChanged'
     >
   >
+  let businessNotificationProducer: {
+    notifyAdminsNewOrder: jest.Mock
+  }
 
   const apothekerId = '507f1f77bcf86cd799439011'
   const otherApothekerId = '507f1f77bcf86cd799439012'
@@ -159,6 +163,10 @@ describe('OrderService', () => {
       createOrderCancelledNotification: jest.fn().mockResolvedValue(undefined),
     }
 
+    businessNotificationProducer = {
+      notifyAdminsNewOrder: jest.fn().mockResolvedValue(undefined),
+    }
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         OrderService,
@@ -181,6 +189,10 @@ describe('OrderService', () => {
         {
           provide: OrderNotificationService,
           useValue: orderNotificationService,
+        },
+        {
+          provide: BusinessNotificationProducerService,
+          useValue: businessNotificationProducer,
         },
         {
           provide: OrderNormalizationService,
@@ -263,6 +275,9 @@ describe('OrderService', () => {
 
     expect(orderEventsService.publishOrderCreated).toHaveBeenCalledTimes(1)
     expect(orderNotificationService.handleOrderCreated).toHaveBeenCalledTimes(1)
+    expect(businessNotificationProducer.notifyAdminsNewOrder).toHaveBeenCalledTimes(
+      1,
+    )
     expect(orderEventsService.publishOrderStatusChanged).not.toHaveBeenCalled()
   })
 
@@ -273,6 +288,9 @@ describe('OrderService', () => {
 
     expect(orderEventsService.publishOrderCreated).not.toHaveBeenCalled()
     expect(orderNotificationService.handleOrderCreated).not.toHaveBeenCalled()
+    expect(
+      businessNotificationProducer.notifyAdminsNewOrder,
+    ).not.toHaveBeenCalled()
   })
 
   it('derives pharmacist ownership from the application user', async () => {

@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common'
 import { ScheduleModule } from '@nestjs/schedule'
 
 import { CLOCK, SystemClock } from '../../order/clock.provider'
+import { BusinessNotificationModule } from '../business-notification.module'
 import { NotificationScheduleService } from './notification-schedule.service'
 
 const isSchemaGeneration =
@@ -9,7 +10,7 @@ const isSchemaGeneration =
   process.env.GENERATE_SCHEMA_ONLY === 'true'
 
 /**
- * Narrow Nest Schedule init for Phase 27A reminder foundation.
+ * Nest Schedule init for route-date reminders.
  * Cron is skipped in test/schema-generation so e2e teardown is not blocked by
  * scheduler timers. No high-frequency polling.
  */
@@ -19,7 +20,7 @@ const scheduleImports =
     : [ScheduleModule.forRoot()]
 
 @Module({
-  imports: scheduleImports,
+  imports: [...scheduleImports, BusinessNotificationModule],
   providers: [
     NotificationScheduleService,
     {

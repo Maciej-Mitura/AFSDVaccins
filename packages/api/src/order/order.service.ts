@@ -4,6 +4,7 @@ import { ObjectId } from 'mongodb'
 import { MongoRepository } from 'typeorm'
 
 import { OrderNotificationService } from '../notifications/order-notification.service'
+import { BusinessNotificationProducerService } from '../notifications/business-notification-producer.service'
 import { tryParseGraphqlObjectId } from '../common/mongodb/graphql-object-id.util'
 import { ApplicationSettings } from '../settings/settings.entity'
 import { SettingsService } from '../settings/settings.service'
@@ -72,6 +73,7 @@ export class OrderService {
     private readonly settingsService: SettingsService,
     private readonly orderEventsService: OrderEventsService,
     private readonly orderNotificationService: OrderNotificationService,
+    private readonly businessNotificationProducer: BusinessNotificationProducerService,
     private readonly orderNormalizationService: OrderNormalizationService,
     private readonly stockService: StockService,
     @Inject(CLOCK) private readonly clock: Clock,
@@ -402,6 +404,7 @@ export class OrderService {
       currentWeeklyQuantity,
       settings,
     )
+    await this.businessNotificationProducer.notifyAdminsNewOrder(saved)
 
     return saved
   }

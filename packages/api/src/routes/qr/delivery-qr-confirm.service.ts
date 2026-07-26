@@ -3,6 +3,7 @@ import { InjectRepository } from '@nestjs/typeorm'
 import { ObjectId } from 'mongodb'
 import { MongoRepository } from 'typeorm'
 
+import { BusinessNotificationProducerService } from '../../notifications/business-notification-producer.service'
 import { tryParseGraphqlObjectId } from '../../common/mongodb/graphql-object-id.util'
 import { OrderDeliveryMethod } from '../../order/order-delivery-method.enum'
 import { Order } from '../../order/order.entity'
@@ -88,6 +89,7 @@ export class DeliveryQrConfirmService {
     private readonly orderService: OrderService,
     private readonly deliveryRouteEventsService: DeliveryRouteEventsService,
     private readonly auditService: DeliveryQrConfirmAuditService,
+    private readonly businessNotificationProducer: BusinessNotificationProducerService,
     @Inject(DELIVERY_QR_TOKEN_SERVICE)
     private readonly tokenService: DeliveryQrTokenService,
   ) {}
@@ -286,6 +288,20 @@ export class DeliveryQrConfirmService {
       persistedRoute,
     )
     await this.orderService.publishQrDeliveredOrderUpdates(deliveredOrders)
+
+    const completedStop =
+      persistedRoute.stops?.find(s => s.stopId === stop.stopId) ?? stop
+
+    await this.businessNotificationProducer.notifyPharmacyDeliveryConfirmed({
+      route: persistedRoute,
+      stop: completedStop,
+      confirmationEventId,
+      orderCount: orderIds.length,
+    })
+    await this.businessNotificationProducer.notifyNextPharmacy(
+      persistedRoute,
+      completedStop,
+    )
 
     return {
       routeId: parsedRouteId.stringValue,

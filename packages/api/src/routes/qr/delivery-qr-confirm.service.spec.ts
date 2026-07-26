@@ -173,6 +173,11 @@ describe('DeliveryQrConfirmService', () => {
       record: jest.fn().mockResolvedValue(undefined),
     }
 
+    const businessNotificationProducer = {
+      notifyPharmacyDeliveryConfirmed: jest.fn().mockResolvedValue(undefined),
+      notifyNextPharmacy: jest.fn().mockResolvedValue(undefined),
+    }
+
     const service = new DeliveryQrConfirmService(
       deliveryRouteRepository as never,
       orderRepository as never,
@@ -180,6 +185,7 @@ describe('DeliveryQrConfirmService', () => {
       orderService as never,
       deliveryRouteEventsService as never,
       auditService as never,
+      businessNotificationProducer as never,
       tokenService,
     )
 
@@ -189,6 +195,7 @@ describe('DeliveryQrConfirmService', () => {
       orderService,
       deliveryRouteEventsService,
       auditService,
+      businessNotificationProducer,
       deliveryRouteRepository,
     }
   }

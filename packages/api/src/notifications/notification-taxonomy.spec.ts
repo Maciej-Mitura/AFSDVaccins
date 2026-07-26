@@ -42,9 +42,9 @@ describe('notification taxonomy', () => {
     expect(
       sanitizeInterpolationData(NotificationType.BEZORGER_ROUTE_ASSIGNED, {
         routeDate: '2026-07-26',
-        city: 'Gent',
+        stopCount: 3,
       }),
-    ).toEqual({ routeDate: '2026-07-26', city: 'Gent' })
+    ).toEqual({ routeDate: '2026-07-26', stopCount: 3 })
 
     expect(() =>
       sanitizeInterpolationData(NotificationType.BEZORGER_ROUTE_ASSIGNED, {

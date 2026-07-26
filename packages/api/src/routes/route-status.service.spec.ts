@@ -9,6 +9,7 @@ import { BezorgerProfileService } from '../profile/bezorger/bezorger-profile.ser
 import { SettingsService } from '../settings/settings.service'
 import { User } from '../user/user.entity'
 import { UserRole } from '../user/user-role.enum'
+import { BusinessNotificationProducerService } from '../notifications/business-notification-producer.service'
 import { DeliveryRoute } from './delivery-route.entity'
 import { DeliveryRouteEventsService } from './delivery-route-events.service'
 import {
@@ -200,6 +201,12 @@ describe('RoutesService.updateRouteStatus', () => {
         {
           provide: DeliveryRouteEventsService,
           useValue: eventsService,
+        },
+        {
+          provide: BusinessNotificationProducerService,
+          useValue: {
+            notifyPharmacyRouteStarted: jest.fn().mockResolvedValue(undefined),
+          },
         },
         {
           provide: BezorgerProfileService,

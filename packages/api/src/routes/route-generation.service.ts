@@ -3,6 +3,7 @@ import { InjectRepository } from '@nestjs/typeorm'
 import { ObjectId } from 'mongodb'
 import { MongoRepository } from 'typeorm'
 
+import { BusinessNotificationProducerService } from '../notifications/business-notification-producer.service'
 import { tryParseGraphqlObjectId } from '../common/mongodb/graphql-object-id.util'
 import { getLocalCalendarDate } from '../order/delivery-date.util'
 import { Order } from '../order/order.entity'
@@ -112,6 +113,7 @@ export class RouteGenerationService {
     private readonly orderService: OrderService,
     private readonly settingsService: SettingsService,
     private readonly deliveryRouteEventsService: DeliveryRouteEventsService,
+    private readonly businessNotificationProducer: BusinessNotificationProducerService,
     @Inject(DELIVERY_QR_RANDOM_SOURCE)
     private readonly deliveryQrRandomSource: DeliveryQrRandomSource,
     @Inject(DELIVERY_QR_TOKEN_SERVICE)
@@ -292,6 +294,7 @@ export class RouteGenerationService {
 
     await this.orderService.publishPlannedOrderUpdates(changedOrders)
     await this.deliveryRouteEventsService.publishBezorgerRouteUpdated(saved)
+    await this.businessNotificationProducer.notifyCourierRouteAssigned(saved)
 
     return saved
   }

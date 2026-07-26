@@ -26,4 +26,8 @@ export class NotificationInterpolationDataFields {
   @Column({ nullable: true })
   @Field(() => Int, { nullable: true })
   orderCount?: number | null
+
+  @Column({ nullable: true })
+  @Field(() => Int, { nullable: true })
+  stopCount?: number | null
 }

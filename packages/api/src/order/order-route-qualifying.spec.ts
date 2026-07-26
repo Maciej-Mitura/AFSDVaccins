@@ -4,6 +4,7 @@ import { ObjectId } from 'mongodb'
 import { MongoRepository } from 'typeorm'
 
 import { OrderNotificationService } from '../notifications/order-notification.service'
+import { BusinessNotificationProducerService } from '../notifications/business-notification-producer.service'
 import { SettingsService } from '../settings/settings.service'
 import { StockService } from '../stock/stock.service'
 import { VaccineService } from '../vaccine/vaccine.service'
@@ -115,6 +116,10 @@ describe('OrderService findQualifyingOrdersForRoute', () => {
         {
           provide: OrderNotificationService,
           useValue: {},
+        },
+        {
+          provide: BusinessNotificationProducerService,
+          useValue: { notifyAdminsNewOrder: jest.fn() },
         },
         { provide: OrderNormalizationService, useValue: normalizationService },
         { provide: StockService, useValue: {} },

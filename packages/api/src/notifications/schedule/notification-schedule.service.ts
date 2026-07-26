@@ -5,76 +5,47 @@ import { DEFAULT_TIMEZONE } from '../../settings/settings.constants'
 import { getZonedDateParts } from '../../order/delivery-date.util'
 import { CLOCK } from '../../order/clock.provider'
 import type { Clock } from '../../order/clock.provider'
+import { BusinessNotificationProducerService } from '../business-notification-producer.service'
 
-export const ROUTE_DATE_REMINDER_HOUR_BRUSSELS = 8
-export const ROUTE_DATE_REMINDER_MINUTE_BRUSSELS = 0
-
-/**
- * Builds an idempotent event id for the courier route-date reminder.
- * Safe across restarts: same recipient + route + calendar date → same id.
- */
-export function buildRouteDateReminderEventId(
-  recipientUserId: string,
-  routeId: string,
-  routeDate: string,
-): string {
-  return `bezorger-route-date-reminder:${recipientUserId}:${routeId}:${routeDate}`
-}
+export {
+  buildRouteDateReminderEventId,
+  shouldSkipSameDayRouteDateReminder,
+  ROUTE_DATE_REMINDER_HOUR_BRUSSELS,
+  ROUTE_DATE_REMINDER_MINUTE_BRUSSELS,
+} from './route-date-reminder.policy'
 
 /**
- * True when a same-day assignment after the 08:00 Brussels reminder window
- * should skip the redundant route-date reminder (wired in Phase 27C).
- */
-export function shouldSkipSameDayRouteDateReminder(
-  assignedAt: Date,
-  routeDate: string,
-  timeZone: string = DEFAULT_TIMEZONE,
-): boolean {
-  const parts = getZonedDateParts(assignedAt, timeZone)
-  const localDate = `${parts.year}-${String(parts.month).padStart(2, '0')}-${String(parts.day).padStart(2, '0')}`
-
-  if (localDate !== routeDate) {
-    return false
-  }
-
-  if (parts.hour > ROUTE_DATE_REMINDER_HOUR_BRUSSELS) {
-    return true
-  }
-
-  if (
-    parts.hour === ROUTE_DATE_REMINDER_HOUR_BRUSSELS &&
-    parts.minute >= ROUTE_DATE_REMINDER_MINUTE_BRUSSELS
-  ) {
-    return true
-  }
-
-  return false
-}
-
-/**
- * Provider-neutral scheduled-notification job foundation.
- * Cron is Europe/Brussels 08:00. Does not yet generate route reminders.
+ * Provider-neutral scheduled-notification job.
+ * Cron is Europe/Brussels 08:00; generation is delegated to the producer.
  */
 @Injectable()
 export class NotificationScheduleService {
   private readonly logger = new Logger(NotificationScheduleService.name)
 
-  constructor(@Inject(CLOCK) private readonly clock: Clock) {}
+  constructor(
+    @Inject(CLOCK) private readonly clock: Clock,
+    private readonly businessNotificationProducer: BusinessNotificationProducerService,
+  ) {}
 
   /**
    * Daily tick at 08:00 Europe/Brussels.
-   * Phase 27A: logs only — route reminder generation is Phase 27C.
+   * Generates BEZORGER_ROUTE_DATE_REMINDER for eligible routes.
    */
   @Cron('0 8 * * *', {
     timeZone: DEFAULT_TIMEZONE,
     name: 'bezorger-route-date-reminder-tick',
   })
-  handleRouteDateReminderTick(): void {
+  async handleRouteDateReminderTick(): Promise<void> {
     const now = this.clock.now()
     const parts = getZonedDateParts(now, DEFAULT_TIMEZONE)
+    const localDate = `${parts.year}-${String(parts.month).padStart(2, '0')}-${String(parts.day).padStart(2, '0')}`
 
     this.logger.debug(
-      `Route-date reminder tick (foundation only) local=${parts.year}-${String(parts.month).padStart(2, '0')}-${String(parts.day).padStart(2, '0')} ${String(parts.hour).padStart(2, '0')}:${String(parts.minute).padStart(2, '0')} ${DEFAULT_TIMEZONE}`,
+      `Route-date reminder tick local=${localDate} ${String(parts.hour).padStart(2, '0')}:${String(parts.minute).padStart(2, '0')} ${DEFAULT_TIMEZONE}`,
+    )
+
+    await this.businessNotificationProducer.notifyCourierRouteDateRemindersForLocalDate(
+      localDate,
     )
   }
 

@@ -1,15 +1,20 @@
 import { DEFAULT_TIMEZONE } from '../../settings/settings.constants'
+import { NotificationScheduleService } from './notification-schedule.service'
 import {
   buildRouteDateReminderEventId,
-  NotificationScheduleService,
   shouldSkipSameDayRouteDateReminder,
-} from './notification-schedule.service'
+} from './route-date-reminder.policy'
 
-describe('NotificationScheduleService foundation', () => {
+describe('NotificationScheduleService', () => {
   it('uses Europe/Brussels timezone', () => {
-    const service = new NotificationScheduleService({
-      now: () => new Date('2026-07-26T06:00:00.000Z'),
-    })
+    const service = new NotificationScheduleService(
+      { now: () => new Date('2026-07-26T06:00:00.000Z') },
+      {
+        notifyCourierRouteDateRemindersForLocalDate: jest
+          .fn()
+          .mockResolvedValue(undefined),
+      } as never,
+    )
     expect(service.getReminderTimezone()).toBe(DEFAULT_TIMEZONE)
     expect(DEFAULT_TIMEZONE).toBe('Europe/Brussels')
   })
@@ -38,10 +43,18 @@ describe('NotificationScheduleService foundation', () => {
     ).toBe(false)
   })
 
-  it('tick is foundation-only (no throw)', () => {
-    const service = new NotificationScheduleService({
-      now: () => new Date('2026-07-26T06:00:00.000Z'),
-    })
-    expect(() => service.handleRouteDateReminderTick()).not.toThrow()
+  it('tick delegates to producer for local Brussels date', async () => {
+    const notify = jest.fn().mockResolvedValue(undefined)
+    const service = new NotificationScheduleService(
+      // 06:00 UTC = 08:00 CEST Brussels on 2026-07-26
+      { now: () => new Date('2026-07-26T06:00:00.000Z') },
+      {
+        notifyCourierRouteDateRemindersForLocalDate: notify,
+      } as never,
+    )
+
+    await service.handleRouteDateReminderTick()
+
+    expect(notify).toHaveBeenCalledWith('2026-07-26')
   })
 })

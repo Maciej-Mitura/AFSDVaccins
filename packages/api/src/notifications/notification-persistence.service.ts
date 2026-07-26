@@ -64,13 +64,20 @@ export class NotificationPersistenceService implements OnModuleInit {
   }
 
   async initializeNotificationPersistence(): Promise<void> {
-    const unsetCount = await this.repairLegacyNullEventIds()
+    const unsetEventIdCount = await this.repairLegacyNullEventIds()
+    const unsetDedupCount = await this.repairLegacyNullDeduplicationKeys()
     const backfilled = await this.backfillEventIdFromDeduplicationKey()
     await this.ensurePartialUniqueRecipientEventIndex()
 
-    if (unsetCount > 0) {
+    if (unsetEventIdCount > 0) {
       this.logger.log(
-        `Unset null eventId on ${unsetCount} notification record(s)`,
+        `Unset null eventId on ${unsetEventIdCount} notification record(s)`,
+      )
+    }
+
+    if (unsetDedupCount > 0) {
+      this.logger.log(
+        `Unset null deduplicationKey on ${unsetDedupCount} notification record(s)`,
       )
     }
 
@@ -85,6 +92,19 @@ export class NotificationPersistenceService implements OnModuleInit {
     const result = await this.notificationRepository.updateMany(
       { eventId: { $type: 'null' } },
       { $unset: { eventId: '' } },
+    )
+
+    return readModifiedCount(result)
+  }
+
+  /**
+   * Explicit null deduplicationKey breaks TypeORM’s sparse unique index on
+   * synchronize (Mongo indexes null; only absent fields are skipped).
+   */
+  async repairLegacyNullDeduplicationKeys(): Promise<number> {
+    const result = await this.notificationRepository.updateMany(
+      { deduplicationKey: { $type: 'null' } },
+      { $unset: { deduplicationKey: '' } },
     )
 
     return readModifiedCount(result)

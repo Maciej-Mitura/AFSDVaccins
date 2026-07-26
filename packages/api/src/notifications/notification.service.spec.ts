@@ -156,10 +156,15 @@ describe('NotificationService', () => {
       interpolationData: { routeDate: '2026-07-26', city: 'Gent' },
     })
 
-    expect(result.titleKey).toBe('notifications.bezorger.routeAssigned.title')
-    expect(result.bodyKey).toBe('notifications.bezorger.routeAssigned.body')
-    expect(result.title).toBe(result.titleKey)
-    expect(result.eventId).toBe('route-assigned:route-1:bezorger')
+    expect(result.created).toBe(true)
+    expect(result.notification.titleKey).toBe(
+      'notifications.bezorger.routeAssigned.title',
+    )
+    expect(result.notification.bodyKey).toBe(
+      'notifications.bezorger.routeAssigned.body',
+    )
+    expect(result.notification.title).toBe(result.notification.titleKey)
+    expect(result.notification.eventId).toBe('route-assigned:route-1:bezorger')
     expect(repository.save).toHaveBeenCalledTimes(1)
     expect(
       notificationEventsService.publishNotificationReceived,
@@ -183,7 +188,8 @@ describe('NotificationService', () => {
       eventId: 'route-assigned:route-1:bezorger',
     })
 
-    expect(result).toBe(existing)
+    expect(result.created).toBe(false)
+    expect(result.notification).toBe(existing)
     expect(repository.save).not.toHaveBeenCalled()
   })
 
@@ -216,8 +222,10 @@ describe('NotificationService', () => {
       interpolationData: { orderReference: 'order-99', orderCount: 1 },
     })
 
-    expect(first.recipientUserId).not.toBe(second.recipientUserId)
-    expect(first.eventId).toBe(second.eventId)
+    expect(first.notification.recipientUserId).not.toBe(
+      second.notification.recipientUserId,
+    )
+    expect(first.notification.eventId).toBe(second.notification.eventId)
     expect(repository.save).toHaveBeenCalledTimes(2)
   })
 

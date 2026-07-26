@@ -11,6 +11,7 @@ import { RouteTemplatesService } from '../route-templates/route-templates.servic
 import { SettingsService } from '../settings/settings.service'
 import { User } from '../user/user.entity'
 import { UserRole } from '../user/user-role.enum'
+import { BusinessNotificationProducerService } from '../notifications/business-notification-producer.service'
 import { DeliveryRoute } from './delivery-route.entity'
 import { DeliveryRouteEventsService } from './delivery-route-events.service'
 import {
@@ -110,6 +111,12 @@ describe('RoutesService.findMyTodayRoute', () => {
         {
           provide: DeliveryRouteEventsService,
           useValue: { publishBezorgerRouteUpdated: jest.fn() },
+        },
+        {
+          provide: BusinessNotificationProducerService,
+          useValue: {
+            notifyPharmacyRouteStarted: jest.fn().mockResolvedValue(undefined),
+          },
         },
         {
           provide: BezorgerProfileService,
@@ -269,6 +276,12 @@ describe('RouteGenerationService.findByBezorgerAndDate', () => {
           },
         },
         { provide: DeliveryRouteEventsService, useValue: {} },
+        {
+          provide: BusinessNotificationProducerService,
+          useValue: {
+            notifyCourierRouteAssigned: jest.fn().mockResolvedValue(undefined),
+          },
+        },
         {
           provide: DELIVERY_QR_RANDOM_SOURCE,
           useValue: systemDeliveryQrRandomSource,

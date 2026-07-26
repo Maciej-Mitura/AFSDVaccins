@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common'
 
 import { AuthenticationModule } from '../authentication/authentication.module'
 import { PubSubModule } from '../common/pubsub/pubsub.module'
+import { BusinessNotificationModule } from '../notifications/business-notification.module'
 import { CLOCK, SystemClock } from '../order/clock.provider'
 import { UserModule } from '../user/user.module'
 import { DeliveryQrConfirmAuditEvent } from './qr/delivery-qr-confirm-audit.entity'
@@ -118,6 +119,7 @@ const confirmAuditPersistence = isSchemaGeneration
     UserModule,
     PubSubModule,
     RoutesCoreModule,
+    BusinessNotificationModule,
     ...confirmAuditPersistence,
   ],
   controllers: isSchemaGeneration

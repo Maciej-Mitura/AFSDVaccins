@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common'
 import { TypeOrmModule } from '@nestjs/typeorm'
 
 import { PubSubModule } from '../common/pubsub/pubsub.module'
+import { BusinessNotificationModule } from '../notifications/business-notification.module'
 import { NotificationsCoreModule } from '../notifications/notifications-core.module'
 import { SettingsCoreModule } from '../settings/settings-core.module'
 import { StockCoreModule } from '../stock/stock-core.module'
@@ -60,6 +61,7 @@ const persistenceImports = isSchemaGeneration
     VaccineCoreModule,
     SettingsCoreModule,
     NotificationsCoreModule,
+    BusinessNotificationModule,
     StockCoreModule,
     ...persistenceImports,
   ],

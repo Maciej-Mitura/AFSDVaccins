@@ -8,6 +8,7 @@ export const NOTIFICATION_INTERPOLATION_KEYS = [
   'city',
   'orderReference',
   'orderCount',
+  'stopCount',
 ] as const
 
 export type NotificationInterpolationKey =
@@ -34,7 +35,7 @@ const PHASE_27A_TAXONOMY: readonly NotificationTaxonomyEntry[] = [
     titleKey: 'notifications.apotheker.routeStarted.title',
     bodyKey: 'notifications.apotheker.routeStarted.body',
     actionPath: '/apotheker/orders',
-    allowedInterpolationKeys: ['routeDate', 'city'],
+    allowedInterpolationKeys: ['routeDate', 'city', 'pharmacyName'],
   },
   {
     type: NotificationType.APOTHEKER_NEXT_STOP,
@@ -50,23 +51,28 @@ const PHASE_27A_TAXONOMY: readonly NotificationTaxonomyEntry[] = [
     titleKey: 'notifications.apotheker.deliveryConfirmed.title',
     bodyKey: 'notifications.apotheker.deliveryConfirmed.body',
     actionPath: '/apotheker/orders',
-    allowedInterpolationKeys: ['orderReference', 'routeDate', 'pharmacyName'],
+    allowedInterpolationKeys: [
+      'orderReference',
+      'routeDate',
+      'pharmacyName',
+      'orderCount',
+    ],
   },
   {
     type: NotificationType.BEZORGER_ROUTE_ASSIGNED,
     recipientRole: UserRole.BEZORGER,
     titleKey: 'notifications.bezorger.routeAssigned.title',
     bodyKey: 'notifications.bezorger.routeAssigned.body',
-    actionPath: '/bezorger/routes',
-    allowedInterpolationKeys: ['routeDate', 'city'],
+    actionPath: '/bezorger/today',
+    allowedInterpolationKeys: ['routeDate', 'city', 'stopCount'],
   },
   {
     type: NotificationType.BEZORGER_ROUTE_DATE_REMINDER,
     recipientRole: UserRole.BEZORGER,
     titleKey: 'notifications.bezorger.routeDateReminder.title',
     bodyKey: 'notifications.bezorger.routeDateReminder.body',
-    actionPath: '/bezorger/routes',
-    allowedInterpolationKeys: ['routeDate', 'city'],
+    actionPath: '/bezorger/today',
+    allowedInterpolationKeys: ['routeDate', 'city', 'stopCount'],
   },
   {
     type: NotificationType.ADMIN_NEW_ORDER,
@@ -74,7 +80,12 @@ const PHASE_27A_TAXONOMY: readonly NotificationTaxonomyEntry[] = [
     titleKey: 'notifications.admin.newOrder.title',
     bodyKey: 'notifications.admin.newOrder.body',
     actionPath: '/admin/orders',
-    allowedInterpolationKeys: ['orderReference', 'orderCount', 'pharmacyName'],
+    allowedInterpolationKeys: [
+      'orderReference',
+      'orderCount',
+      'pharmacyName',
+      'routeDate',
+    ],
   },
 ] as const
 

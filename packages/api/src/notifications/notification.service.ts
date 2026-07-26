@@ -47,6 +47,12 @@ export type CreateTypedNotificationInput = {
   expiresAt?: Date | null
 }
 
+export type CreateTypedNotificationResult = {
+  notification: Notification
+  /** False when an existing (recipientUserId, eventId) row was returned. */
+  created: boolean
+}
+
 export const MY_NOTIFICATIONS_DEFAULT_LIMIT = 50
 export const MY_NOTIFICATIONS_MAX_LIMIT = 100
 
@@ -118,7 +124,10 @@ export class NotificationService {
       bodyKey: null,
       interpolationData: null,
       relatedOrderId: input.relatedOrderId ?? null,
-      deduplicationKey: input.deduplicationKey ?? null,
+      // Omit null deduplicationKey so Mongo sparse unique index ignores those rows.
+      ...(input.deduplicationKey
+        ? { deduplicationKey: input.deduplicationKey }
+        : {}),
       // Omit null eventId so Mongo partial unique index can ignore legacy/null rows.
       ...(eventId ? { eventId } : {}),
       sourceEntityType: input.relatedOrderId ? 'order' : null,
@@ -141,13 +150,14 @@ export class NotificationService {
   }
 
   /**
-   * Canonical Phase 27A creation entry — later business events call this.
+   * Canonical Phase 27A/27C creation entry.
    * Persists i18n keys (not translated text), idempotent by recipient + eventId.
    * Publishes realtime only; does not automatically request OS push.
+   * `created` is false when an existing (recipient, eventId) row is returned.
    */
   async createTypedNotification(
     input: CreateTypedNotificationInput,
-  ): Promise<Notification> {
+  ): Promise<CreateTypedNotificationResult> {
     if (!isPhase27ANotificationType(input.type)) {
       throw new Error(
         `createTypedNotification requires a Phase 27A type, got ${input.type}`,
@@ -168,7 +178,7 @@ export class NotificationService {
     )
 
     if (existing) {
-      return existing
+      return { notification: existing, created: false }
     }
 
     const taxonomy = getNotificationTaxonomy(input.type)!
@@ -193,7 +203,7 @@ export class NotificationService {
         ? this.toInterpolationFields(interpolationData)
         : null,
       relatedOrderId: null,
-      deduplicationKey: null,
+      // Omit null deduplicationKey so Mongo sparse unique index ignores typed rows.
       eventId,
       sourceEntityType: input.sourceEntityType ?? null,
       sourceEntityId: input.sourceEntityId ?? null,
@@ -211,7 +221,7 @@ export class NotificationService {
     const saved = await this.notificationRepository.save(notification)
     await this.notificationEventsService.publishNotificationReceived(saved)
 
-    return saved
+    return { notification: saved, created: true }
   }
 
   private toInterpolationFields(data: NotificationInterpolationData) {
@@ -224,6 +234,7 @@ export class NotificationService {
         data.orderReference != null ? String(data.orderReference) : null,
       orderCount:
         data.orderCount != null ? Number(data.orderCount) : null,
+      stopCount: data.stopCount != null ? Number(data.stopCount) : null,
     }
   }
 

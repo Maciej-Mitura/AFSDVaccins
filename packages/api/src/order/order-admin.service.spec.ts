@@ -4,6 +4,7 @@ import { ObjectId } from 'mongodb'
 import { MongoRepository } from 'typeorm'
 
 import { OrderNotificationService } from '../notifications/order-notification.service'
+import { BusinessNotificationProducerService } from '../notifications/business-notification-producer.service'
 import { StockService } from '../stock/stock.service'
 import { SettingsService } from '../settings/settings.service'
 import { User } from '../user/user.entity'
@@ -129,6 +130,10 @@ describe('OrderService admin lifecycle', () => {
         { provide: SettingsService, useValue: {} },
         { provide: OrderEventsService, useValue: orderEventsService },
         { provide: OrderNotificationService, useValue: orderNotificationService },
+        {
+          provide: BusinessNotificationProducerService,
+          useValue: { notifyAdminsNewOrder: jest.fn() },
+        },
         { provide: OrderNormalizationService, useValue: normalizationService },
         { provide: StockService, useValue: stockService },
         {

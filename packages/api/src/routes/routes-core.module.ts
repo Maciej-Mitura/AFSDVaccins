@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common'
 import { TypeOrmModule } from '@nestjs/typeorm'
 
 import { PubSubModule } from '../common/pubsub/pubsub.module'
+import { BusinessNotificationModule } from '../notifications/business-notification.module'
 import { OrderCoreModule } from '../order/order-core.module'
 import { ProfileCoreModule } from '../profile/profile-core.module'
 import { RouteTemplatesCoreModule } from '../route-templates/route-templates-core.module'
@@ -42,6 +43,7 @@ const persistenceImports = isSchemaGeneration
     RouteTemplatesCoreModule,
     SettingsCoreModule,
     DeliveryQrModule,
+    BusinessNotificationModule,
     ...persistenceImports,
   ],
   providers: [routeGenerationServiceProvider, DeliveryRouteEventsService],

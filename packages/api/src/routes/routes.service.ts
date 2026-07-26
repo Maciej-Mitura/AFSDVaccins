@@ -2,6 +2,7 @@ import { Inject, Injectable } from '@nestjs/common'
 import { InjectRepository } from '@nestjs/typeorm'
 import { MongoRepository } from 'typeorm'
 
+import { BusinessNotificationProducerService } from '../notifications/business-notification-producer.service'
 import { GraphqlRequestContext } from '../authentication/firebase.types'
 import { getApplicationUser } from '../authentication/graphql-auth.context'
 import { tryParseGraphqlObjectId } from '../common/mongodb/graphql-object-id.util'
@@ -43,6 +44,7 @@ export class RoutesService {
     private readonly routeGenerationService: RouteGenerationService,
     private readonly routePreviewService: RoutePreviewService,
     private readonly deliveryRouteEventsService: DeliveryRouteEventsService,
+    private readonly businessNotificationProducer: BusinessNotificationProducerService,
     private readonly bezorgerProfileService: BezorgerProfileService,
     private readonly settingsService: SettingsService,
     @Inject(CLOCK) private readonly clock: Clock,
@@ -202,6 +204,13 @@ export class RoutesService {
 
     const saved = await this.findDeliveryRouteById(id)
     await this.deliveryRouteEventsService.publishBezorgerRouteUpdated(saved)
+
+    if (
+      previousStatus === RouteStatus.ASSIGNED &&
+      targetStatus === RouteStatus.IN_PROGRESS
+    ) {
+      await this.businessNotificationProducer.notifyPharmacyRouteStarted(saved)
+    }
 
     return saved
   }
