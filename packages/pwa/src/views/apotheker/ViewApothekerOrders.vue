@@ -8,6 +8,7 @@ import CommonEmptyState from '@/components/common/CommonEmptyState.vue'
 import CommonErrorState from '@/components/common/CommonErrorState.vue'
 import CommonLoadingSkeleton from '@/components/common/CommonLoadingSkeleton.vue'
 import CommonRealtimeStatus from '@/components/common/CommonRealtimeStatus.vue'
+import FeatureApothekerPlannedDeliveries from '@/components/feature/apotheker/FeatureApothekerPlannedDeliveries.vue'
 import { registerReconnectHandler } from '@/composables/useGraphQL'
 import { useNotifications } from '@/composables/useNotifications'
 import { useOrders } from '@/composables/useOrders'
@@ -80,6 +81,8 @@ async function onCancel(id: string) {
 <template>
   <div class="space-y-6">
     <CommonRealtimeStatus />
+
+    <FeatureApothekerPlannedDeliveries />
 
     <UCard>
       <template #header>

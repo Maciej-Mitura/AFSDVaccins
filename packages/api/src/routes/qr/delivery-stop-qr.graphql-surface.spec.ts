@@ -5,6 +5,11 @@ import { DeliveryStop } from '../delivery-stop.embed'
 import { RouteTemplateStop } from '../../route-templates/route-template-stop.embed'
 import { DeliveryStopQrFieldsResolver } from './delivery-stop-qr-fields.resolver'
 import { DeliveryStopQr } from './delivery-stop-qr.type'
+import {
+  MyPlannedDelivery,
+  MyPlannedDeliveryOrder,
+  MyPlannedDeliveryOrderLine,
+} from './my-planned-delivery.type'
 import '../order-line-snapshot.embed'
 import '../../profile/address.type'
 
@@ -12,6 +17,7 @@ describe('DeliveryStop QR GraphQL surface', () => {
   let stopFieldNames: Set<string>
   let templateStopFieldNames: Set<string>
   let stopQrFieldNames: Set<string>
+  let plannedDeliveryFieldNames: Set<string>
 
   beforeAll(() => {
     LazyMetadataStorage.load()
@@ -19,6 +25,9 @@ describe('DeliveryStop QR GraphQL surface', () => {
       DeliveryStop,
       RouteTemplateStop,
       DeliveryStopQr,
+      MyPlannedDelivery,
+      MyPlannedDeliveryOrder,
+      MyPlannedDeliveryOrderLine,
     ])
 
     stopFieldNames = new Set(
@@ -38,6 +47,13 @@ describe('DeliveryStop QR GraphQL surface', () => {
     stopQrFieldNames = new Set(
       (
         TypeMetadataStorage.getObjectTypeMetadataByTarget(DeliveryStopQr)
+          ?.properties ?? []
+      ).map(property => property.name),
+    )
+
+    plannedDeliveryFieldNames = new Set(
+      (
+        TypeMetadataStorage.getObjectTypeMetadataByTarget(MyPlannedDelivery)
           ?.properties ?? []
       ).map(property => property.name),
     )
@@ -118,6 +134,40 @@ describe('DeliveryStop QR GraphQL surface', () => {
       'consumedByUserId',
     ]) {
       expect(stopQrFieldNames.has(name)).toBe(false)
+    }
+  })
+
+  it('exposes only safe MyPlannedDelivery fields', () => {
+    for (const name of [
+      'routeId',
+      'stopId',
+      'routeDate',
+      'routeStatus',
+      'stopSequence',
+      'pharmacyName',
+      'address',
+      'orderCount',
+      'orderIds',
+      'orders',
+      'totalLineCount',
+      'totalQuantity',
+      'qrAvailable',
+      'qrConsumed',
+      'deliveredAt',
+      'qrImagePath',
+    ]) {
+      expect(plannedDeliveryFieldNames.has(name)).toBe(true)
+    }
+
+    for (const name of [
+      'encodedToken',
+      'nonceHash',
+      'nonce',
+      'qrConfirmation',
+      'tokenVersion',
+      'consumedByUserId',
+    ]) {
+      expect(plannedDeliveryFieldNames.has(name)).toBe(false)
     }
   })
 })

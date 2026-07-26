@@ -15,6 +15,7 @@ import { DeliveryStopQrFieldsResolver } from './qr/delivery-stop-qr-fields.resol
 import { DeliveryStopQrImageService } from './qr/delivery-stop-qr-image.service'
 import { DeliveryStopQrResolver } from './qr/delivery-stop-qr.resolver'
 import { DeliveryStopQrRetrievalService } from './qr/delivery-stop-qr-retrieval.service'
+import { MyPlannedDeliveriesService } from './qr/my-planned-deliveries.service'
 import { RoutePreviewService } from './route-preview.service'
 import { RoutesCoreModule } from './routes-core.module'
 import { RoutesResolver } from './routes.resolver'
@@ -71,6 +72,15 @@ const deliveryStopQrRetrievalServiceProvider = isSchemaGeneration
     }
   : DeliveryStopQrRetrievalService
 
+const myPlannedDeliveriesServiceProvider = isSchemaGeneration
+  ? {
+      provide: MyPlannedDeliveriesService,
+      useValue: {
+        listForApotheker: () => Promise.resolve([]),
+      },
+    }
+  : MyPlannedDeliveriesService
+
 const deliveryQrPreviewServiceProvider = isSchemaGeneration
   ? {
       provide: DeliveryQrPreviewService,
@@ -121,6 +131,7 @@ const confirmAuditPersistence = isSchemaGeneration
     routePreviewServiceProvider,
     routesServiceProvider,
     deliveryStopQrRetrievalServiceProvider,
+    myPlannedDeliveriesServiceProvider,
     deliveryQrPreviewServiceProvider,
     deliveryQrConfirmServiceProvider,
     deliveryQrConfirmAuditServiceProvider,

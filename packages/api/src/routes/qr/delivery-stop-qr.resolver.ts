@@ -11,11 +11,14 @@ import { User } from '../../user/user.entity'
 import { UserRole } from '../../user/user-role.enum'
 import { DeliveryStopQrRetrievalService } from './delivery-stop-qr-retrieval.service'
 import { DeliveryStopQr } from './delivery-stop-qr.type'
+import { MyPlannedDeliveriesService } from './my-planned-deliveries.service'
+import { MyPlannedDelivery } from './my-planned-delivery.type'
 
 @Resolver(() => DeliveryStopQr)
 export class DeliveryStopQrResolver {
   constructor(
     private readonly retrievalService: DeliveryStopQrRetrievalService,
+    private readonly plannedDeliveriesService: MyPlannedDeliveriesService,
   ) {}
 
   @Query(() => DeliveryStopQr, {
@@ -31,5 +34,18 @@ export class DeliveryStopQrResolver {
     @Args('stopId', { type: () => ID }) stopId: string,
   ): Promise<DeliveryStopQr> {
     return this.retrievalService.getSafeStopQrMetadata(user, routeId, stopId)
+  }
+
+  @Query(() => [MyPlannedDelivery], {
+    description:
+      'Stop-grouped planned deliveries for the authenticated pharmacist (no bearer token).',
+  })
+  @UseGuards(AuthorizationGuard, RolesGuard, StrictIdentityThrottlerGuard)
+  @StrictThrottle()
+  @Roles(UserRole.APOTHEKER)
+  myPlannedDeliveries(
+    @CurrentUser() user: User,
+  ): Promise<MyPlannedDelivery[]> {
+    return this.plannedDeliveriesService.listForApotheker(user)
   }
 }

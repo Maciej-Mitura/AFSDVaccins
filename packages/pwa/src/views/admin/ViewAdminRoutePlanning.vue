@@ -5,12 +5,15 @@ import { useI18n } from 'vue-i18n'
 import CommonEmptyState from '@/components/common/CommonEmptyState.vue'
 import CommonErrorState from '@/components/common/CommonErrorState.vue'
 import CommonLoadingSkeleton from '@/components/common/CommonLoadingSkeleton.vue'
+import FeatureDeliveryStopQrModal from '@/components/feature/delivery-qr/FeatureDeliveryStopQrModal.vue'
 import {
   RouteStatus,
   useDeliveryRoutes,
   type DeliveryRouteItem,
+  type DeliveryStopItem,
   type RouteStatusValue,
 } from '@/composables/useDeliveryRoutes'
+import { useDeliveryStopQrDisplay } from '@/composables/useDeliveryStopQrDisplay'
 import { useOnlineStatus } from '@/composables/useOnlineStatus'
 import { useRouteTemplates } from '@/composables/useRouteTemplates'
 import { formatDateTime, routeStatusLabel, translatePlural } from '@/i18n'
@@ -47,6 +50,88 @@ const {
 
 const { isOnline } = useOnlineStatus()
 const { loadProfileOptions, findBezorgerProfile } = useRouteTemplates()
+
+const authoritativeStops = computed(() =>
+  deliveryRoutes.value.flatMap(route =>
+    route.stops.map(stop => ({
+      routeId: route.id,
+      stopId: stop.stopId,
+      qrAvailable: stop.qrAvailable,
+      qrConsumed: stop.qrConsumed,
+    })),
+  ),
+)
+
+const {
+  open: qrModalOpen,
+  context: qrContext,
+  objectUrl: qrObjectUrl,
+  loading: qrLoading,
+  errorMessage: qrError,
+  inactiveMessage: qrInactive,
+  canDownload: qrCanDownload,
+  downloadFilename: qrDownloadFilename,
+  openDeliveryStopQr,
+  closeModal: closeQrModal,
+  retry: retryQr,
+  downloadQr,
+} = useDeliveryStopQrDisplay({ authoritativeStops })
+
+function stopQrStateLabel(stop: DeliveryStopItem): string {
+  if (stop.qrConsumed) {
+    return t('deliveryStopQr.state.confirmed')
+  }
+  if (stop.qrAvailable && stop.stopId) {
+    return t('deliveryStopQr.state.available')
+  }
+  return t('deliveryStopQr.state.unavailable')
+}
+
+function canViewStopQr(
+  route: DeliveryRouteItem,
+  stop: DeliveryStopItem,
+): boolean {
+  return Boolean(
+    stop.stopId &&
+      stop.qrAvailable &&
+      !stop.qrConsumed &&
+      (route.status === RouteStatus.Assigned ||
+        route.status === RouteStatus.InProgress),
+  )
+}
+
+async function onViewStopQr(
+  route: DeliveryRouteItem,
+  stop: DeliveryStopItem,
+  event: MouseEvent,
+): Promise<void> {
+  if (!stop.stopId) {
+    return
+  }
+
+  await openDeliveryStopQr(
+    {
+      routeId: route.id,
+      stopId: stop.stopId,
+      routeDate: route.deliveryDate,
+      routeStatus: route.status,
+      stopSequence: stop.sequence,
+      pharmacyName: stop.pharmacyName,
+      address: stop.address,
+      orderCount: stop.orderCount,
+      orders: stop.orderIds.map(orderId => ({
+        orderId,
+        status: 'PLANNED',
+        lines: [],
+      })),
+      totalLineCount: stop.lines.length,
+      totalQuantity: stop.totalQuantity,
+      qrAvailable: Boolean(stop.qrAvailable),
+      qrConsumed: Boolean(stop.qrConsumed),
+    },
+    event.currentTarget,
+  )
+}
 
 const deliveryDate = ref(todayLocalDate())
 const selectedTemplateId = ref<string | undefined>(undefined)
@@ -440,6 +525,7 @@ onMounted(() => {
               v-for="stop in route.stops"
               :key="`${route.id}-${stop.sequence}`"
               class="rounded-md bg-elevated/40 px-3 py-3"
+              data-testid="admin-route-stop"
             >
               <p class="font-medium">
                 {{ stop.sequence }}. {{ stop.pharmacyName }}
@@ -453,10 +539,51 @@ onMounted(() => {
                   {{ line.vaccineName }}: {{ line.quantity }}
                 </li>
               </ul>
+              <div class="mt-2 flex flex-wrap items-center gap-2">
+                <UBadge
+                  variant="subtle"
+                  data-testid="admin-stop-qr-state"
+                >
+                  {{ stopQrStateLabel(stop) }}
+                </UBadge>
+                <UButton
+                  v-if="canViewStopQr(route, stop)"
+                  size="sm"
+                  color="primary"
+                  variant="soft"
+                  :aria-label="t('deliveryStopQr.admin.viewQrAria')"
+                  data-testid="admin-view-delivery-qr"
+                  @click="onViewStopQr(route, stop, $event)"
+                >
+                  {{ t('deliveryStopQr.admin.viewQr') }}
+                </UButton>
+                <span
+                  v-else-if="stop.qrConsumed"
+                  class="text-sm text-muted"
+                  data-testid="admin-stop-qr-confirmed"
+                >
+                  {{ t('deliveryStopQr.state.confirmed') }}
+                </span>
+              </div>
             </li>
           </ul>
         </div>
       </div>
+
+      <FeatureDeliveryStopQrModal
+        :open="qrModalOpen"
+        :context="qrContext"
+        :object-url="qrObjectUrl"
+        :loading="qrLoading"
+        :error-message="qrError"
+        :inactive-message="qrInactive"
+        :can-download="qrCanDownload"
+        :download-filename="qrDownloadFilename"
+        @update:open="value => !value && closeQrModal()"
+        @close="closeQrModal"
+        @retry="retryQr"
+        @download="downloadQr"
+      />
 
       <CommonErrorState
         v-if="statusError"
