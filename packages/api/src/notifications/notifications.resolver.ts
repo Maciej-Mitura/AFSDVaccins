@@ -22,7 +22,10 @@ import { User } from '../user/user.entity'
 import { UserRole } from '../user/user-role.enum'
 import { Notification } from './notification.entity'
 import { filterNotificationReceivedEvent } from './notification-subscription.filter'
-import { NotificationService } from './notification.service'
+import {
+  MY_NOTIFICATIONS_DEFAULT_LIMIT,
+  NotificationService,
+} from './notification.service'
 
 @Resolver(() => Notification)
 export class NotificationsResolver {
@@ -33,33 +36,42 @@ export class NotificationsResolver {
 
   @Query(() => [Notification], {
     description:
-      'Returns notifications for the authenticated apotheker or admin user',
+      'Returns notifications for the authenticated user (newest first, bounded)',
   })
   @UseGuards(AuthorizationGuard, RolesGuard)
-  @Roles(UserRole.APOTHEKER, UserRole.ADMIN)
+  @Roles(UserRole.APOTHEKER, UserRole.ADMIN, UserRole.BEZORGER)
   myNotifications(
     @CurrentUser() user: User,
     @Args('unreadOnly', { type: () => Boolean, defaultValue: false })
     unreadOnly: boolean,
+    @Args('limit', {
+      type: () => Int,
+      nullable: true,
+      defaultValue: MY_NOTIFICATIONS_DEFAULT_LIMIT,
+    })
+    limit?: number,
   ): Promise<Notification[]> {
-    return this.notificationService.findMyNotifications(user, unreadOnly)
+    return this.notificationService.findMyNotifications(
+      user,
+      unreadOnly,
+      limit ?? MY_NOTIFICATIONS_DEFAULT_LIMIT,
+    )
   }
 
   @Query(() => Int, {
-    description:
-      'Returns unread notification count for the authenticated apotheker or admin user',
+    description: 'Returns unread notification count for the authenticated user',
   })
   @UseGuards(AuthorizationGuard, RolesGuard)
-  @Roles(UserRole.APOTHEKER, UserRole.ADMIN)
+  @Roles(UserRole.APOTHEKER, UserRole.ADMIN, UserRole.BEZORGER)
   myUnreadNotificationCount(@CurrentUser() user: User): Promise<number> {
     return this.notificationService.countUnread(user)
   }
 
   @Mutation(() => Notification, {
-    description: 'Marks one owned notification as read',
+    description: 'Marks one owned notification as read (idempotent)',
   })
   @UseGuards(AuthorizationGuard, RolesGuard)
-  @Roles(UserRole.APOTHEKER, UserRole.ADMIN)
+  @Roles(UserRole.APOTHEKER, UserRole.ADMIN, UserRole.BEZORGER)
   markNotificationRead(
     @CurrentUser() user: User,
     @Args('id', { type: () => ID }) id: string,
@@ -67,15 +79,25 @@ export class NotificationsResolver {
     return this.notificationService.markNotificationRead(user, id)
   }
 
+  @Mutation(() => Int, {
+    description:
+      'Marks all owned notifications as read (idempotent); returns updated count',
+  })
+  @UseGuards(AuthorizationGuard, RolesGuard)
+  @Roles(UserRole.APOTHEKER, UserRole.ADMIN, UserRole.BEZORGER)
+  markAllNotificationsRead(@CurrentUser() user: User): Promise<number> {
+    return this.notificationService.markAllNotificationsRead(user)
+  }
+
   @Subscription(() => Notification, {
     description:
-      'Live notification events for the authenticated apotheker or admin user',
+      'Live notification events for the authenticated recipient only (no cross-user leakage)',
     filter: filterNotificationReceivedEvent,
     resolve: (payload: { notificationReceived: Notification }) =>
       payload.notificationReceived,
   })
   @UseGuards(AuthorizationGuard, RolesGuard)
-  @Roles(UserRole.APOTHEKER, UserRole.ADMIN)
+  @Roles(UserRole.APOTHEKER, UserRole.ADMIN, UserRole.BEZORGER)
   notificationReceived() {
     return this.pubSub.asyncIterableIterator(NOTIFICATION_RECEIVED_EVENT)
   }

@@ -5,6 +5,7 @@ import { PubSubModule } from '../common/pubsub/pubsub.module'
 import { CLOCK, SystemClock } from '../order/clock.provider'
 import { NotificationEventsService } from './notification-events.service'
 import { Notification } from './notification.entity'
+import { NotificationPersistenceService } from './notification-persistence.service'
 import { NotificationService } from './notification.service'
 import { OrderNotificationService } from './order-notification.service'
 
@@ -17,9 +18,13 @@ const notificationServiceProvider = isSchemaGeneration
       provide: NotificationService,
       useValue: {
         createNotification: () => Promise.resolve(null),
+        createTypedNotification: () => Promise.resolve(null),
         findMyNotifications: () => Promise.resolve([]),
         countUnread: () => Promise.resolve(0),
         markNotificationRead: () => Promise.resolve(null),
+        markAllNotificationsRead: () => Promise.resolve(0),
+        recordPushRequested: () => Promise.resolve(),
+        recordPushOutcome: () => Promise.resolve(),
       },
     }
   : NotificationService
@@ -34,6 +39,16 @@ const orderNotificationServiceProvider = isSchemaGeneration
     }
   : OrderNotificationService
 
+const notificationPersistenceProvider = isSchemaGeneration
+  ? {
+      provide: NotificationPersistenceService,
+      useValue: {
+        initializeNotificationPersistence: () => Promise.resolve(),
+        onModuleInit: () => Promise.resolve(),
+      },
+    }
+  : NotificationPersistenceService
+
 const persistenceImports = isSchemaGeneration
   ? []
   : [TypeOrmModule.forFeature([Notification])]
@@ -43,6 +58,7 @@ const persistenceImports = isSchemaGeneration
   providers: [
     notificationServiceProvider,
     orderNotificationServiceProvider,
+    notificationPersistenceProvider,
     NotificationEventsService,
     {
       provide: CLOCK,
@@ -52,6 +68,8 @@ const persistenceImports = isSchemaGeneration
   exports: [
     NotificationService,
     OrderNotificationService,
+    NotificationEventsService,
+    NotificationPersistenceService,
     ...persistenceImports,
   ],
 })

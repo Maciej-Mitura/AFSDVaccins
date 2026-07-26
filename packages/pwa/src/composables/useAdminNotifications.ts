@@ -69,6 +69,9 @@ export function useAdminNotifications() {
       })
 
       notifications.value = result.data.myNotifications
+      const { markNotificationsSeenForToast } =
+        await import('@/composables/useNotificationToast')
+      markNotificationsSeenForToast(notifications.value)
     } catch (error: unknown) {
       errorMessage.value = mapGraphQLError(error)
       throw error
@@ -134,7 +137,17 @@ export function useAdminNotifications() {
           const notification = data?.notificationReceived
 
           if (notification) {
+            const existed = notifications.value.some(
+              item => item.id === notification.id,
+            )
             upsertNotification(notification)
+            if (!existed) {
+              void import('@/composables/useNotificationToast').then(
+                ({ showNotificationToastIfNew }) => {
+                  showNotificationToastIfNew(notification)
+                },
+              )
+            }
           }
         },
       })

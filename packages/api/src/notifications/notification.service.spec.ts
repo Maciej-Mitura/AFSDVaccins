@@ -40,6 +40,15 @@ describe('NotificationService', () => {
     email: 'b@example.com',
   }
 
+  const bezorger: User = {
+    ...apotheker,
+    _id: '507f1f77bcf86cd799439014',
+    id: '507f1f77bcf86cd799439014',
+    role: UserRole.BEZORGER,
+    email: 'c@example.com',
+    firebaseUid: 'firebase-c',
+  }
+
   const now = new Date('2026-07-14T12:00:00.000Z')
 
   const notification: Notification = {
@@ -51,6 +60,7 @@ describe('NotificationService', () => {
     body: 'Bestelling order-a met 10 dosissen wordt geleverd op 14/07/2026.',
     relatedOrderId: 'order-a',
     deduplicationKey: 'order-confirmation:order-a',
+    eventId: 'order-confirmation:order-a',
     readAt: null,
     createdAt: now,
     read: false,
@@ -97,7 +107,9 @@ describe('NotificationService', () => {
 
     expect(result.body).toContain('14/07/2026')
     expect(repository.save).toHaveBeenCalledTimes(1)
-    expect(notificationEventsService.publishNotificationReceived).toHaveBeenCalledTimes(1)
+    expect(
+      notificationEventsService.publishNotificationReceived,
+    ).toHaveBeenCalledTimes(1)
   })
 
   it('does not duplicate weekly warning notifications in the same ISO week', async () => {
@@ -105,6 +117,7 @@ describe('NotificationService', () => {
       ...notification,
       type: NotificationType.WEEK_LIMIT_WARNING,
       deduplicationKey: 'weekly-warning:507f1f77bcf86cd799439011:2026:29:90',
+      eventId: 'weekly-warning:507f1f77bcf86cd799439011:2026:29:90',
     } as Notification)
 
     const result = await service.createNotification({
@@ -117,10 +130,121 @@ describe('NotificationService', () => {
 
     expect(result.type).toBe(NotificationType.WEEK_LIMIT_WARNING)
     expect(repository.save).not.toHaveBeenCalled()
-    expect(notificationEventsService.publishNotificationReceived).not.toHaveBeenCalled()
+    expect(
+      notificationEventsService.publishNotificationReceived,
+    ).not.toHaveBeenCalled()
   })
 
-  it('lists only current user notifications and supports unread-only filtering', async () => {
+  it('createTypedNotification persists one record with i18n keys (not required Dutch copy)', async () => {
+    repository.findOne.mockResolvedValue(null)
+    repository.create.mockImplementation(value => value as Notification)
+    repository.save.mockImplementation(value =>
+      Promise.resolve({
+        ...value,
+        _id: '6a569d2cbb2590db980429ce',
+        id: '6a569d2cbb2590db980429ce',
+        createdAt: now,
+        read: false,
+      } as Notification),
+    )
+
+    const result = await service.createTypedNotification({
+      recipientUserId: bezorger._id,
+      recipientRole: UserRole.BEZORGER,
+      type: NotificationType.BEZORGER_ROUTE_ASSIGNED,
+      eventId: 'route-assigned:route-1:bezorger',
+      interpolationData: { routeDate: '2026-07-26', city: 'Gent' },
+    })
+
+    expect(result.titleKey).toBe('notifications.bezorger.routeAssigned.title')
+    expect(result.bodyKey).toBe('notifications.bezorger.routeAssigned.body')
+    expect(result.title).toBe(result.titleKey)
+    expect(result.eventId).toBe('route-assigned:route-1:bezorger')
+    expect(repository.save).toHaveBeenCalledTimes(1)
+    expect(
+      notificationEventsService.publishNotificationReceived,
+    ).toHaveBeenCalledTimes(1)
+  })
+
+  it('same recipient + eventId is idempotent for typed notifications', async () => {
+    const existing = {
+      ...notification,
+      type: NotificationType.BEZORGER_ROUTE_ASSIGNED,
+      eventId: 'route-assigned:route-1:bezorger',
+      recipientUserId: bezorger._id,
+      titleKey: 'notifications.bezorger.routeAssigned.title',
+    } as Notification
+    repository.findOne.mockResolvedValue(existing)
+
+    const result = await service.createTypedNotification({
+      recipientUserId: bezorger._id,
+      recipientRole: UserRole.BEZORGER,
+      type: NotificationType.BEZORGER_ROUTE_ASSIGNED,
+      eventId: 'route-assigned:route-1:bezorger',
+    })
+
+    expect(result).toBe(existing)
+    expect(repository.save).not.toHaveBeenCalled()
+  })
+
+  it('different recipients may share the same domain eventId', async () => {
+    repository.findOne.mockResolvedValue(null)
+    repository.create.mockImplementation(value => value as Notification)
+    repository.save.mockImplementation(value =>
+      Promise.resolve({
+        ...value,
+        _id: 'id-' + (value as Notification).recipientUserId,
+        id: 'id-' + (value as Notification).recipientUserId,
+        createdAt: now,
+        read: false,
+      } as Notification),
+    )
+
+    const eventId = 'admin-new-order:order-99'
+    const first = await service.createTypedNotification({
+      recipientUserId: '507f1f77bcf86cd799439013',
+      recipientRole: UserRole.ADMIN,
+      type: NotificationType.ADMIN_NEW_ORDER,
+      eventId,
+      interpolationData: { orderReference: 'order-99', orderCount: 1 },
+    })
+    const second = await service.createTypedNotification({
+      recipientUserId: '507f1f77bcf86cd799439015',
+      recipientRole: UserRole.ADMIN,
+      type: NotificationType.ADMIN_NEW_ORDER,
+      eventId,
+      interpolationData: { orderReference: 'order-99', orderCount: 1 },
+    })
+
+    expect(first.recipientUserId).not.toBe(second.recipientUserId)
+    expect(first.eventId).toBe(second.eventId)
+    expect(repository.save).toHaveBeenCalledTimes(2)
+  })
+
+  it('enforces recipient-role compatibility for typed types', async () => {
+    await expect(
+      service.createTypedNotification({
+        recipientUserId: apotheker._id,
+        recipientRole: UserRole.APOTHEKER,
+        type: NotificationType.BEZORGER_ROUTE_ASSIGNED,
+        eventId: 'bad-role',
+      }),
+    ).rejects.toThrow(/requires role BEZORGER/)
+  })
+
+  it('rejects oversized / unknown interpolation data', async () => {
+    await expect(
+      service.createTypedNotification({
+        recipientUserId: bezorger._id,
+        recipientRole: UserRole.BEZORGER,
+        type: NotificationType.BEZORGER_ROUTE_ASSIGNED,
+        eventId: 'interp-bad',
+        interpolationData: { secretToken: 'nope' },
+      }),
+    ).rejects.toThrow(/not allowed/)
+  })
+
+  it('lists only current user notifications newest first and supports unread-only', async () => {
     repository.find.mockResolvedValue([notification])
 
     await service.findMyNotifications(apotheker, true)
@@ -131,6 +255,7 @@ describe('NotificationService', () => {
         readAt: null,
       },
       order: { createdAt: 'DESC' },
+      take: 50,
     })
   })
 
@@ -140,8 +265,9 @@ describe('NotificationService', () => {
     await expect(service.countUnread(apotheker)).resolves.toBe(2)
   })
 
-  it('marks a notification read and sets readAt', async () => {
-    repository.findOne.mockResolvedValue({ ...notification } as Notification)
+  it('marks a notification read and sets readAt (idempotent on second call)', async () => {
+    const unread = { ...notification } as Notification
+    repository.findOne.mockResolvedValue(unread)
     repository.save.mockImplementation(value =>
       Promise.resolve(value as Notification),
     )
@@ -152,6 +278,14 @@ describe('NotificationService', () => {
     )
 
     expect(result.readAt).toEqual(now)
+
+    repository.findOne.mockResolvedValue(result)
+    const again = await service.markNotificationRead(
+      apotheker,
+      notification.id,
+    )
+    expect(again.readAt).toEqual(now)
+    expect(repository.save).toHaveBeenCalledTimes(1)
   })
 
   it('cannot mark another user notification', async () => {

@@ -31,6 +31,7 @@ import { HealthModule } from './health/health.module'
 import { NotificationsModule } from './notifications/notifications.module'
 import { OrderModule } from './order/order.module'
 import { ProfileModule } from './profile/profile.module'
+import { PushModule } from './push/push.module'
 import { RouteTemplatesModule } from './route-templates/route-templates.module'
 import { RoutesModule } from './routes/routes.module'
 import { SettingsModule } from './settings/settings.module'
@@ -158,6 +159,7 @@ const databaseImports = isSchemaGeneration
     VaccineModule,
     StockModule,
     NotificationsModule,
+    PushModule,
     OrderModule,
     RouteTemplatesModule,
     RoutesModule,

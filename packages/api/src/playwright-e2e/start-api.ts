@@ -41,6 +41,7 @@ function applyPlaywrightEnv(dbHost: string): void {
   process.env.DELIVERY_QR_SIGNING_SECRET =
     process.env.DELIVERY_QR_SIGNING_SECRET ??
     'test-only-delivery-qr-signing-secret-32b!'
+  process.env.PUSH_PROVIDER = process.env.PUSH_PROVIDER ?? 'fake'
   delete process.env.GOOGLE_APPLICATION_CREDENTIALS
   delete process.env.GENERATE_SCHEMA_ONLY
 }

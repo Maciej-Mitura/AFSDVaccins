@@ -7,10 +7,12 @@ const viteConfigPath = join(pwaRoot, 'vite.config.ts')
 const publicDir = join(pwaRoot, 'public')
 const offlineHtmlPath = join(publicDir, 'offline.html')
 const distDir = join(pwaRoot, 'dist')
+const swSourcePath = join(pwaRoot, 'src', 'sw.ts')
 
 describe('PWA safety and configuration', () => {
   const viteConfig = readFileSync(viteConfigPath, 'utf8')
   const offlineHtml = readFileSync(offlineHtmlPath, 'utf8')
+  const swSource = readFileSync(swSourcePath, 'utf8')
 
   it('manifest contains required fields', () => {
     expect(viteConfig).toContain("name: 'Vaccinatie-levering'")
@@ -47,24 +49,25 @@ describe('PWA safety and configuration', () => {
     )
   })
 
-  it('normal router navigation does not resolve to /offline.html while online', () => {
-    // Must not use offline.html as the Workbox NavigationRoute document.
+  it('uses injectManifest with custom SW for push + NetworkOnly navigations', () => {
+    expect(viteConfig).toContain("strategies: 'injectManifest'")
+    expect(viteConfig).toContain("filename: 'sw.ts'")
     expect(viteConfig).not.toMatch(
       /navigateFallback:\s*['"]\/offline\.html['"]/,
     )
-    expect(viteConfig).toMatch(/navigateFallback:\s*['"]\/index\.html['"]/)
-    expect(viteConfig).toContain("handler: 'NetworkOnly'")
-    expect(viteConfig).toContain("fallbackURL: '/offline.html'")
-    expect(viteConfig).toMatch(
-      /urlPattern:\s*\(\{\s*request\s*\}\)\s*=>\s*request\.mode\s*===\s*['"]navigate['"]/,
-    )
+    expect(swSource).toContain('NetworkOnly')
+    expect(swSource).toContain('/offline.html')
+    expect(swSource).toContain('/graphql')
+    expect(swSource).toContain('/api')
   })
 
   it('GraphQL endpoints are not runtime cached', () => {
     expect(viteConfig).not.toMatch(/urlPattern:.*graphql/i)
     expect(viteConfig).not.toMatch(/cacheName:\s*['"][^'"]*graphql[^'"]*['"]/i)
-    // Navigation NetworkOnly must not target GraphQL documents as a cache.
-    expect(viteConfig).toContain("handler: 'NetworkOnly'")
+    expect(swSource).toContain('NetworkOnly')
+    expect(swSource).not.toContain('NetworkFirst')
+    expect(swSource).not.toContain('CacheFirst')
+    expect(swSource).not.toContain('StaleWhileRevalidate')
     expect(viteConfig).not.toContain('NetworkFirst')
     expect(viteConfig).not.toContain('CacheFirst')
     expect(viteConfig).not.toContain('StaleWhileRevalidate')
@@ -74,12 +77,16 @@ describe('PWA safety and configuration', () => {
     expect(viteConfig).not.toMatch(
       /urlPattern:\s*.*(identitytoolkit|securetoken\.google|googleapis\.com\/identitytoolkit)/i,
     )
+    expect(swSource).not.toMatch(/identitytoolkit|securetoken\.google/i)
   })
 
   it('private API responses are not cached', () => {
     expect(viteConfig).not.toContain('CacheFirst')
     expect(viteConfig).not.toContain('StaleWhileRevalidate')
     expect(viteConfig).not.toContain('NetworkFirst')
+    expect(swSource).not.toContain('CacheFirst')
+    expect(swSource).not.toContain('StaleWhileRevalidate')
+    expect(swSource).not.toContain('NetworkFirst')
   })
 
   it('service worker precaches only safe static assets', () => {
@@ -87,7 +94,15 @@ describe('PWA safety and configuration', () => {
       "globPatterns: ['**/*.{js,css,html,ico,png,svg,woff2,webp}']",
     )
     expect(viteConfig).toContain("registerType: 'prompt'")
-    expect(viteConfig).toContain("fallbackURL: '/offline.html'")
+    expect(swSource).toContain('/offline.html')
+  })
+
+  it('custom SW handles push with visible-client suppression', () => {
+    expect(swSource).toContain("addEventListener('push'")
+    expect(swSource).toContain('shouldDisplayOsNotification')
+    expect(swSource).toContain('showNotification')
+    expect(swSource).toContain("addEventListener('notificationclick'")
+    expect(swSource).toContain('focusOrOpenActionPath')
   })
 
   it('no offline mutation queue exists', () => {
@@ -100,6 +115,7 @@ describe('PWA safety and configuration', () => {
 
     for (const mention of queueMentions) {
       expect(viteConfig).not.toContain(mention)
+      expect(swSource).not.toContain(mention)
     }
   })
 
@@ -107,6 +123,7 @@ describe('PWA safety and configuration', () => {
     expect(viteConfig).not.toMatch(/authorization|idToken|refreshToken|Bearer/i)
     expect(viteConfig).not.toContain('localStorage')
     expect(viteConfig).not.toContain('IndexedDB')
+    expect(swSource).not.toMatch(/authorization|idToken|refreshToken|Bearer/i)
   })
 
   it('Playwright E2E preview generates GraphQL types before vite build', () => {
@@ -114,12 +131,10 @@ describe('PWA safety and configuration', () => {
     expect(existsSync(previewScriptPath)).toBe(true)
     const script = readFileSync(previewScriptPath, 'utf8')
 
-    // Must invoke root generate:graphql from the monorepo root (not packages/pwa).
     expect(script).toContain("['run', 'generate:graphql']")
     expect(script).toContain('repoRoot')
     expect(script).toMatch(/join\(pwaRoot,\s*'\.\.',\s*'\.\.'\)/)
 
-    // Stage order: generate → build:e2e → preview:e2e
     const generateAt = script.indexOf("['run', 'generate:graphql']")
     const buildAt = script.indexOf("['run', 'build:e2e']")
     const previewAt = script.indexOf("['run', 'preview:e2e']")
@@ -131,13 +146,11 @@ describe('PWA safety and configuration', () => {
     expect(script).toContain('building PWA')
     expect(script).toContain('starting Vite preview')
 
-    // Must not assume a pre-existing packages/types/dist artifact.
     expect(script).not.toMatch(/existsSync\([^)]*types[/\\]dist/)
     expect(script).not.toMatch(/types\/dist\/graphql/)
   })
 
   it('production build emits index.html, offline.html, manifest and sw.js', () => {
-    // Meaningful after `npm run build:pwa`. Skip assertions when dist is absent.
     if (!existsSync(distDir)) {
       return
     }
@@ -150,10 +163,17 @@ describe('PWA safety and configuration', () => {
     const sw = readFileSync(join(distDir, 'sw.js'), 'utf8')
     expect(sw).toContain('offline.html')
     expect(sw).toContain('index.html')
-    // Must not bind NavigationRoute exclusively to the offline document.
     expect(sw).not.toContain('createHandlerBoundToURL("/offline.html")')
     expect(sw).not.toContain("createHandlerBoundToURL('/offline.html')")
     expect(sw).not.toMatch(/identitytoolkit|securetoken\.google/i)
+    // After injectManifest rebuild, push handlers are present. Stale generateSW
+    // artefacts from before Phase 27A are ignored until the next production build.
+    if (
+      sw.includes('shouldDisplayOsNotification') ||
+      sw.includes('PUSH_SUPPRESSED')
+    ) {
+      expect(sw).toMatch(/showNotification|notificationclick/)
+    }
   })
 
   it('Firebase Hosting config mirrors nginx cache and SPA rules', () => {

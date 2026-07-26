@@ -115,6 +115,29 @@ describe('notification-subscription.filter', () => {
     expect(canReceiveNotification(apothekerA, lowStockNotification)).toBe(false)
   })
 
+  it('allows BEZORGER to receive own Phase 27A route notifications', () => {
+    const bezorger: User = {
+      ...apothekerA,
+      _id: '507f1f77bcf86cd799439014',
+      id: '507f1f77bcf86cd799439014',
+      role: UserRole.BEZORGER,
+      email: 'c@example.com',
+    }
+    const routeNotification = {
+      ...orderNotification,
+      recipientUserId: bezorger._id,
+      type: NotificationType.BEZORGER_ROUTE_ASSIGNED,
+      recipientRole: UserRole.BEZORGER,
+      titleKey: 'notifications.bezorger.routeAssigned.title',
+      bodyKey: 'notifications.bezorger.routeAssigned.body',
+      title: 'notifications.bezorger.routeAssigned.title',
+      body: 'notifications.bezorger.routeAssigned.body',
+    } as Notification
+
+    expect(canReceiveNotification(bezorger, routeNotification)).toBe(true)
+    expect(canReceiveNotification(apothekerA, routeNotification)).toBe(false)
+  })
+
   it('filters notificationReceived for recipient ownership', () => {
     expect(
       filterNotificationReceivedEvent(

@@ -27,6 +27,15 @@ const DELIVERY_QR_SIGNING = {
   DELIVERY_QR_SIGNING_SECRET: 'test-fixture-delivery-qr-signing-secret-32b!',
 } as const
 
+/** Phase 27A placeholder VAPID keys (not real secrets). */
+const WEB_PUSH_VAPID = {
+  PUSH_PROVIDER: 'webpush' as const,
+  WEB_PUSH_VAPID_PUBLIC_KEY:
+    'BNcRdtreKN2ymJxwWZiOrQbKYi-U1WUPVP_vJKdF8n0abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOP',
+  WEB_PUSH_VAPID_PRIVATE_KEY: 'ci-placeholder-vapid-private-key-min-40-chars!!',
+  WEB_PUSH_SUBJECT: 'mailto:ops@example.com',
+} as const
+
 const BASE_DEV = {
   NODE_ENV: 'development' as const,
   PORT: 3000,
@@ -45,6 +54,7 @@ const BASE_PRODUCTION = {
   TRUST_PROXY: '1',
   ...PRODUCTION_AZURE,
   ...DELIVERY_QR_SIGNING,
+  ...WEB_PUSH_VAPID,
 }
 
 describe('envValidationSchema', () => {
@@ -383,6 +393,52 @@ describe('envValidationSchema', () => {
       DB_NAME: 'vaccin-delivery',
     })
     expect(result.error).toBeUndefined()
+  })
+
+  it('rejects fake push provider in production', () => {
+    const result = envValidationSchema.validate({
+      ...BASE_PRODUCTION,
+      PUSH_PROVIDER: 'fake',
+    })
+    expect(result.error).toBeDefined()
+    expect(result.error?.message).toMatch(/PUSH_PROVIDER/)
+  })
+
+  it('requires VAPID secrets when PUSH_PROVIDER=webpush', () => {
+    const result = envValidationSchema.validate({
+      ...BASE_DEV,
+      PUSH_PROVIDER: 'webpush',
+    })
+    expect(result.error).toBeDefined()
+    expect(result.error?.message).toMatch(/WEB_PUSH_VAPID/)
+  })
+
+  it('rejects weak VAPID public key when webpush selected', () => {
+    const result = envValidationSchema.validate({
+      ...BASE_DEV,
+      PUSH_PROVIDER: 'webpush',
+      WEB_PUSH_VAPID_PUBLIC_KEY: 'too-short',
+      WEB_PUSH_VAPID_PRIVATE_KEY: 'y'.repeat(40),
+      WEB_PUSH_SUBJECT: 'mailto:ops@example.com',
+    })
+    expect(result.error).toBeDefined()
+    expect(result.error?.message).toMatch(/WEB_PUSH_VAPID_PUBLIC_KEY/)
+  })
+
+  it('defaults push provider to fake outside production', () => {
+    const result = envValidationSchema.validate({ ...BASE_DEV })
+    expect(result.error).toBeUndefined()
+    expect((result.value as { PUSH_PROVIDER: string }).PUSH_PROVIDER).toBe(
+      'fake',
+    )
+  })
+
+  it('accepts production with webpush VAPID placeholders', () => {
+    const result = envValidationSchema.validate({ ...BASE_PRODUCTION })
+    expect(result.error).toBeUndefined()
+    expect((result.value as { PUSH_PROVIDER: string }).PUSH_PROVIDER).toBe(
+      'webpush',
+    )
   })
 })
 

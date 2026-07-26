@@ -7,6 +7,9 @@ import {
   ObjectIdColumn,
 } from 'typeorm'
 
+import { UserRole } from '../user/user-role.enum'
+import { NotificationDeliveryState } from './notification-delivery-state'
+import { NotificationInterpolationDataFields } from './notification-interpolation-data.fields'
 import { NotificationType } from './notification-type.enum'
 
 @Entity('notifications')
@@ -25,11 +28,19 @@ export class Notification {
   @Field(() => ID)
   recipientUserId!: string
 
+  @Column({ nullable: true })
+  @Field(() => UserRole, { nullable: true })
+  recipientRole?: UserRole | null
+
   @Index()
   @Column()
   @Field(() => NotificationType)
   type!: NotificationType
 
+  /**
+   * Legacy persisted Dutch copy for pre–Phase 27A notifications.
+   * Phase 27A types prefer titleKey + client i18n; title may mirror the key.
+   */
   @Column()
   @Field()
   title!: string
@@ -39,12 +50,56 @@ export class Notification {
   body!: string
 
   @Column({ nullable: true })
+  @Field(() => String, { nullable: true })
+  titleKey?: string | null
+
+  @Column({ nullable: true })
+  @Field(() => String, { nullable: true })
+  bodyKey?: string | null
+
+  @Column(() => NotificationInterpolationDataFields)
+  @Field(() => NotificationInterpolationDataFields, { nullable: true })
+  interpolationData?: NotificationInterpolationDataFields | null
+
+  @Column({ nullable: true })
   @Field(() => ID, { nullable: true })
   relatedOrderId?: string | null
 
+  /**
+   * @deprecated Prefer eventId. Kept for legacy rows and dual-write during transition.
+   */
   @Index({ unique: true, sparse: true })
   @Column({ nullable: true })
   deduplicationKey?: string | null
+
+  /**
+   * Idempotency key unique per recipient when present (string).
+   * Partial unique index is ensured by NotificationPersistenceService —
+   * do not add a TypeORM unique compound index (null eventId collides).
+   */
+  @Column({ nullable: true })
+  @Field(() => String, { nullable: true })
+  eventId?: string | null
+
+  @Column({ nullable: true })
+  @Field(() => String, { nullable: true })
+  sourceEntityType?: string | null
+
+  @Column({ nullable: true })
+  @Field(() => String, { nullable: true })
+  sourceEntityId?: string | null
+
+  @Column({ nullable: true })
+  @Field(() => String, { nullable: true })
+  actionPath?: string | null
+
+  @Column(() => NotificationDeliveryState)
+  @Field(() => NotificationDeliveryState, { nullable: true })
+  deliveryState?: NotificationDeliveryState | null
+
+  @Column({ nullable: true })
+  @Field(() => Date, { nullable: true })
+  expiresAt?: Date | null
 
   @Column({ nullable: true })
   @Field(() => Date, { nullable: true })

@@ -235,6 +235,61 @@ export const envValidationSchema = Joi.object({
     then: Joi.string().min(32).allow('').optional(),
     otherwise: Joi.string().min(32).required(),
   }),
+
+  // ---- Phase 27A Web Push (backend-only secrets; public key may be exposed to PWA) ----
+  /**
+   * Push provider: `fake` (local/tests) or `webpush` (VAPID).
+   * Fake is rejected when NODE_ENV=production.
+   * No external push calls occur at module construction / startup.
+   */
+  PUSH_PROVIDER: Joi.when('NODE_ENV', {
+    is: 'production',
+    then: Joi.string().valid('webpush').default('webpush'),
+    otherwise: Joi.string().valid('fake', 'webpush').default('fake'),
+  }),
+  /**
+   * VAPID public key (safe to expose to the PWA for PushManager.subscribe).
+   * Required when PUSH_PROVIDER=webpush.
+   */
+  WEB_PUSH_VAPID_PUBLIC_KEY: Joi.when('PUSH_PROVIDER', {
+    is: 'webpush',
+    then: Joi.string().min(80).required(),
+    otherwise: Joi.when('NODE_ENV', {
+      is: 'production',
+      then: Joi.string().min(80).required(),
+      otherwise: Joi.string().allow('').optional(),
+    }),
+  }),
+  /**
+   * VAPID private key (backend-only). Never log. Never expose to GraphQL/PWA.
+   * Required when PUSH_PROVIDER=webpush. Never reuse Firebase/Azure/QR secrets.
+   */
+  WEB_PUSH_VAPID_PRIVATE_KEY: Joi.when('PUSH_PROVIDER', {
+    is: 'webpush',
+    then: Joi.string().min(40).required(),
+    otherwise: Joi.when('NODE_ENV', {
+      is: 'production',
+      then: Joi.string().min(40).required(),
+      otherwise: Joi.string().allow('').optional(),
+    }),
+  }),
+  /**
+   * VAPID subject (mailto: or https:// contact URI).
+   * Required when PUSH_PROVIDER=webpush.
+   */
+  WEB_PUSH_SUBJECT: Joi.when('PUSH_PROVIDER', {
+    is: 'webpush',
+    then: Joi.string()
+      .pattern(/^(mailto:|https:\/\/)/i)
+      .required(),
+    otherwise: Joi.when('NODE_ENV', {
+      is: 'production',
+      then: Joi.string()
+        .pattern(/^(mailto:|https:\/\/)/i)
+        .required(),
+      otherwise: Joi.string().allow('').optional(),
+    }),
+  }),
 })
 
 export type EnvConfig = {
@@ -278,6 +333,10 @@ export type EnvConfig = {
   AZURE_VISION_KEY?: string
   AZURE_VISION_TIMEOUT_MS: number
   DELIVERY_QR_SIGNING_SECRET?: string
+  PUSH_PROVIDER: 'fake' | 'webpush'
+  WEB_PUSH_VAPID_PUBLIC_KEY?: string
+  WEB_PUSH_VAPID_PRIVATE_KEY?: string
+  WEB_PUSH_SUBJECT?: string
 }
 
 /**

@@ -9,7 +9,7 @@
     "start:dev": "nest start --watch",
     "start:prod": "node dist/main.js",
     "build": "nest build",
-    "generate:schema": "nest build && cross-env GENERATE_SCHEMA_ONLY=true NODE_ENV=test PORT=3000 URL_FRONTEND=http://localhost:5173 DB_HOST=mongodb://localhost:27017 DB_NAME=vaccin-delivery DELIVERY_QR_SIGNING_SECRET=test-only-delivery-qr-signing-secret-32b! node dist/main.js --generate-schema-only",
+    "generate:schema": "nest build && cross-env GENERATE_SCHEMA_ONLY=true NODE_ENV=test PORT=3000 URL_FRONTEND=http://localhost:5173 DB_HOST=mongodb://localhost:27017 DB_NAME=vaccin-delivery DELIVERY_QR_SIGNING_SECRET=test-only-delivery-qr-signing-secret-32b! PUSH_PROVIDER=fake node dist/main.js --generate-schema-only",
     "lint": "eslint \"{src,test}/**/*.ts\"",
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "test": "jest",
@@ -37,6 +37,7 @@
     "@nestjs/graphql": "13.1.0",
     "@nestjs/passport": "^11.0.5",
     "@nestjs/platform-express": "^11.0.1",
+    "@nestjs/schedule": "^6.1.3",
     "@nestjs/throttler": "^6.5.0",
     "@nestjs/typeorm": "^11.0.0",
     "cache-manager": "^7.2.9",
@@ -58,7 +59,8 @@
     "qrcode": "^1.5.4",
     "reflect-metadata": "^0.2.2",
     "rxjs": "^7.8.1",
-    "typeorm": "^0.3.27"
+    "typeorm": "^0.3.27",
+    "web-push": "^3.6.7"
   },
   "devDependencies": {
     "@eslint/js": "^9.18.0",
@@ -74,6 +76,7 @@
     "@types/pngjs": "^6.0.5",
     "@types/qrcode": "^1.5.6",
     "@types/supertest": "^6.0.2",
+    "@types/web-push": "^3.6.4",
     "cross-env": "^7.0.3",
     "eslint": "^9.18.0",
     "eslint-config-prettier": "^10.0.1",

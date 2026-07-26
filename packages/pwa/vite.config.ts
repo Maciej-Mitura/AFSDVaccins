@@ -11,6 +11,13 @@ export default defineConfig({
     VitePWA({
       // Prompt the user before activating a waiting service worker.
       registerType: 'prompt',
+      // Custom SW for Web Push + Workbox precache (Phase 27A).
+      strategies: 'injectManifest',
+      srcDir: 'src',
+      filename: 'sw.ts',
+      injectManifest: {
+        globPatterns: ['**/*.{js,css,html,ico,png,svg,woff2,webp}'],
+      },
       // Keep the Vite dev server free of stale service workers by default.
       // Enable with `VITE_PWA_DEV=true` only when intentionally testing SW locally.
       devOptions: {
@@ -57,27 +64,6 @@ export default defineConfig({
             purpose: 'maskable',
           },
         ],
-      },
-      workbox: {
-        // SPA shell for history API routes (overrides any accidental offline binding).
-        // Runtime NetworkOnly below is registered first and handles navigations:
-        // online → network (preview/nginx → index.html); offline → /offline.html.
-        navigateFallback: '/index.html',
-        navigateFallbackDenylist: [/^\/api/, /\/graphql/],
-        globPatterns: ['**/*.{js,css,html,ico,png,svg,woff2,webp}'],
-        runtimeCaching: [
-          {
-            urlPattern: ({ request }) => request.mode === 'navigate',
-            handler: 'NetworkOnly',
-            options: {
-              precacheFallback: {
-                fallbackURL: '/offline.html',
-              },
-            },
-          },
-        ],
-        cleanupOutdatedCaches: true,
-        clientsClaim: true,
       },
     }),
   ],

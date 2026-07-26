@@ -14,10 +14,16 @@
 </template>
 
 <script setup lang="ts">
-import { inject, type Ref } from 'vue'
+import { inject, onMounted, type Ref } from 'vue'
 
 import CommonLoadingSkeleton from '@/components/common/CommonLoadingSkeleton.vue'
 import CommonPwaStatus from '@/components/common/CommonPwaStatus.vue'
+import { setNotificationToastApi } from '@/composables/useNotificationToast'
 
 const authReady = inject<Ref<boolean>>('authReady')
+
+onMounted(() => {
+  // useToast is auto-imported by @nuxt/ui Vite plugin.
+  setNotificationToastApi(useToast())
+})
 </script>

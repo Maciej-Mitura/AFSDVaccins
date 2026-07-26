@@ -13,7 +13,8 @@ import {
 import { mapGraphQLError } from '@/composables/useCurrentUser'
 import useGraphQL, { registerReconnectHandler } from '@/composables/useGraphQL'
 
-export type NotificationListItem = MyNotificationsQuery['myNotifications'][number]
+export type NotificationListItem =
+  MyNotificationsQuery['myNotifications'][number]
 
 const notifications = ref<NotificationListItem[]>([])
 const unreadCount = ref(0)
@@ -68,6 +69,9 @@ export function useNotifications() {
       })
 
       notifications.value = result.data.myNotifications
+      const { markNotificationsSeenForToast } =
+        await import('@/composables/useNotificationToast')
+      markNotificationsSeenForToast(notifications.value)
     } catch (error: unknown) {
       errorMessage.value = mapGraphQLError(error)
       throw error
@@ -133,7 +137,18 @@ export function useNotifications() {
           const notification = data?.notificationReceived
 
           if (notification) {
+            const existed = notifications.value.some(
+              item => item.id === notification.id,
+            )
             upsertNotification(notification)
+            // Toast only for newly arrived unread events — not reconnect upserts of known ids.
+            if (!existed) {
+              void import('@/composables/useNotificationToast').then(
+                ({ showNotificationToastIfNew }) => {
+                  showNotificationToastIfNew(notification)
+                },
+              )
+            }
           }
         },
       })

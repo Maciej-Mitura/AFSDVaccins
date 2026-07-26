@@ -78,6 +78,10 @@ describe('production readiness (offline)', () => {
     assert.match(example, /BOOTSTRAP_PUBLIC_DEMO_DATABASE/)
     assert.match(example, /mongodb\+srv:\/\/<user>:<password>@<cluster-host>\//)
     assert.match(example, /DELIVERY_QR_SIGNING_SECRET=/)
+    assert.match(example, /PUSH_PROVIDER=/)
+    assert.match(example, /WEB_PUSH_VAPID_PUBLIC_KEY=/)
+    assert.match(example, /WEB_PUSH_VAPID_PRIVATE_KEY=/)
+    assert.match(example, /WEB_PUSH_SUBJECT=/)
     assertNoSecretPatterns(example, 'api .env.example')
   })
 
