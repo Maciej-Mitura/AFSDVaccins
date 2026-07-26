@@ -105,6 +105,7 @@ vi.mock('@/composables/useNotifications', () => ({
     subscribeToNotificationEvents: vi.fn(),
     stopNotificationSubscription: vi.fn(),
   }),
+  registerNotificationReceivedHandler: () => () => undefined,
 }))
 
 vi.mock('@/composables/useDeliveryRoutes', () => ({
@@ -179,6 +180,10 @@ function makeDelivery(overrides?: Partial<Record<string, unknown>>) {
     qrConsumed: false,
     deliveredAt: null,
     qrImagePath: '/delivery-routes/route-1/stops/stop-1/qr',
+    isNextStop: false,
+    lastKnownCourierCity: null,
+    lastKnownLocationRecordedAt: null,
+    courierLocationSource: null,
     ...overrides,
   }
 }
@@ -379,6 +384,86 @@ describe('FeatureApothekerPlannedDeliveries', () => {
     expect(arg.stopId).toBe('stop-1')
     expect(arg.pharmacyName).toBe('Apotheek Centrum')
     expect(arg.orders).toHaveLength(2)
+  })
+
+  it('shows next-delivery location block only for the next in-progress stop', async () => {
+    plannedDeliveries.value = [
+      makeDelivery({
+        routeStatus: RouteStatus.InProgress,
+        isNextStop: true,
+        lastKnownCourierCity: 'Kortrijk',
+        lastKnownLocationRecordedAt: '2026-07-27T12:32:00.000Z',
+        courierLocationSource: 'DELIVERY',
+      }),
+    ]
+
+    const wrapper = mount(FeatureApothekerPlannedDeliveries, {
+      global: { plugins: [createTestI18n('en')], stubs: uiStubs },
+    })
+    await flushPromises()
+
+    expect(
+      wrapper.find('[data-testid="route-location-status-card"]').exists(),
+    ).toBe(true)
+    expect(wrapper.find('[data-testid="route-location-heading"]').text()).toBe(
+      translate('routes.location.yourDeliveryIsNext'),
+    )
+    expect(
+      wrapper.find('[data-testid="route-location-pharmacist-city"]').text(),
+    ).toContain('Kortrijk')
+    expect(
+      wrapper.find('[data-testid="route-location-not-live-gps"]').exists(),
+    ).toBe(true)
+  })
+
+  it('hides location for earlier, later, unrelated, assigned, and delivered stops', async () => {
+    plannedDeliveries.value = [
+      makeDelivery({
+        stopId: 'earlier',
+        routeStatus: RouteStatus.InProgress,
+        isNextStop: false,
+        lastKnownCourierCity: null,
+      }),
+      makeDelivery({
+        stopId: 'later',
+        routeId: 'route-2',
+        routeStatus: RouteStatus.InProgress,
+        isNextStop: false,
+        lastKnownCourierCity: 'HiddenCity',
+      }),
+      makeDelivery({
+        stopId: 'assigned',
+        routeId: 'route-3',
+        routeStatus: RouteStatus.Assigned,
+        isNextStop: false,
+      }),
+      makeDelivery({
+        stopId: 'delivered',
+        routeId: 'route-4',
+        routeStatus: RouteStatus.InProgress,
+        isNextStop: false,
+        qrConsumed: true,
+        lastKnownCourierCity: 'Kortrijk',
+      }),
+      makeDelivery({
+        stopId: 'completed-route',
+        routeId: 'route-5',
+        routeStatus: RouteStatus.Completed,
+        isNextStop: false,
+        lastKnownCourierCity: 'Brugge',
+      }),
+    ]
+
+    const wrapper = mount(FeatureApothekerPlannedDeliveries, {
+      global: { plugins: [createTestI18n('en')], stubs: uiStubs },
+    })
+    await flushPromises()
+
+    expect(
+      wrapper.findAll('[data-testid="route-location-status-card"]'),
+    ).toHaveLength(0)
+    expect(wrapper.text()).not.toContain('HiddenCity')
+    expect(wrapper.text()).not.toContain('Brugge')
   })
 })
 

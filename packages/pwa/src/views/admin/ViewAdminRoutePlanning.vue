@@ -6,6 +6,8 @@ import CommonEmptyState from '@/components/common/CommonEmptyState.vue'
 import CommonErrorState from '@/components/common/CommonErrorState.vue'
 import CommonLoadingSkeleton from '@/components/common/CommonLoadingSkeleton.vue'
 import FeatureDeliveryStopQrModal from '@/components/feature/delivery-qr/FeatureDeliveryStopQrModal.vue'
+import FeatureRouteLocationStatusCard from '@/components/feature/routes/FeatureRouteLocationStatusCard.vue'
+import { toRouteLocationStatusCardProps } from '@/components/feature/routes/route-location-status'
 import {
   RouteStatus,
   useDeliveryRoutes,
@@ -88,7 +90,9 @@ const {
 const manifestActingRouteId = ref<string | null>(null)
 const manifestFeedbackRouteId = ref<string | null>(null)
 
-async function onDownloadRouteManifest(route: DeliveryRouteItem): Promise<void> {
+async function onDownloadRouteManifest(
+  route: DeliveryRouteItem,
+): Promise<void> {
   manifestActingRouteId.value = route.id
   manifestFeedbackRouteId.value = route.id
   try {
@@ -114,10 +118,10 @@ function canViewStopQr(
 ): boolean {
   return Boolean(
     stop.stopId &&
-      stop.qrAvailable &&
-      !stop.qrConsumed &&
-      (route.status === RouteStatus.Assigned ||
-        route.status === RouteStatus.InProgress),
+    stop.qrAvailable &&
+    !stop.qrConsumed &&
+    (route.status === RouteStatus.Assigned ||
+      route.status === RouteStatus.InProgress),
   )
 }
 
@@ -502,17 +506,28 @@ onMounted(() => {
             </UBadge>
           </div>
 
+          <FeatureRouteLocationStatusCard
+            v-bind="
+              toRouteLocationStatusCardProps({
+                locationStatus: route.locationStatus,
+                routeStatus: route.status,
+                viewerRole: 'ADMIN',
+              })
+            "
+          />
+
           <div
-            v-if="availableAdminActions(route.status).length > 0 || route.stops.length > 0"
+            v-if="
+              availableAdminActions(route.status).length > 0 ||
+              route.stops.length > 0
+            "
             class="flex flex-wrap gap-2"
           >
             <UButton
               size="sm"
               color="neutral"
               variant="soft"
-              :loading="
-                manifestActingRouteId === route.id && manifestLoading
-              "
+              :loading="manifestActingRouteId === route.id && manifestLoading"
               :disabled="!isOnline || manifestLoading"
               :aria-label="t('deliveryManifest.downloadRouteAria')"
               data-testid="admin-download-route-manifest"
@@ -596,10 +611,7 @@ onMounted(() => {
                 </li>
               </ul>
               <div class="mt-2 flex flex-wrap items-center gap-2">
-                <UBadge
-                  variant="subtle"
-                  data-testid="admin-stop-qr-state"
-                >
+                <UBadge variant="subtle" data-testid="admin-stop-qr-state">
                   {{ stopQrStateLabel(stop) }}
                 </UBadge>
                 <UButton

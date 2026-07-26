@@ -1,11 +1,14 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { NotificationType, RouteStatus } from '@vaccin-delivery/types'
 
 import CommonEmptyState from '@/components/common/CommonEmptyState.vue'
 import CommonErrorState from '@/components/common/CommonErrorState.vue'
 import CommonLoadingSkeleton from '@/components/common/CommonLoadingSkeleton.vue'
 import FeatureDeliveryStopQrModal from '@/components/feature/delivery-qr/FeatureDeliveryStopQrModal.vue'
+import FeatureRouteLocationStatusCard from '@/components/feature/routes/FeatureRouteLocationStatusCard.vue'
+import { toPharmacistNextStopLocationProps } from '@/components/feature/routes/route-location-status'
 import { registerReconnectHandler } from '@/composables/useGraphQL'
 import { useDeliveryStopQrDisplay } from '@/composables/useDeliveryStopQrDisplay'
 import { useDeliveryManifestDownload } from '@/composables/useDeliveryManifestDownload'
@@ -14,19 +17,15 @@ import {
   type PlannedDeliveryItem,
 } from '@/composables/useMyPlannedDeliveries'
 import {
-  formatDate,
-  routeStatusLabel,
-  translatePlural,
-} from '@/i18n'
+  registerNotificationReceivedHandler,
+  type NotificationListItem,
+} from '@/composables/useNotifications'
+import { formatDate, routeStatusLabel, translatePlural } from '@/i18n'
 
 const { t } = useI18n()
 
-const {
-  plannedDeliveries,
-  loading,
-  errorMessage,
-  loadMyPlannedDeliveries,
-} = useMyPlannedDeliveries()
+const { plannedDeliveries, loading, errorMessage, loadMyPlannedDeliveries } =
+  useMyPlannedDeliveries()
 
 const authoritativeStops = computed(() =>
   plannedDeliveries.value.map(delivery => ({
@@ -98,16 +97,44 @@ function isManifestFeedback(delivery: PlannedDeliveryItem): boolean {
 }
 
 let reconnectCleanup: (() => void) | null = null
+let notificationHandlerCleanup: (() => void) | null = null
+
+const PLANNED_DELIVERY_REFRESH_TYPES = new Set<NotificationType>([
+  NotificationType.ApothekerNextStop,
+  NotificationType.ApothekerDeliveryConfirmed,
+  NotificationType.ApothekerRouteStarted,
+])
+
+function shouldShowNextStopLocation(delivery: PlannedDeliveryItem): boolean {
+  return (
+    delivery.isNextStop === true &&
+    delivery.routeStatus === RouteStatus.InProgress &&
+    !delivery.qrConsumed
+  )
+}
+
+function onPlannedDeliveryNotification(
+  notification: NotificationListItem,
+): void {
+  if (!PLANNED_DELIVERY_REFRESH_TYPES.has(notification.type)) {
+    return
+  }
+  void loadMyPlannedDeliveries()
+}
 
 onMounted(() => {
   void loadMyPlannedDeliveries()
   reconnectCleanup = registerReconnectHandler(async () => {
     await loadMyPlannedDeliveries()
   })
+  notificationHandlerCleanup = registerNotificationReceivedHandler(
+    onPlannedDeliveryNotification,
+  )
 })
 
 onUnmounted(() => {
   reconnectCleanup?.()
+  notificationHandlerCleanup?.()
 })
 
 function deliveryStateLabel(delivery: PlannedDeliveryItem): string {
@@ -126,9 +153,9 @@ function deliveryStateLabel(delivery: PlannedDeliveryItem): string {
 function canShowQr(delivery: PlannedDeliveryItem): boolean {
   return Boolean(
     delivery.stopId &&
-      delivery.qrAvailable &&
-      !delivery.qrConsumed &&
-      delivery.qrImagePath,
+    delivery.qrAvailable &&
+    !delivery.qrConsumed &&
+    delivery.qrImagePath,
   )
 }
 
@@ -226,6 +253,18 @@ async function onShowQr(
               {{ formatDate(delivery.routeDate) }}
             </p>
 
+            <FeatureRouteLocationStatusCard
+              v-if="shouldShowNextStopLocation(delivery)"
+              v-bind="
+                toPharmacistNextStopLocationProps({
+                  routeStatus: delivery.routeStatus,
+                  city: delivery.lastKnownCourierCity,
+                  recordedAt: delivery.lastKnownLocationRecordedAt,
+                  source: delivery.courierLocationSource,
+                })
+              "
+            />
+
             <p>
               <span class="font-medium"
                 >{{ t('deliveryStopQr.planned.pharmacy') }}:</span
@@ -234,9 +273,7 @@ async function onShowQr(
             </p>
 
             <p>
-              {{
-                translatePlural('routes.stop.orders', delivery.orderCount)
-              }}
+              {{ translatePlural('routes.stop.orders', delivery.orderCount) }}
               ·
               {{
                 t('deliveryStopQr.planned.totalLines', {

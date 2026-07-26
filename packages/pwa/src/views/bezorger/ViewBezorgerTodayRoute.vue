@@ -6,6 +6,8 @@ import CommonEmptyState from '@/components/common/CommonEmptyState.vue'
 import CommonErrorState from '@/components/common/CommonErrorState.vue'
 import CommonLoadingSkeleton from '@/components/common/CommonLoadingSkeleton.vue'
 import FeatureBezorgerDeliveryQrWorkflow from '@/components/feature/bezorger/FeatureBezorgerDeliveryQrWorkflow.vue'
+import FeatureRouteLocationStatusCard from '@/components/feature/routes/FeatureRouteLocationStatusCard.vue'
+import { toRouteLocationStatusCardProps } from '@/components/feature/routes/route-location-status'
 import { useCourierStopArrival } from '@/composables/useCourierStopArrival'
 import { RouteStatus, useDeliveryRoutes } from '@/composables/useDeliveryRoutes'
 import { useDeliveryManifestDownload } from '@/composables/useDeliveryManifestDownload'
@@ -404,6 +406,17 @@ watch([ownerUserId, ownerBezorgerProfileId, isOnline], () => {
           data-testid="bezorger-manifest-success"
         />
       </div>
+
+      <FeatureRouteLocationStatusCard
+        v-bind="
+          toRouteLocationStatusCardProps({
+            locationStatus: myTodayRoute.locationStatus,
+            routeStatus: myTodayRoute.status,
+            viewerRole: 'BEZORGER',
+            isOfflineSnapshot: todayRouteSource === 'CACHE',
+          })
+        "
+      />
 
       <div
         v-if="

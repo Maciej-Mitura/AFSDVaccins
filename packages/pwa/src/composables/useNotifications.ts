@@ -38,6 +38,8 @@ export type NotificationListItem =
 
 export type { NotificationDataSource, OfflineUiErrorCategory }
 
+type NotificationReceivedHandler = (notification: NotificationListItem) => void
+
 const notifications = ref<NotificationListItem[]>([])
 const unreadCount = ref(0)
 const loading = ref(false)
@@ -48,6 +50,32 @@ const notificationSource = ref<NotificationDataSource>('NONE')
 const notificationCachedAt = ref<string | null>(null)
 const notificationErrorCategory = ref<OfflineUiErrorCategory | null>(null)
 const notificationRefreshError = ref<string | null>(null)
+
+/** Recipient-scoped handlers invoked for newly arrived realtime notifications. */
+const notificationReceivedHandlers = new Set<NotificationReceivedHandler>()
+
+/**
+ * Register a handler for newly received notification events (not reconnect upserts).
+ * Used for recipient-scoped refetches (e.g. pharmacist planned deliveries).
+ */
+export function registerNotificationReceivedHandler(
+  handler: NotificationReceivedHandler,
+): () => void {
+  notificationReceivedHandlers.add(handler)
+  return () => {
+    notificationReceivedHandlers.delete(handler)
+  }
+}
+
+function notifyReceivedHandlers(notification: NotificationListItem): void {
+  for (const handler of notificationReceivedHandlers) {
+    try {
+      handler(notification)
+    } catch {
+      // Handlers must not break the subscription pipeline.
+    }
+  }
+}
 
 /** Actor user id bound to the current realtime subscription (account isolation). */
 let boundRecipientUserId: string | null = null
@@ -479,6 +507,7 @@ export function useNotifications() {
             // Toast only for newly arrived unread events — not reconnect upserts.
             if (!existed) {
               toastForNewNotification(notification)
+              notifyReceivedHandlers(notification)
             }
           }
         },
@@ -573,5 +602,6 @@ export function __resetNotificationOfflineStateForTests(): void {
   notificationCachedAt.value = null
   notificationErrorCategory.value = null
   notificationRefreshError.value = null
+  notificationReceivedHandlers.clear()
   notificationLoadGeneration += 1
 }

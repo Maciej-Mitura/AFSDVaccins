@@ -167,6 +167,12 @@ Courier route snapshot whitelist extended with:
 Assigned courier only; no coordinates; pending offline arrival overlay does
 **not** fake confirmed location before server sync.
 
+## UI (Phase 30B)
+
+See `docs/phase-30b-coarse-courier-location-ui.md` for role-specific cards,
+historical wording, pharmacist privacy, offline outdated warning, and
+realtime/refetch strategy.
+
 ## Service entry points
 
 `DeliveryRouteProgressLocationService`:

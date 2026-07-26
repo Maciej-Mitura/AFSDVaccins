@@ -34,6 +34,7 @@ declare module 'vue' {
     FeatureDeliveryStopQrModal: typeof import('./src/components/feature/delivery-qr/FeatureDeliveryStopQrModal.vue')['default']
     FeatureNotificationCentre: typeof import('./src/components/feature/notifications/FeatureNotificationCentre.vue')['default']
     FeatureProfileLayout: typeof import('./src/components/feature/profile/FeatureProfileLayout.vue')['default']
+    FeatureRouteLocationStatusCard: typeof import('./src/components/feature/routes/FeatureRouteLocationStatusCard.vue')['default']
     RouterLink: typeof import('vue-router')['RouterLink']
     RouterView: typeof import('vue-router')['RouterView']
     UAlert: typeof import('./node_modules/@nuxt/ui/dist/runtime/components/Alert.vue')['default']
