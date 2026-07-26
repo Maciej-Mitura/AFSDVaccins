@@ -61,6 +61,17 @@ vi.mock('@/composables/useDeliveryStopQrDisplay', () => ({
   }),
 }))
 
+vi.mock('@/composables/useDeliveryManifestDownload', () => ({
+  useDeliveryManifestDownload: () => ({
+    loading: ref(false),
+    errorMessage: ref(null),
+    successMessage: ref(null),
+    clearFeedback: vi.fn(),
+    downloadRouteManifest: vi.fn(),
+    downloadStopManifest: vi.fn(),
+  }),
+}))
+
 vi.mock('@/api/delivery-stop-qr-image-rest', () => ({
   fetchDeliveryStopQrImage: (...args: unknown[]) => fetchImageMock(...args),
   buildDeliveryStopQrDownloadFilename: (
@@ -235,14 +246,16 @@ describe('FeatureApothekerPlannedDeliveries', () => {
     })
     await flushPromises()
 
-    expect(wrapper.findAll('[data-testid="planned-delivery-card"]')).toHaveLength(
-      1,
-    )
+    expect(
+      wrapper.findAll('[data-testid="planned-delivery-card"]'),
+    ).toHaveLength(1)
     expect(wrapper.findAll('[data-testid="show-delivery-qr"]')).toHaveLength(1)
-    expect(wrapper.findAll('[data-testid="planned-delivery-order-ref"]')).toHaveLength(
-      2,
+    expect(
+      wrapper.findAll('[data-testid="planned-delivery-order-ref"]'),
+    ).toHaveLength(2)
+    expect(wrapper.text()).toContain(
+      translate('deliveryStopQr.planned.cardTitle'),
     )
-    expect(wrapper.text()).toContain(translate('deliveryStopQr.planned.cardTitle'))
   })
 
   it('groups two orders in one stop into one card', async () => {
@@ -258,9 +271,9 @@ describe('FeatureApothekerPlannedDeliveries', () => {
     })
     await flushPromises()
 
-    expect(wrapper.findAll('[data-testid="planned-delivery-card"]')).toHaveLength(
-      1,
-    )
+    expect(
+      wrapper.findAll('[data-testid="planned-delivery-card"]'),
+    ).toHaveLength(1)
     expect(wrapper.findAll('[data-testid="show-delivery-qr"]')).toHaveLength(1)
   })
 
@@ -311,7 +324,9 @@ describe('FeatureApothekerPlannedDeliveries', () => {
     })
     await flushPromises()
 
-    expect(wrapper.find('[data-testid="show-delivery-qr"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="show-delivery-qr"]').exists()).toBe(
+      false,
+    )
     expect(
       wrapper.find('[data-testid="planned-delivery-confirmed"]').exists(),
     ).toBe(true)
@@ -332,7 +347,9 @@ describe('FeatureApothekerPlannedDeliveries', () => {
     })
     await flushPromises()
 
-    expect(wrapper.find('[data-testid="show-delivery-qr"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="show-delivery-qr"]').exists()).toBe(
+      false,
+    )
     expect(
       wrapper.find('[data-testid="planned-delivery-unavailable"]').text(),
     ).toContain(translate('deliveryStopQr.state.unavailable'))
@@ -390,13 +407,15 @@ describe('courier display QR isolation', () => {
     })
     await flushPromises()
 
-    expect(wrapper.find('[data-testid="show-delivery-qr"]').exists()).toBe(false)
-    expect(wrapper.find('[data-testid="admin-view-delivery-qr"]').exists()).toBe(
+    expect(wrapper.find('[data-testid="show-delivery-qr"]').exists()).toBe(
       false,
     )
-    expect(wrapper.find('[data-testid="planned-deliveries-section"]').exists()).toBe(
-      false,
-    )
+    expect(
+      wrapper.find('[data-testid="admin-view-delivery-qr"]').exists(),
+    ).toBe(false)
+    expect(
+      wrapper.find('[data-testid="planned-deliveries-section"]').exists(),
+    ).toBe(false)
     wrapper.unmount()
   })
 })

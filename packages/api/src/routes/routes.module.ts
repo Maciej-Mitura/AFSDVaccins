@@ -11,6 +11,12 @@ import { DeliveryStopArrivalAuditPersistenceService } from './arrival/delivery-s
 import { DeliveryStopArrivalAuditService } from './arrival/delivery-stop-arrival-audit.service'
 import { DeliveryStopArrivalController } from './arrival/delivery-stop-arrival.controller'
 import { DeliveryStopArrivalService } from './arrival/delivery-stop-arrival.service'
+import { DeliveryManifestAuditEvent } from './manifest/delivery-manifest-audit.entity'
+import { DeliveryManifestAuditService } from './manifest/delivery-manifest-audit.service'
+import { DeliveryManifestController } from './manifest/delivery-manifest.controller'
+import { DeliveryManifestDataService } from './manifest/delivery-manifest-data.service'
+import { DeliveryManifestPdfService } from './manifest/delivery-manifest-pdf.service'
+import { DeliveryManifestService } from './manifest/delivery-manifest.service'
 import { DeliveryQrConfirmAuditEvent } from './qr/delivery-qr-confirm-audit.entity'
 import { DeliveryQrConfirmAuditService } from './qr/delivery-qr-confirm-audit.service'
 import { DeliveryQrConfirmController } from './qr/delivery-qr-confirm.controller'
@@ -143,6 +149,44 @@ const deliveryStopArrivalAuditPersistenceProvider = isSchemaGeneration
     }
   : DeliveryStopArrivalAuditPersistenceService
 
+const deliveryManifestDataServiceProvider = isSchemaGeneration
+  ? {
+      provide: DeliveryManifestDataService,
+      useValue: {
+        buildRouteManifest: () => Promise.resolve(null),
+        buildStopManifest: () => Promise.resolve(null),
+      },
+    }
+  : DeliveryManifestDataService
+
+const deliveryManifestPdfServiceProvider = isSchemaGeneration
+  ? {
+      provide: DeliveryManifestPdfService,
+      useValue: {
+        render: () => Promise.resolve(Buffer.alloc(0)),
+      },
+    }
+  : DeliveryManifestPdfService
+
+const deliveryManifestServiceProvider = isSchemaGeneration
+  ? {
+      provide: DeliveryManifestService,
+      useValue: {
+        generateRouteManifestPdf: () => Promise.resolve(null),
+        generateStopManifestPdf: () => Promise.resolve(null),
+      },
+    }
+  : DeliveryManifestService
+
+const deliveryManifestAuditServiceProvider = isSchemaGeneration
+  ? {
+      provide: DeliveryManifestAuditService,
+      useValue: {
+        record: () => Promise.resolve(),
+      },
+    }
+  : DeliveryManifestAuditService
+
 const confirmAuditPersistence = isSchemaGeneration
   ? []
   : [TypeOrmModule.forFeature([DeliveryQrConfirmAuditEvent])]
@@ -150,6 +194,10 @@ const confirmAuditPersistence = isSchemaGeneration
 const arrivalAuditPersistence = isSchemaGeneration
   ? []
   : [TypeOrmModule.forFeature([DeliveryStopArrivalAuditEvent])]
+
+const manifestAuditPersistence = isSchemaGeneration
+  ? []
+  : [TypeOrmModule.forFeature([DeliveryManifestAuditEvent])]
 
 @Module({
   imports: [
@@ -160,6 +208,7 @@ const arrivalAuditPersistence = isSchemaGeneration
     BusinessNotificationModule,
     ...confirmAuditPersistence,
     ...arrivalAuditPersistence,
+    ...manifestAuditPersistence,
   ],
   controllers: isSchemaGeneration
     ? []
@@ -168,6 +217,7 @@ const arrivalAuditPersistence = isSchemaGeneration
         DeliveryQrConfirmController,
         DeliveryStopQrController,
         DeliveryStopArrivalController,
+        DeliveryManifestController,
       ],
   providers: [
     routePreviewServiceProvider,
@@ -180,6 +230,10 @@ const arrivalAuditPersistence = isSchemaGeneration
     deliveryStopArrivalServiceProvider,
     deliveryStopArrivalAuditServiceProvider,
     deliveryStopArrivalAuditPersistenceProvider,
+    deliveryManifestDataServiceProvider,
+    deliveryManifestPdfServiceProvider,
+    deliveryManifestServiceProvider,
+    deliveryManifestAuditServiceProvider,
     DeliveryStopQrImageService,
     RoutesResolver,
     DeliveryStopQrFieldsResolver,

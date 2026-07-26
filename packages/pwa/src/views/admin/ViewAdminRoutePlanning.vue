@@ -14,6 +14,7 @@ import {
   type RouteStatusValue,
 } from '@/composables/useDeliveryRoutes'
 import { useDeliveryStopQrDisplay } from '@/composables/useDeliveryStopQrDisplay'
+import { useDeliveryManifestDownload } from '@/composables/useDeliveryManifestDownload'
 import { useOnlineStatus } from '@/composables/useOnlineStatus'
 import { useRouteTemplates } from '@/composables/useRouteTemplates'
 import { formatDateTime, routeStatusLabel, translatePlural } from '@/i18n'
@@ -76,6 +77,26 @@ const {
   retry: retryQr,
   downloadQr,
 } = useDeliveryStopQrDisplay({ authoritativeStops })
+
+const {
+  loading: manifestLoading,
+  errorMessage: manifestError,
+  successMessage: manifestSuccess,
+  downloadRouteManifest,
+} = useDeliveryManifestDownload()
+
+const manifestActingRouteId = ref<string | null>(null)
+const manifestFeedbackRouteId = ref<string | null>(null)
+
+async function onDownloadRouteManifest(route: DeliveryRouteItem): Promise<void> {
+  manifestActingRouteId.value = route.id
+  manifestFeedbackRouteId.value = route.id
+  try {
+    await downloadRouteManifest(route.id, route.deliveryDate)
+  } finally {
+    manifestActingRouteId.value = null
+  }
+}
 
 function stopQrStateLabel(stop: DeliveryStopItem): string {
   if (stop.qrConsumed) {
@@ -482,9 +503,27 @@ onMounted(() => {
           </div>
 
           <div
-            v-if="availableAdminActions(route.status).length > 0"
+            v-if="availableAdminActions(route.status).length > 0 || route.stops.length > 0"
             class="flex flex-wrap gap-2"
           >
+            <UButton
+              size="sm"
+              color="neutral"
+              variant="soft"
+              :loading="
+                manifestActingRouteId === route.id && manifestLoading
+              "
+              :disabled="!isOnline || manifestLoading"
+              :aria-label="t('deliveryManifest.downloadRouteAria')"
+              data-testid="admin-download-route-manifest"
+              @click="onDownloadRouteManifest(route)"
+            >
+              {{
+                manifestActingRouteId === route.id && manifestLoading
+                  ? t('deliveryManifest.generating')
+                  : t('deliveryManifest.downloadRoute')
+              }}
+            </UButton>
             <UButton
               v-for="action in availableAdminActions(route.status)"
               :key="`${route.id}-${action.status}`"
@@ -498,6 +537,23 @@ onMounted(() => {
               {{ action.label }}
             </UButton>
           </div>
+
+          <UAlert
+            v-if="manifestFeedbackRouteId === route.id && manifestError"
+            class="mt-2"
+            color="error"
+            variant="subtle"
+            :title="manifestError"
+            data-testid="admin-manifest-error"
+          />
+          <UAlert
+            v-else-if="manifestFeedbackRouteId === route.id && manifestSuccess"
+            class="mt-2"
+            color="success"
+            variant="subtle"
+            :title="manifestSuccess"
+            data-testid="admin-manifest-success"
+          />
 
           <div
             v-if="route.statusHistory.length > 0"

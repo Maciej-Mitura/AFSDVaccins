@@ -8,6 +8,7 @@ import CommonLoadingSkeleton from '@/components/common/CommonLoadingSkeleton.vue
 import FeatureBezorgerDeliveryQrWorkflow from '@/components/feature/bezorger/FeatureBezorgerDeliveryQrWorkflow.vue'
 import { useCourierStopArrival } from '@/composables/useCourierStopArrival'
 import { RouteStatus, useDeliveryRoutes } from '@/composables/useDeliveryRoutes'
+import { useDeliveryManifestDownload } from '@/composables/useDeliveryManifestDownload'
 import { useRealtimeConnection } from '@/composables/useRealtimeConnection'
 import { formatDateTime, routeStatusLabel, translatePlural } from '@/i18n'
 import { UserRole } from '@vaccin-delivery/types'
@@ -38,6 +39,21 @@ const {
 } = useDeliveryRoutes()
 
 const { connectionState } = useRealtimeConnection()
+
+const {
+  loading: manifestLoading,
+  errorMessage: manifestError,
+  successMessage: manifestSuccess,
+  downloadRouteManifest,
+} = useDeliveryManifestDownload()
+
+async function onDownloadRouteManifest(): Promise<void> {
+  const route = myTodayRoute.value
+  if (!route) {
+    return
+  }
+  await downloadRouteManifest(route.id, route.deliveryDate)
+}
 
 const confirmStart = ref(false)
 const confirmComplete = ref(false)
@@ -352,6 +368,41 @@ watch([ownerUserId, ownerBezorgerProfileId, isOnline], () => {
         >
           {{ t('bezorger.route.today.completedNote') }}
         </p>
+
+        <div class="mt-3 flex flex-wrap gap-2">
+          <UButton
+            size="sm"
+            color="neutral"
+            variant="soft"
+            :loading="manifestLoading"
+            :disabled="!isOnline || manifestLoading"
+            :aria-label="t('deliveryManifest.downloadRouteAria')"
+            data-testid="bezorger-download-route-manifest"
+            @click="onDownloadRouteManifest"
+          >
+            {{
+              manifestLoading
+                ? t('deliveryManifest.generating')
+                : t('deliveryManifest.downloadRoute')
+            }}
+          </UButton>
+        </div>
+        <UAlert
+          v-if="manifestError"
+          class="mt-2"
+          color="error"
+          variant="subtle"
+          :title="manifestError"
+          data-testid="bezorger-manifest-error"
+        />
+        <UAlert
+          v-else-if="manifestSuccess"
+          class="mt-2"
+          color="success"
+          variant="subtle"
+          :title="manifestSuccess"
+          data-testid="bezorger-manifest-success"
+        />
       </div>
 
       <div

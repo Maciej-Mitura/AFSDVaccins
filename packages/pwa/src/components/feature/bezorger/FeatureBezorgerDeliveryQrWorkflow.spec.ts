@@ -80,6 +80,37 @@ vi.mock('@/composables/useRealtimeConnection', () => ({
   useRealtimeConnection: () => ({ connectionState: ref('connected') }),
 }))
 
+vi.mock('@/composables/useDeliveryManifestDownload', () => ({
+  useDeliveryManifestDownload: () => ({
+    loading: ref(false),
+    errorMessage: ref(null),
+    successMessage: ref(null),
+    clearFeedback: vi.fn(),
+    downloadRouteManifest: vi.fn(),
+    downloadStopManifest: vi.fn(),
+  }),
+}))
+
+vi.mock('@/composables/useCourierStopArrival', () => ({
+  useCourierStopArrival: () => ({
+    viewModelForStop: () => ({
+      state: 'idle',
+      canMarkArrived: false,
+      clientArrivedAt: null,
+      recordedAt: null,
+      pendingLocal: false,
+    }),
+    feedbackMessage: ref(null),
+    feedbackTone: ref(null),
+    reloadPendingActions: vi.fn(),
+    markArrived: vi.fn(),
+    cancelPending: vi.fn(),
+    discardPending: vi.fn(),
+    retrySync: vi.fn(),
+    syncOnReconnect: vi.fn(),
+  }),
+}))
+
 vi.mock('vue-router', async () => {
   const actual =
     await vi.importActual<typeof import('vue-router')>('vue-router')

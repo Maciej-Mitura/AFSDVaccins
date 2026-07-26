@@ -100,6 +100,30 @@ describe('PWA safety and configuration', () => {
     expect(swSource).not.toContain('CacheFirst')
   })
 
+  it('route and stop manifest PDF endpoints are not service-worker cached', () => {
+    expect(swSource).not.toMatch(/manifest\.pdf/i)
+    expect(swSource).not.toContain('delivery-routes')
+    expect(viteConfig).not.toMatch(/manifest\.pdf/i)
+    expect(swSource).not.toContain('CacheFirst')
+    expect(swSource).not.toContain('NetworkFirst')
+    expect(swSource).not.toContain('StaleWhileRevalidate')
+  })
+
+  it('manifest PDF helpers require auth headers and never write offline stores', () => {
+    const restHelper = readFileSync(
+      join(pwaRoot, 'src', 'api', 'delivery-manifest-rest.ts'),
+      'utf8',
+    )
+    expect(restHelper).toContain('Authorization')
+    expect(restHelper).toContain('Bearer ${token}')
+    expect(restHelper).toContain("cache: 'no-store'")
+    expect(restHelper).toContain('application/pdf')
+    expect(restHelper).not.toMatch(
+      /\bindexedDB\b|\bopenDB\b|\bfrom ['"]idb['"]/i,
+    )
+    expect(restHelper).toContain('URL.revokeObjectURL')
+  })
+
   it('Firebase Auth endpoints are not runtime cached', () => {
     expect(viteConfig).not.toMatch(
       /urlPattern:\s*.*(identitytoolkit|securetoken\.google|googleapis\.com\/identitytoolkit)/i,

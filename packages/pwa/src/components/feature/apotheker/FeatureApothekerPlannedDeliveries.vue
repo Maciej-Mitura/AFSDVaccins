@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted } from 'vue'
+import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 
 import CommonEmptyState from '@/components/common/CommonEmptyState.vue'
@@ -8,6 +8,7 @@ import CommonLoadingSkeleton from '@/components/common/CommonLoadingSkeleton.vue
 import FeatureDeliveryStopQrModal from '@/components/feature/delivery-qr/FeatureDeliveryStopQrModal.vue'
 import { registerReconnectHandler } from '@/composables/useGraphQL'
 import { useDeliveryStopQrDisplay } from '@/composables/useDeliveryStopQrDisplay'
+import { useDeliveryManifestDownload } from '@/composables/useDeliveryManifestDownload'
 import {
   useMyPlannedDeliveries,
   type PlannedDeliveryItem,
@@ -50,6 +51,51 @@ const {
   retry,
   downloadQr,
 } = useDeliveryStopQrDisplay({ authoritativeStops })
+
+const {
+  loading: manifestLoading,
+  errorMessage: manifestError,
+  successMessage: manifestSuccess,
+  downloadStopManifest,
+} = useDeliveryManifestDownload()
+
+const manifestActingKey = ref<string | null>(null)
+const manifestFeedbackKey = ref<string | null>(null)
+
+async function onDownloadStopManifest(
+  delivery: PlannedDeliveryItem,
+): Promise<void> {
+  if (!delivery.stopId) {
+    return
+  }
+  const key = `${delivery.routeId}:${delivery.stopId}`
+  manifestActingKey.value = key
+  manifestFeedbackKey.value = key
+  try {
+    await downloadStopManifest(
+      delivery.routeId,
+      delivery.stopId,
+      delivery.routeDate,
+      delivery.stopSequence,
+    )
+  } finally {
+    manifestActingKey.value = null
+  }
+}
+
+function isManifestActing(delivery: PlannedDeliveryItem): boolean {
+  if (!delivery.stopId) {
+    return false
+  }
+  return manifestActingKey.value === `${delivery.routeId}:${delivery.stopId}`
+}
+
+function isManifestFeedback(delivery: PlannedDeliveryItem): boolean {
+  if (!delivery.stopId) {
+    return false
+  }
+  return manifestFeedbackKey.value === `${delivery.routeId}:${delivery.stopId}`
+}
 
 let reconnectCleanup: (() => void) | null = null
 
@@ -221,32 +267,69 @@ async function onShowQr(
               </ul>
             </div>
 
-            <UButton
-              v-if="canShowQr(delivery)"
-              size="sm"
-              color="primary"
-              :aria-label="t('deliveryStopQr.planned.showQrAria')"
-              data-testid="show-delivery-qr"
-              @click="onShowQr(delivery, $event)"
-            >
-              {{ t('deliveryStopQr.planned.showQr') }}
-            </UButton>
+            <div class="mt-2 flex flex-wrap items-center gap-2">
+              <UButton
+                v-if="delivery.stopId"
+                size="sm"
+                color="neutral"
+                variant="soft"
+                :loading="isManifestActing(delivery) && manifestLoading"
+                :disabled="manifestLoading || !delivery.stopId"
+                :aria-label="t('deliveryManifest.downloadStopAria')"
+                data-testid="apotheker-download-stop-manifest"
+                @click="onDownloadStopManifest(delivery)"
+              >
+                {{
+                  isManifestActing(delivery) && manifestLoading
+                    ? t('deliveryManifest.generating')
+                    : t('deliveryManifest.downloadStop')
+                }}
+              </UButton>
 
-            <p
-              v-else-if="delivery.qrConsumed"
-              class="text-sm text-muted"
-              data-testid="planned-delivery-confirmed"
-            >
-              {{ t('deliveryStopQr.state.confirmed') }}
-            </p>
+              <UButton
+                v-if="canShowQr(delivery)"
+                size="sm"
+                color="primary"
+                :aria-label="t('deliveryStopQr.planned.showQrAria')"
+                data-testid="show-delivery-qr"
+                @click="onShowQr(delivery, $event)"
+              >
+                {{ t('deliveryStopQr.planned.showQr') }}
+              </UButton>
 
-            <p
-              v-else
-              class="text-sm text-muted"
-              data-testid="planned-delivery-unavailable"
-            >
-              {{ t('deliveryStopQr.state.unavailable') }}
-            </p>
+              <p
+                v-else-if="delivery.qrConsumed"
+                class="text-sm text-muted"
+                data-testid="planned-delivery-confirmed"
+              >
+                {{ t('deliveryStopQr.state.confirmed') }}
+              </p>
+
+              <p
+                v-else
+                class="text-sm text-muted"
+                data-testid="planned-delivery-unavailable"
+              >
+                {{ t('deliveryStopQr.state.unavailable') }}
+              </p>
+            </div>
+
+            <UAlert
+              v-if="isManifestFeedback(delivery) && manifestError"
+              class="mt-2"
+              color="error"
+              variant="subtle"
+              :title="manifestError"
+              data-testid="apotheker-manifest-error"
+            />
+            <UAlert
+              v-else-if="isManifestFeedback(delivery) && manifestSuccess"
+              class="mt-2"
+              color="success"
+              variant="subtle"
+              :title="manifestSuccess"
+              data-testid="apotheker-manifest-success"
+            />
           </div>
         </UCard>
       </li>
