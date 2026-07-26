@@ -204,6 +204,12 @@ const router = createRouter({
           component: () =>
             import('@/views/bezorger/ViewBezorgerTomorrowPreview.vue'),
         },
+        {
+          path: 'notifications',
+          name: 'bezorger-notifications',
+          component: () =>
+            import('@/views/bezorger/ViewBezorgerNotifications.vue'),
+        },
       ],
     },
     {

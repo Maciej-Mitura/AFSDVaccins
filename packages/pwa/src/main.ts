@@ -42,6 +42,12 @@ registerSessionExpiredHandler(async message => {
   await logout()
   clearCurrentUser()
   clearNotificationState()
+  const { clearNotificationToastState } =
+    await import('./composables/useNotificationToast')
+  const { usePushNotifications } =
+    await import('./composables/usePushNotifications')
+  clearNotificationToastState()
+  usePushNotifications().resetSession()
   await clearApolloCache()
   await router.push({
     name: 'auth-login',

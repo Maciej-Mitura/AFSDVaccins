@@ -7,9 +7,20 @@ export const myNotificationsQuerySource = gql`
       type
       title
       body
+      titleKey
+      bodyKey
+      interpolationData {
+        routeDate
+        pharmacyName
+        city
+        orderReference
+        orderCount
+      }
       read
       readAt
       relatedOrderId
+      eventId
+      actionPath
       createdAt
     }
   }
@@ -46,6 +57,15 @@ export type {
 } from '@vaccin-delivery/types'
 export { MarkNotificationReadDocument as MARK_NOTIFICATION_READ_MUTATION } from '@vaccin-delivery/types'
 
+export const markAllNotificationsReadMutationSource = gql`
+  mutation MarkAllNotificationsRead {
+    markAllNotificationsRead
+  }
+`
+
+export type { MarkAllNotificationsReadMutation } from '@vaccin-delivery/types'
+export { MarkAllNotificationsReadDocument as MARK_ALL_NOTIFICATIONS_READ_MUTATION } from '@vaccin-delivery/types'
+
 export const notificationReceivedSubscriptionSource = gql`
   subscription NotificationReceived {
     notificationReceived {
@@ -53,9 +73,20 @@ export const notificationReceivedSubscriptionSource = gql`
       type
       title
       body
+      titleKey
+      bodyKey
+      interpolationData {
+        routeDate
+        pharmacyName
+        city
+        orderReference
+        orderCount
+      }
       read
       readAt
       relatedOrderId
+      eventId
+      actionPath
       createdAt
     }
   }

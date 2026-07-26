@@ -4,6 +4,6 @@ import FeatureNotificationCentre from '@/components/feature/notifications/Featur
 
 <template>
   <FeatureNotificationCentre
-    empty-description-key="apotheker.notifications.empty.description"
+    empty-description-key="bezorger.notifications.empty.description"
   />
 </template>

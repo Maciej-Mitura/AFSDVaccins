@@ -35,6 +35,8 @@ const REQUIRED_VITE_KEYS = [
   'VITE_FIREBASE_MESSAGING_SENDER_ID',
   'VITE_FIREBASE_APP_ID',
   'VITE_E2E_AUTH_BYPASS',
+  'VITE_WEB_PUSH_ENABLED',
+  'VITE_WEB_PUSH_VAPID_PUBLIC_KEY',
 ] as const
 
 const validFileContents = {
@@ -77,7 +79,10 @@ function restoreViteEnv(): void {
   viteEnvSnapshotted = false
 }
 
-function createFixture(envFileName: string, values: Record<string, string>): string {
+function createFixture(
+  envFileName: string,
+  values: Record<string, string>,
+): string {
   const root = mkdtempSync(join(tmpdir(), 'pwa-prod-env-'))
   fixtureRoots.push(root)
   mkdirSync(join(root, 'scripts'), { recursive: true })
@@ -89,11 +94,15 @@ function createFixture(envFileName: string, values: Record<string, string>): str
 }
 
 function scriptUrlForFixture(fixtureRoot: string): string {
-  return pathToFileURL(join(fixtureRoot, 'scripts', 'validate-production-env.mjs'))
-    .href
+  return pathToFileURL(
+    join(fixtureRoot, 'scripts', 'validate-production-env.mjs'),
+  ).href
 }
 
-function runValidateScript(cwd: string, env: NodeJS.ProcessEnv): {
+function runValidateScript(
+  cwd: string,
+  env: NodeJS.ProcessEnv,
+): {
   status: number | null
   stdout: string
   stderr: string
@@ -200,6 +209,26 @@ describe('collectProductionEnvErrors', () => {
     expect(errors.some(e => e.includes('VITE_E2E_AUTH_BYPASS'))).toBe(true)
   })
 
+  it('requires VAPID public key when web push is enabled', () => {
+    const errors = collectProductionEnvErrors({
+      ...validEnv,
+      VITE_WEB_PUSH_ENABLED: 'true',
+    })
+    expect(errors.some(e => e.includes('VITE_WEB_PUSH_VAPID_PUBLIC_KEY'))).toBe(
+      true,
+    )
+  })
+
+  it('rejects invalid VAPID public key format when provided', () => {
+    const errors = collectProductionEnvErrors({
+      ...validEnv,
+      VITE_WEB_PUSH_VAPID_PUBLIC_KEY: 'not-a-valid-key',
+    })
+    expect(errors.some(e => e.includes('VITE_WEB_PUSH_VAPID_PUBLIC_KEY'))).toBe(
+      true,
+    )
+  })
+
   it('never includes secret values in error messages', () => {
     const secret = 'super-secret-api-key-xyz-never-print-me'
     const errors = collectProductionEnvErrors({
@@ -216,10 +245,7 @@ describe('collectProductionEnvErrors', () => {
 describe('loadProductionPwaEnv (Vite loadEnv)', () => {
   it('discovers .env.production.local values from the PWA directory', () => {
     snapshotViteEnv()
-    const fixture = createFixture(
-      '.env.production.local',
-      validFileContents,
-    )
+    const fixture = createFixture('.env.production.local', validFileContents)
     const env = loadProductionPwaEnv(fixture)
     expect(collectProductionEnvErrors(env)).toEqual([])
     expect(env.VITE_BACKEND_URL).toBe(validFileContents.VITE_BACKEND_URL)
@@ -227,10 +253,7 @@ describe('loadProductionPwaEnv (Vite loadEnv)', () => {
 
   it('loads from script-relative PWA root when cwd is the monorepo root', () => {
     snapshotViteEnv()
-    const fixture = createFixture(
-      '.env.production.local',
-      validFileContents,
-    )
+    const fixture = createFixture('.env.production.local', validFileContents)
     const originalCwd = process.cwd()
     process.chdir(monorepoRoot)
     try {
@@ -245,10 +268,7 @@ describe('loadProductionPwaEnv (Vite loadEnv)', () => {
 
   it('loads from script-relative PWA root when cwd is packages/pwa', () => {
     snapshotViteEnv()
-    const fixture = createFixture(
-      '.env.production.local',
-      validFileContents,
-    )
+    const fixture = createFixture('.env.production.local', validFileContents)
     const originalCwd = process.cwd()
     process.chdir(pwaPackageRoot)
     try {
@@ -374,7 +394,11 @@ describe('validate-production-env.mjs CLI', () => {
     const script = readFileSync(validateScript, 'utf8')
     const code = script
       .split('\n')
-      .filter(line => !line.trimStart().startsWith('*') && !line.trimStart().startsWith('//'))
+      .filter(
+        line =>
+          !line.trimStart().startsWith('*') &&
+          !line.trimStart().startsWith('//'),
+      )
       .join('\n')
     expect(script).toContain('resolvePwaRootFromScriptUrl')
     expect(script).toContain('import.meta.url')

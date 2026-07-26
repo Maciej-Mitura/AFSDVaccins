@@ -24,7 +24,7 @@ import { useI18n } from 'vue-i18n'
 import CommonAppShell, {
   type AppShellLink,
 } from '@/components/common/CommonAppShell.vue'
-import { useAdminNotifications } from '@/composables/useAdminNotifications'
+import { useNotifications } from '@/composables/useNotifications'
 
 const { t } = useI18n()
 
@@ -35,6 +35,7 @@ const adminNavLinks = computed<AppShellLink[]>(() => [
   { label: t('navigation.admin.routeTemplates'), to: '/admin/route-templates' },
   { label: t('navigation.admin.vaccines'), to: '/admin/vaccines' },
   { label: t('navigation.admin.stock'), to: '/admin/stock' },
+  { label: t('navigation.admin.notifications'), to: '/admin/notifications' },
   { label: t('navigation.admin.settings'), to: '/admin/settings' },
   { label: t('navigation.admin.profile'), to: '/profile' },
 ])
@@ -46,7 +47,7 @@ const {
   subscribeToNotificationEvents,
   stopNotificationSubscription,
   registerReconnectRefetch,
-} = useAdminNotifications()
+} = useNotifications()
 
 let reconnectCleanup: (() => void) | null = null
 

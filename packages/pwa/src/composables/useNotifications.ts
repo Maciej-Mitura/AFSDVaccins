@@ -1,10 +1,12 @@
 import { computed, ref } from 'vue'
 
 import {
+  MARK_ALL_NOTIFICATIONS_READ_MUTATION,
   MARK_NOTIFICATION_READ_MUTATION,
   MY_NOTIFICATIONS_QUERY,
   MY_UNREAD_NOTIFICATION_COUNT_QUERY,
   NOTIFICATION_RECEIVED_SUBSCRIPTION,
+  type MarkAllNotificationsReadMutation,
   type MarkNotificationReadMutation,
   type MyNotificationsQuery,
   type MyUnreadNotificationCountQuery,
@@ -12,6 +14,7 @@ import {
 } from '@/assets/graphql/notification'
 import { mapGraphQLError } from '@/composables/useCurrentUser'
 import useGraphQL, { registerReconnectHandler } from '@/composables/useGraphQL'
+import { resolveNotificationCopy } from '@/utils/notification-display'
 
 export type NotificationListItem =
   MyNotificationsQuery['myNotifications'][number]
@@ -21,8 +24,20 @@ const unreadCount = ref(0)
 const loading = ref(false)
 const errorMessage = ref<string | null>(null)
 
+/** Actor user id bound to the current realtime subscription (account isolation). */
+let boundRecipientUserId: string | null = null
+
 let notificationSubscriptionCleanup: (() => void) | null = null
 let reconnectCleanup: (() => void) | null = null
+
+let translateFn:
+  ((key: string, values?: Record<string, unknown>) => string) | null = null
+
+export function setNotificationTranslate(
+  fn: ((key: string, values?: Record<string, unknown>) => string) | null,
+): void {
+  translateFn = fn
+}
 
 function upsertNotification(notification: NotificationListItem): void {
   const existingIndex = notifications.value.findIndex(
@@ -47,6 +62,26 @@ function upsertNotification(notification: NotificationListItem): void {
   } else if (previous.read && !notification.read) {
     unreadCount.value += 1
   }
+}
+
+function toastForNewNotification(notification: NotificationListItem): void {
+  void import('@/composables/useNotificationToast').then(
+    ({ showNotificationToastIfNew }) => {
+      const copy = translateFn
+        ? resolveNotificationCopy(notification, translateFn)
+        : { title: notification.title, body: notification.body }
+
+      showNotificationToastIfNew({
+        id: notification.id,
+        eventId: notification.eventId,
+        title: copy.title,
+        body: copy.body,
+        read: notification.read,
+        actionPath: notification.actionPath,
+        createdAt: notification.createdAt,
+      })
+    },
+  )
 }
 
 export function useNotifications() {
@@ -120,13 +155,52 @@ export function useNotifications() {
     }
   }
 
+  async function markAllNotificationsRead(): Promise<number> {
+    errorMessage.value = null
+
+    try {
+      const result =
+        await apolloClient.mutate<MarkAllNotificationsReadMutation>({
+          mutation: MARK_ALL_NOTIFICATIONS_READ_MUTATION,
+        })
+
+      const updatedCount = result.data?.markAllNotificationsRead ?? 0
+
+      notifications.value = notifications.value.map(item =>
+        item.read
+          ? item
+          : {
+              ...item,
+              read: true,
+              readAt: item.readAt ?? new Date().toISOString(),
+            },
+      )
+      unreadCount.value = 0
+
+      return updatedCount
+    } catch (error: unknown) {
+      errorMessage.value = mapGraphQLError(error)
+      throw error
+    }
+  }
+
   function stopNotificationSubscription(): void {
     notificationSubscriptionCleanup?.()
     notificationSubscriptionCleanup = null
   }
 
-  function subscribeToNotificationEvents(): () => void {
+  function subscribeToNotificationEvents(options?: {
+    recipientUserId?: string | null
+  }): () => void {
     stopNotificationSubscription()
+
+    boundRecipientUserId = options?.recipientUserId ?? boundRecipientUserId
+
+    void import('@/composables/useNotificationToast').then(
+      ({ markNotificationToastSubscriptionBoundary }) => {
+        markNotificationToastSubscriptionBoundary()
+      },
+    )
 
     const subscription = apolloClient
       .subscribe<NotificationReceivedSubscription>({
@@ -141,13 +215,9 @@ export function useNotifications() {
               item => item.id === notification.id,
             )
             upsertNotification(notification)
-            // Toast only for newly arrived unread events — not reconnect upserts of known ids.
+            // Toast only for newly arrived unread events — not reconnect upserts.
             if (!existed) {
-              void import('@/composables/useNotificationToast').then(
-                ({ showNotificationToastIfNew }) => {
-                  showNotificationToastIfNew(notification)
-                },
-              )
+              toastForNewNotification(notification)
             }
           }
         },
@@ -186,10 +256,16 @@ export function useNotifications() {
     stopNotificationSubscription()
     reconnectCleanup?.()
     reconnectCleanup = null
+    boundRecipientUserId = null
     notifications.value = []
     unreadCount.value = 0
     loading.value = false
     errorMessage.value = null
+    void import('@/composables/useNotificationToast').then(
+      ({ clearNotificationToastState }) => {
+        clearNotificationToastState()
+      },
+    )
   }
 
   return {
@@ -202,9 +278,14 @@ export function useNotifications() {
     loadNotifications,
     loadUnreadCount,
     markNotificationRead,
+    markAllNotificationsRead,
     subscribeToNotificationEvents,
     stopNotificationSubscription,
     registerReconnectRefetch,
     clearNotificationState,
   }
+}
+
+export function __getBoundRecipientUserIdForTests(): string | null {
+  return boundRecipientUserId
 }

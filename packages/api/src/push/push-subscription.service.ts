@@ -37,6 +37,11 @@ export class PushSubscriptionService {
   /**
    * Idempotent register/update for the authenticated actor only.
    * Never trusts a client-supplied userId.
+   *
+   * Multi-account safety: the same browser endpoint may only be active for one
+   * user. Registering claims the endpoint and disables other users' active rows
+   * with the same endpointHash (so account B cannot keep receiving pushes for
+   * an endpoint still registered to account A).
    */
   async registerSubscription(
     user: User,
@@ -46,6 +51,8 @@ export class PushSubscriptionService {
     const endpointHash = hashPushEndpoint(endpoint)
     const userId = user._id.toString()
     const now = this.clock.now()
+
+    await this.claimEndpointExclusivity(userId, endpointHash, now)
 
     const existing = await this.subscriptionRepository.findOne({
       where: { userId, endpointHash },
@@ -81,6 +88,30 @@ export class PushSubscriptionService {
     }
 
     return this.getCapabilityStatus(user)
+  }
+
+  /**
+   * Disables active subscriptions for other users that share this endpoint.
+   * Does not delete history rows; only clears active delivery for the endpoint.
+   */
+  private async claimEndpointExclusivity(
+    userId: string,
+    endpointHash: string,
+    now: Date,
+  ): Promise<void> {
+    const sharingEndpoint = await this.subscriptionRepository.find({
+      where: { endpointHash, disabledAt: null },
+    })
+
+    for (const sub of sharingEndpoint) {
+      if (sub.userId === userId) {
+        continue
+      }
+
+      sub.disabledAt = now
+      sub.updatedAt = now
+      await this.subscriptionRepository.save(sub)
+    }
   }
 
   /**

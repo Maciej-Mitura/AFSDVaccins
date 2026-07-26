@@ -40,22 +40,34 @@
       </div>
     </header>
     <main class="mx-auto max-w-5xl px-4 py-6">
+      <div class="mb-4">
+        <CommonPushPermissionBanner />
+      </div>
       <slot />
     </main>
   </div>
 </template>
 
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
 
 import CommonLanguageSelector from '@/components/common/CommonLanguageSelector.vue'
+import CommonPushPermissionBanner from '@/components/common/CommonPushPermissionBanner.vue'
 import { clearApolloCache } from '@/composables/useGraphQL'
 import { useCurrentUser } from '@/composables/useCurrentUser'
 import { useFirebase } from '@/composables/useFirebase'
-import { useNotifications } from '@/composables/useNotifications'
-import { useAdminNotifications } from '@/composables/useAdminNotifications'
+import {
+  setNotificationToastNavigate,
+  setNotificationToastOpenLabel,
+  clearNotificationToastState,
+} from '@/composables/useNotificationToast'
+import {
+  setNotificationTranslate,
+  useNotifications,
+} from '@/composables/useNotifications'
+import { usePushNotifications } from '@/composables/usePushNotifications'
 
 const { t } = useI18n()
 
@@ -73,10 +85,25 @@ const router = useRouter()
 const { isAuthenticated, logout } = useFirebase()
 const { clearCurrentUser } = useCurrentUser()
 const { clearNotificationState } = useNotifications()
-const { clearAdminNotificationState } = useAdminNotifications()
+const { resetSession: resetPushSession } = usePushNotifications()
 const loggingOut = ref(false)
 
 const navigationLinks = computed(() => props.navLinks ?? [])
+
+onMounted(() => {
+  setNotificationTranslate((key, values) => (values ? t(key, values) : t(key)))
+  setNotificationToastOpenLabel(t('notifications.centre.openDetails'))
+  setNotificationToastNavigate(path => {
+    void router.push(path)
+  })
+})
+
+watch(
+  () => t('notifications.centre.openDetails'),
+  label => {
+    setNotificationToastOpenLabel(label)
+  },
+)
 
 async function onLogout() {
   loggingOut.value = true
@@ -85,7 +112,8 @@ async function onLogout() {
     await logout()
     clearCurrentUser()
     clearNotificationState()
-    clearAdminNotificationState()
+    clearNotificationToastState()
+    resetPushSession()
     await clearApolloCache()
     await router.push({ name: 'auth-login' })
   } finally {

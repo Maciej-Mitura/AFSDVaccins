@@ -8,6 +8,7 @@ import type * as z from 'zod'
 
 import CommonErrorState from '@/components/common/CommonErrorState.vue'
 import CommonLoadingSkeleton from '@/components/common/CommonLoadingSkeleton.vue'
+import CommonPushNotificationSettings from '@/components/common/CommonPushNotificationSettings.vue'
 import { useCurrentUser } from '@/composables/useCurrentUser'
 import { useOnlineStatus } from '@/composables/useOnlineStatus'
 import {
@@ -208,6 +209,10 @@ async function onSubmitBezorger(event: FormSubmitEvent<BezorgerForm>) {
             <span class="font-medium">{{ t('profiles.role.label') }}:</span>
             {{ roleLabel }} ({{ currentUser.role }})
           </p>
+        </div>
+
+        <div class="mb-6">
+          <CommonPushNotificationSettings />
         </div>
 
         <UForm

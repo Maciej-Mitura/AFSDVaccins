@@ -138,7 +138,7 @@ describe('PushSubscriptionService', () => {
   beforeEach(() => {
     repository = {
       findOne: jest.fn(),
-      find: jest.fn(),
+      find: jest.fn().mockResolvedValue([]),
       create: jest.fn(),
       save: jest.fn(),
       count: jest.fn().mockResolvedValue(1),
@@ -224,6 +224,7 @@ describe('PushSubscriptionService', () => {
       Promise.resolve(value as PushSubscriptionEntity),
     )
     repository.count.mockResolvedValue(2)
+    repository.find.mockResolvedValue([])
 
     await service.registerSubscription(user, {
       endpoint: 'https://push.example/device-a',
@@ -239,6 +240,40 @@ describe('PushSubscriptionService', () => {
     expect(repository.save).toHaveBeenCalledTimes(2)
     const status = await service.getCapabilityStatus(user)
     expect(status.subscriptionCount).toBe(2)
+  })
+
+  it('claims endpoint exclusivity so one browser endpoint is not active for two users', async () => {
+    repository.findOne.mockResolvedValue(null)
+    repository.create.mockImplementation(value => value as PushSubscriptionEntity)
+    repository.save.mockImplementation(value =>
+      Promise.resolve(value as PushSubscriptionEntity),
+    )
+    repository.count.mockResolvedValue(1)
+
+    const otherActive = {
+      _id: 'other-sub',
+      userId: other._id,
+      endpoint: 'https://push.example/shared-device',
+      endpointHash: 'shared-hash',
+      disabledAt: null,
+      failureCount: 0,
+    } as PushSubscriptionEntity
+
+    repository.find.mockResolvedValue([otherActive])
+
+    await service.registerSubscription(user, {
+      endpoint: 'https://push.example/shared-device',
+      p256dh: 'p256dh-key-material-xx',
+      auth: 'auth-key-material-xxxx',
+    })
+
+    expect(otherActive.disabledAt).toEqual(now)
+    expect(repository.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        userId: user._id,
+        endpoint: 'https://push.example/shared-device',
+      }),
+    )
   })
 
   it('unsubscribe is idempotent and scoped to actor', async () => {
