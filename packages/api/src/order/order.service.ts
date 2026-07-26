@@ -52,6 +52,10 @@ import {
 } from './order-status.policy'
 import { Order } from './order.entity'
 import { OrderStatus } from './order-status.enum'
+import {
+  DailyVaccineAllowance,
+  MyDailyVaccineAllowances,
+} from './daily-vaccine-allowance.type'
 import { WeeklyOrderSummary } from './weekly-order-summary.type'
 
 type NormalizedLineInput = {
@@ -342,10 +346,18 @@ export class OrderService {
       const currentDaily = dailyTotals.get(line.vaccineId) ?? 0
 
       if (currentDaily + line.quantity > settings.dailyDoseCapPerType) {
-        throw new DailyLimitExceededException(
-          vaccine.name,
-          settings.dailyDoseCapPerType,
+        const remainingToday = Math.max(
+          settings.dailyDoseCapPerType - currentDaily,
+          0,
         )
+        throw new DailyLimitExceededException({
+          vaccineId: line.vaccineId,
+          vaccineName: vaccine.name,
+          dailyMaximum: settings.dailyDoseCapPerType,
+          alreadyOrderedToday: currentDaily,
+          remainingToday,
+          requestedQuantity: line.quantity,
+        })
       }
     }
 
@@ -447,6 +459,43 @@ export class OrderService {
       targetIsoWeek,
       settings,
     )
+  }
+
+  async findMyDailyVaccineAllowances(
+    user: User,
+  ): Promise<MyDailyVaccineAllowances> {
+    if (user.role !== UserRole.APOTHEKER) {
+      throw new OrderNotFoundException()
+    }
+
+    const settings = await this.settingsService.getApplicationSettings()
+    const now = this.clock.now()
+    const deliveryDate = resolveDeliveryDate(
+      now,
+      settings.timezone,
+      settings.orderingClosingTime,
+    )
+    const [orders, vaccines] = await Promise.all([
+      this.findOrdersForApotheker(user._id),
+      this.vaccineService.findVaccines(false, UserRole.APOTHEKER),
+    ])
+    const dailyTotals = this.getDailyQuantityByVaccine(orders, deliveryDate)
+    const dailyMaximum = settings.dailyDoseCapPerType
+
+    const allowances: DailyVaccineAllowance[] = vaccines.map(vaccine => {
+      const vaccineId = vaccine._id.toString()
+      const orderedToday = dailyTotals.get(vaccineId) ?? 0
+
+      return {
+        vaccineId,
+        vaccineName: vaccine.name,
+        dailyMaximum,
+        orderedToday,
+        remainingToday: Math.max(dailyMaximum - orderedToday, 0),
+      }
+    })
+
+    return { deliveryDate, allowances }
   }
 
   async cancelOwnOrder(user: User, id: string): Promise<Order> {

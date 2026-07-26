@@ -99,6 +99,7 @@ describe('OrderResolver (GraphQL)', () => {
     findMyOrders: jest.fn(),
     findMyOrder: jest.fn(),
     findMyWeeklyOrderSummary: jest.fn(),
+    findMyDailyVaccineAllowances: jest.fn(),
     cancelOwnOrder: jest.fn(),
     findOrders: jest.fn(),
     findOrderById: jest.fn(),

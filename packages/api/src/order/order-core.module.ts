@@ -24,6 +24,7 @@ const orderServiceProvider = isSchemaGeneration
         findMyOrders: () => Promise.resolve([]),
         findMyOrder: () => Promise.resolve(null),
         findMyWeeklyOrderSummary: () => Promise.resolve(null),
+        findMyDailyVaccineAllowances: () => Promise.resolve(null),
         cancelOwnOrder: () => Promise.resolve(null),
         findOrders: () => Promise.resolve([]),
         findOrderById: () => Promise.resolve(null),

@@ -50,13 +50,27 @@ export class WeeklyLimitExceededException extends BadRequestException {
   }
 }
 
+export type DailyLimitExceededDetails = {
+  vaccineId: string
+  vaccineName: string
+  dailyMaximum: number
+  alreadyOrderedToday: number
+  remainingToday: number
+  requestedQuantity: number
+}
+
 export class DailyLimitExceededException extends BadRequestException {
-  constructor(vaccineName: string, dailyLimit: number) {
+  constructor(details: DailyLimitExceededDetails) {
     super({
-      message: `Het dagmaximum van ${dailyLimit} dosissen voor ${vaccineName} is overschreden.`,
+      message: `Het dagmaximum van ${details.dailyMaximum} dosissen voor ${details.vaccineName} is overschreden.`,
       error: 'DAILY_LIMIT_EXCEEDED',
-      vaccineName,
-      dailyLimit,
+      vaccineId: details.vaccineId,
+      vaccineName: details.vaccineName,
+      dailyMaximum: details.dailyMaximum,
+      dailyLimit: details.dailyMaximum,
+      alreadyOrderedToday: details.alreadyOrderedToday,
+      remainingToday: details.remainingToday,
+      requestedQuantity: details.requestedQuantity,
     })
   }
 }

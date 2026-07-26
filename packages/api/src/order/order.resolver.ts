@@ -39,6 +39,7 @@ import {
 import { Order } from './order.entity'
 import { OrderStatus } from './order-status.enum'
 import { OrderService } from './order.service'
+import { MyDailyVaccineAllowances } from './daily-vaccine-allowance.type'
 import { WeeklyOrderSummary } from './weekly-order-summary.type'
 
 @Resolver(() => Order)
@@ -98,6 +99,18 @@ export class OrderResolver {
     @Args('isoWeek', { type: () => Int, nullable: true }) isoWeek?: number,
   ): Promise<WeeklyOrderSummary> {
     return this.orderService.findMyWeeklyOrderSummary(user, isoYear, isoWeek)
+  }
+
+  @Query(() => MyDailyVaccineAllowances, {
+    description:
+      'Returns per-vaccine daily order allowances for the authenticated apotheker (current delivery window)',
+  })
+  @UseGuards(AuthorizationGuard, RolesGuard)
+  @Roles(UserRole.APOTHEKER)
+  myDailyVaccineAllowances(
+    @CurrentUser() user: User,
+  ): Promise<MyDailyVaccineAllowances> {
+    return this.orderService.findMyDailyVaccineAllowances(user)
   }
 
   @Mutation(() => Order, {

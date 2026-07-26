@@ -120,6 +120,29 @@ export type {
 } from '@vaccin-delivery/types'
 export { MyWeeklyOrderSummaryDocument as MY_WEEKLY_ORDER_SUMMARY_QUERY } from '@vaccin-delivery/types'
 
+export const myDailyVaccineAllowancesQuerySource = gql`
+  query MyDailyVaccineAllowances {
+    myDailyVaccineAllowances {
+      deliveryDate
+      allowances {
+        vaccineId
+        vaccineName
+        dailyMaximum
+        orderedToday
+        remainingToday
+      }
+    }
+  }
+`
+
+export type {
+  MyDailyVaccineAllowancesQuery,
+  MyDailyVaccineAllowancesQueryVariables,
+} from '@vaccin-delivery/types'
+export {
+  MyDailyVaccineAllowancesDocument as MY_DAILY_VACCINE_ALLOWANCES_QUERY,
+} from '@vaccin-delivery/types'
+
 export const cancelOwnOrderMutationSource = gql`
   mutation CancelOwnOrder($id: ID!) {
     cancelOwnOrder(id: $id) {

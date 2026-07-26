@@ -35,7 +35,7 @@ describe('OrderService', () => {
     Pick<MongoRepository<Order>, 'findOne' | 'find' | 'create' | 'save'>
   >
   let vaccineService: jest.Mocked<
-    Pick<VaccineService, 'findVaccineEntityById'>
+    Pick<VaccineService, 'findVaccineEntityById' | 'findVaccines'>
   >
   let settingsService: jest.Mocked<
     Pick<SettingsService, 'getApplicationSettings'>
@@ -141,6 +141,7 @@ describe('OrderService', () => {
 
     vaccineService = {
       findVaccineEntityById: jest.fn(),
+      findVaccines: jest.fn(),
     }
 
     settingsService = {
@@ -468,11 +469,64 @@ describe('OrderService', () => {
       } as Order,
     ])
 
-    await expect(
-      service.createOrder(apotheker, {
+    try {
+      await service.createOrder(apotheker, {
         lines: [{ vaccineId: vaccineAId, quantity: 1 }],
-      }),
-    ).rejects.toBeInstanceOf(DailyLimitExceededException)
+      })
+      fail('Expected DailyLimitExceededException')
+    } catch (error: unknown) {
+      expect(error).toBeInstanceOf(DailyLimitExceededException)
+      const exception = error as DailyLimitExceededException
+      expect(exception.getResponse()).toEqual(
+        expect.objectContaining({
+          error: 'DAILY_LIMIT_EXCEEDED',
+          vaccineId: vaccineAId,
+          dailyMaximum: 50,
+          alreadyOrderedToday: 50,
+          remainingToday: 0,
+          requestedQuantity: 1,
+        }),
+      )
+    }
+  })
+
+  it('returns per-vaccine daily allowances for the current delivery window', async () => {
+    repository.find.mockResolvedValue([
+      {
+        ...pendingOrder,
+        totalQuantity: 12,
+        orderLines: [
+          {
+            vaccineId: vaccineAId,
+            vaccineName: 'Influenza',
+            manufacturer: 'PharmaCo',
+            quantity: 12,
+          },
+        ],
+      } as Order,
+    ])
+    vaccineService.findVaccines = jest
+      .fn()
+      .mockResolvedValue([activeVaccineA, activeVaccineB])
+
+    const result = await service.findMyDailyVaccineAllowances(apotheker)
+
+    expect(result.deliveryDate).toBe('2026-07-14')
+    expect(result.allowances).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          vaccineId: vaccineAId,
+          dailyMaximum: 50,
+          orderedToday: 12,
+          remainingToday: 38,
+        }),
+        expect.objectContaining({
+          vaccineId: vaccineBId,
+          orderedToday: 0,
+          remainingToday: 50,
+        }),
+      ]),
+    )
   })
 
   it('retrieves only the current pharmacist orders', async () => {

@@ -18,6 +18,7 @@ import {
   CANCEL_ORDER_MUTATION,
   CANCEL_OWN_ORDER_MUTATION,
   CREATE_ORDER_MUTATION,
+  MY_DAILY_VACCINE_ALLOWANCES_QUERY,
   MY_ORDERS_QUERY,
   MY_WEEKLY_ORDER_SUMMARY_QUERY,
   UPDATE_ORDER_STATUS_MUTATION,
@@ -30,11 +31,13 @@ import {
   type CancelOwnOrderMutation,
   type CreateOrderMutation,
   type CreateOrderMutationVariables,
+  type MyDailyVaccineAllowancesQuery,
   type MyOrdersQuery,
   type MyWeeklyOrderSummaryQuery,
   type UpdateOrderStatusMutation,
   type UpdateOrderStatusMutationVariables,
 } from '@/assets/graphql/order'
+import { extractDailyLimitExceededDetails } from '@/composables/daily-limit-error'
 import {
   applyCancelMutationFailure,
   applyStatusMutationFailure,
@@ -53,12 +56,17 @@ export type AdminWeeklyStats =
   AdminWeeklyStatisticsQuery['adminWeeklyStatistics']
 export type WeeklyOrderSummary =
   MyWeeklyOrderSummaryQuery['myWeeklyOrderSummary']
+export type DailyVaccineAllowances =
+  MyDailyVaccineAllowancesQuery['myDailyVaccineAllowances']
+export type DailyVaccineAllowance =
+  DailyVaccineAllowances['allowances'][number]
 
 const myOrders = ref<OrderListItem[]>([])
 const adminOrders = ref<AdminOrderListItem[]>([])
 const dailyOverview = ref<AdminDailyOverview | null>(null)
 const weeklyStatistics = ref<AdminWeeklyStats | null>(null)
 const weeklySummary = ref<WeeklyOrderSummary | null>(null)
+const dailyAllowances = ref<DailyVaccineAllowances | null>(null)
 const loading = ref(false)
 const errorMessage = ref<string | null>(null)
 const adminOrdersLoading = ref(false)
@@ -187,6 +195,26 @@ export function useOrders() {
 
       weeklySummary.value = result.data.myWeeklyOrderSummary
       return result.data.myWeeklyOrderSummary
+    } catch (error: unknown) {
+      errorMessage.value = mapGraphQLError(error)
+      throw error
+    } finally {
+      loading.value = false
+    }
+  }
+
+  async function loadDailyAllowances(): Promise<DailyVaccineAllowances> {
+    loading.value = true
+    errorMessage.value = null
+
+    try {
+      const result = await apolloClient.query<MyDailyVaccineAllowancesQuery>({
+        query: MY_DAILY_VACCINE_ALLOWANCES_QUERY,
+        fetchPolicy: 'network-only',
+      })
+
+      dailyAllowances.value = result.data.myDailyVaccineAllowances
+      return result.data.myDailyVaccineAllowances
     } catch (error: unknown) {
       errorMessage.value = mapGraphQLError(error)
       throw error
@@ -532,6 +560,7 @@ export function useOrders() {
     dailyOverview,
     weeklyStatistics,
     weeklySummary,
+    dailyAllowances,
     loading,
     errorMessage,
     adminOrdersLoading,
@@ -549,6 +578,7 @@ export function useOrders() {
     hasWeeklyWarning,
     loadMyOrders,
     loadWeeklySummary,
+    loadDailyAllowances,
     createOrder,
     cancelOwnOrder,
     loadAdminOrders,
@@ -564,6 +594,7 @@ export function useOrders() {
     stopAdminOrderSubscriptions,
     isWeeklyLimitExceededError,
     isDailyLimitExceededError,
+    extractDailyLimitExceededDetails,
     isVaccineInactiveError,
     isOrderCannotBeCancelledError,
     isInvalidOrderStatusTransitionError,
