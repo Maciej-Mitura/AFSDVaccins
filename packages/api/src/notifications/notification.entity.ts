@@ -67,8 +67,10 @@ export class Notification {
 
   /**
    * @deprecated Prefer eventId. Kept for legacy rows and dual-write during transition.
+   * Uniqueness is a partial index on string values only (see NotificationPersistenceService).
+   * Do not use TypeORM `@Index({ unique: true, sparse: true })` — Mongo indexes explicit
+   * nulls and blocks multi-recipient typed notifications that omit this field.
    */
-  @Index({ unique: true, sparse: true })
   @Column({ nullable: true })
   deduplicationKey?: string | null
 

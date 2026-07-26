@@ -219,6 +219,16 @@ export class NotificationService {
     })
 
     const saved = await this.notificationRepository.save(notification)
+
+    // TypeORM Mongo may persist explicit null for omitted nullable columns.
+    // Typed notifications never set deduplicationKey — unset so partial unique
+    // indexes and multi-recipient fan-out stay valid.
+    await this.notificationRepository.updateOne(
+      { _id: saved._id },
+      { $unset: { deduplicationKey: '' } },
+    )
+    delete (saved as { deduplicationKey?: string | null }).deduplicationKey
+
     await this.notificationEventsService.publishNotificationReceived(saved)
 
     return { notification: saved, created: true }

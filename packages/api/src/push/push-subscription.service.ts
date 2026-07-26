@@ -23,6 +23,17 @@ import {
 } from './push-notification.provider'
 import { resolvePushProviderMode } from './push-provider.selection'
 
+/**
+ * TypeORM Mongo `where: { disabledAt: null }` / `count` is unreliable against
+ * real Mongo nulls (Phase 27D acceptance). Filter active rows in memory after
+ * loading by indexed equality fields.
+ */
+export function isActivePushSubscription(
+  subscription: Pick<PushSubscriptionEntity, 'disabledAt'>,
+): boolean {
+  return subscription.disabledAt == null
+}
+
 @Injectable()
 export class PushSubscriptionService {
   constructor(
@@ -100,11 +111,11 @@ export class PushSubscriptionService {
     now: Date,
   ): Promise<void> {
     const sharingEndpoint = await this.subscriptionRepository.find({
-      where: { endpointHash, disabledAt: null },
+      where: { endpointHash },
     })
 
     for (const sub of sharingEndpoint) {
-      if (sub.userId === userId) {
+      if (sub.userId === userId || !isActivePushSubscription(sub)) {
         continue
       }
 
@@ -130,17 +141,20 @@ export class PushSubscriptionService {
         where: { userId, endpointHash },
       })
 
-      if (existing && !existing.disabledAt) {
+      if (existing && isActivePushSubscription(existing)) {
         existing.disabledAt = now
         existing.updatedAt = now
         await this.subscriptionRepository.save(existing)
       }
     } else {
-      const active = await this.subscriptionRepository.find({
-        where: { userId, disabledAt: null },
+      const owned = await this.subscriptionRepository.find({
+        where: { userId },
       })
 
-      for (const sub of active) {
+      for (const sub of owned) {
+        if (!isActivePushSubscription(sub)) {
+          continue
+        }
         sub.disabledAt = now
         sub.updatedAt = now
         await this.subscriptionRepository.save(sub)
@@ -152,9 +166,7 @@ export class PushSubscriptionService {
 
   async getCapabilityStatus(user: User): Promise<PushCapabilityStatus> {
     const userId = user._id.toString()
-    const active = await this.subscriptionRepository.count({
-      where: { userId, disabledAt: null },
-    })
+    const active = (await this.findActiveSubscriptionsForUser(userId)).length
 
     const nodeEnv = this.configService.get('NODE_ENV', { infer: true })
     const mode = resolvePushProviderMode(
@@ -184,9 +196,10 @@ export class PushSubscriptionService {
   async findActiveSubscriptionsForUser(
     userId: string,
   ): Promise<PushSubscriptionEntity[]> {
-    return this.subscriptionRepository.find({
-      where: { userId, disabledAt: null },
+    const owned = await this.subscriptionRepository.find({
+      where: { userId },
     })
+    return owned.filter(isActivePushSubscription)
   }
 
   async applyPushResult(

@@ -20,7 +20,8 @@ export class Order {
 
   @Field(() => ID)
   get id(): string {
-    return this._id
+    // TypeORM Mongo may leave _id as ObjectId; interpolation/i18n need a string.
+    return typeof this._id === 'string' ? this._id : String(this._id)
   }
 
   @Index()

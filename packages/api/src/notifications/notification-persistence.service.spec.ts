@@ -2,6 +2,8 @@ import { MongoRepository } from 'typeorm'
 
 import {
   LEGACY_NOTIFICATION_RECIPIENT_EVENT_INDEX_NAME,
+  NOTIFICATION_DEDUPLICATION_KEY_INDEX_NAME,
+  NOTIFICATION_DEDUPLICATION_KEY_PARTIAL_INDEX,
   NOTIFICATION_RECIPIENT_EVENT_INDEX_NAME,
   NOTIFICATION_RECIPIENT_EVENT_PARTIAL_INDEX,
   NotificationPersistenceService,
@@ -42,6 +44,12 @@ describe('NotificationPersistenceService', () => {
         key: { recipientUserId: 1, eventId: 1 },
         unique: true,
       },
+      {
+        name: 'IDX_legacy_dedup_null',
+        key: { deduplicationKey: 1 },
+        unique: true,
+        sparse: true,
+      },
     ])
 
     await service.initializeNotificationPersistence()
@@ -53,12 +61,23 @@ describe('NotificationPersistenceService', () => {
     expect(repository.dropCollectionIndex).toHaveBeenCalledWith(
       LEGACY_NOTIFICATION_RECIPIENT_EVENT_INDEX_NAME,
     )
+    expect(repository.dropCollectionIndex).toHaveBeenCalledWith(
+      'IDX_legacy_dedup_null',
+    )
     expect(repository.createCollectionIndex).toHaveBeenCalledWith(
       NOTIFICATION_RECIPIENT_EVENT_PARTIAL_INDEX.key,
       expect.objectContaining({
         name: NOTIFICATION_RECIPIENT_EVENT_INDEX_NAME,
         unique: true,
         partialFilterExpression: { eventId: { $type: 'string' } },
+      }),
+    )
+    expect(repository.createCollectionIndex).toHaveBeenCalledWith(
+      NOTIFICATION_DEDUPLICATION_KEY_PARTIAL_INDEX.key,
+      expect.objectContaining({
+        name: NOTIFICATION_DEDUPLICATION_KEY_INDEX_NAME,
+        unique: true,
+        partialFilterExpression: { deduplicationKey: { $type: 'string' } },
       }),
     )
   })

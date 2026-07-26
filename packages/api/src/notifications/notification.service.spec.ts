@@ -13,7 +13,7 @@ describe('NotificationService', () => {
   let repository: jest.Mocked<
     Pick<
       MongoRepository<Notification>,
-      'findOne' | 'find' | 'create' | 'save' | 'count'
+      'findOne' | 'find' | 'create' | 'save' | 'count' | 'updateOne'
     >
   >
   let notificationEventsService: jest.Mocked<
@@ -73,6 +73,7 @@ describe('NotificationService', () => {
       create: jest.fn(),
       save: jest.fn(),
       count: jest.fn(),
+      updateOne: jest.fn().mockResolvedValue({ modifiedCount: 1 }),
     }
 
     notificationEventsService = {
@@ -166,6 +167,10 @@ describe('NotificationService', () => {
     expect(result.notification.title).toBe(result.notification.titleKey)
     expect(result.notification.eventId).toBe('route-assigned:route-1:bezorger')
     expect(repository.save).toHaveBeenCalledTimes(1)
+    expect(repository.updateOne).toHaveBeenCalledWith(
+      { _id: '6a569d2cbb2590db980429ce' },
+      { $unset: { deduplicationKey: '' } },
+    )
     expect(
       notificationEventsService.publishNotificationReceived,
     ).toHaveBeenCalledTimes(1)

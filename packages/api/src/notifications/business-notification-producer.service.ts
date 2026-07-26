@@ -74,11 +74,11 @@ export class BusinessNotificationProducerService {
         order.apothekerId.toString(),
       )
       const pharmacyName = profile?.pharmacyName?.trim() || 'Pharmacy'
-      const orderReference = order.id
+      const orderReference = String(order.id)
       const orderCount =
         order.orderLines?.length ??
         (order.totalQuantity != null ? 1 : 0)
-      const eventId = buildAdminNewOrderEventId(order.id)
+      const eventId = buildAdminNewOrderEventId(orderReference)
       const actionPath = this.requireInternalPath(ACTION_ADMIN_ORDERS)
 
       await Promise.all(
@@ -95,7 +95,7 @@ export class BusinessNotificationProducerService {
               routeDate: order.deliveryDate,
             },
             sourceEntityType: 'order',
-            sourceEntityId: order.id,
+            sourceEntityId: orderReference,
             actionPath,
           }),
         ),

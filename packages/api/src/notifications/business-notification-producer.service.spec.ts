@@ -186,6 +186,24 @@ describe('BusinessNotificationProducerService', () => {
       expect(first.actionPath).toBe('/admin/orders')
     })
 
+    it('stringifies ObjectId-like order.id for orderReference (Phase 27D)', async () => {
+      const objectIdLike = {
+        toString: () => '507f1f77bcf86cd799439011',
+      }
+      await producer.notifyAdminsNewOrder(
+        makeOrder({ id: objectIdLike as unknown as string }),
+      )
+
+      expect(typedCall(0).interpolationData?.orderReference).toBe(
+        '507f1f77bcf86cd799439011',
+      )
+      expect(typeof typedCall(0).interpolationData?.orderReference).toBe(
+        'string',
+      )
+      expect(typedCall(0).sourceEntityId).toBe('507f1f77bcf86cd799439011')
+      expect(requestPushDelivery).toHaveBeenCalled()
+    })
+
     it('does not duplicate on retry', async () => {
       const order = makeOrder()
       await producer.notifyAdminsNewOrder(order)

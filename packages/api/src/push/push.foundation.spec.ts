@@ -12,7 +12,10 @@ import {
   assertWebPushSecrets,
 } from './push-provider.selection'
 import { PushSubscriptionEntity } from './push-subscription.entity'
-import { PushSubscriptionService } from './push-subscription.service'
+import {
+  isActivePushSubscription,
+  PushSubscriptionService,
+} from './push-subscription.service'
 import { NotificationType } from '../notifications/notification-type.enum'
 import { Notification } from '../notifications/notification.entity'
 import { NotificationService } from '../notifications/notification.service'
@@ -129,7 +132,7 @@ describe('PushSubscriptionService', () => {
   let repository: jest.Mocked<
     Pick<
       MongoRepository<PushSubscriptionEntity>,
-      'findOne' | 'find' | 'create' | 'save' | 'count'
+      'findOne' | 'find' | 'create' | 'save'
     >
   >
   let service: PushSubscriptionService
@@ -141,7 +144,6 @@ describe('PushSubscriptionService', () => {
       find: jest.fn().mockResolvedValue([]),
       create: jest.fn(),
       save: jest.fn(),
-      count: jest.fn().mockResolvedValue(1),
     }
     fake = new FakePushNotificationProvider()
     const config = {
@@ -160,6 +162,12 @@ describe('PushSubscriptionService', () => {
     )
   })
 
+  it('treats null and missing disabledAt as active (TypeORM null-query regression)', () => {
+    expect(isActivePushSubscription({ disabledAt: null })).toBe(true)
+    expect(isActivePushSubscription({ disabledAt: undefined })).toBe(true)
+    expect(isActivePushSubscription({ disabledAt: now })).toBe(false)
+  })
+
   it('registers subscription with actor-derived userId (idempotent update)', async () => {
     repository.findOne.mockResolvedValue(null)
     repository.create.mockImplementation(value => value as PushSubscriptionEntity)
@@ -172,6 +180,14 @@ describe('PushSubscriptionService', () => {
         updatedAt: now,
       } as PushSubscriptionEntity),
     )
+    const activeRow = {
+      _id: 'sub-1',
+      userId: user._id,
+      disabledAt: null,
+    } as PushSubscriptionEntity
+    repository.find
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([activeRow])
 
     const status = await service.registerSubscription(user, {
       endpoint: 'https://push.example/device-1',
@@ -204,7 +220,11 @@ describe('PushSubscriptionService', () => {
       updatedAt: now,
     } as PushSubscriptionEntity
     repository.findOne.mockResolvedValue(existing)
-    repository.count.mockResolvedValue(1)
+    repository.find
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([
+        { ...existing, disabledAt: null } as PushSubscriptionEntity,
+      ])
 
     const updated = await service.registerSubscription(user, {
       endpoint: 'https://push.example/device-1',
@@ -217,14 +237,44 @@ describe('PushSubscriptionService', () => {
     expect(updated.subscriptionCount).toBe(1)
   })
 
+  it('counts active subscriptions via find+filter (not TypeORM null count)', async () => {
+    repository.find.mockResolvedValue([
+      {
+        _id: 'a',
+        userId: user._id,
+        disabledAt: null,
+      } as PushSubscriptionEntity,
+      {
+        _id: 'b',
+        userId: user._id,
+        disabledAt: now,
+      } as PushSubscriptionEntity,
+    ])
+
+    const status = await service.getCapabilityStatus(user)
+    expect(status.enabled).toBe(true)
+    expect(status.subscriptionCount).toBe(1)
+    expect(repository.find).toHaveBeenCalledWith({
+      where: { userId: user._id },
+    })
+  })
+
   it('allows multiple devices per user', async () => {
     repository.findOne.mockResolvedValue(null)
     repository.create.mockImplementation(value => value as PushSubscriptionEntity)
     repository.save.mockImplementation(value =>
       Promise.resolve(value as PushSubscriptionEntity),
     )
-    repository.count.mockResolvedValue(2)
-    repository.find.mockResolvedValue([])
+    const twoActive = [
+      { _id: 'a', userId: user._id, disabledAt: null },
+      { _id: 'b', userId: user._id, disabledAt: null },
+    ] as PushSubscriptionEntity[]
+    repository.find
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([twoActive[0]])
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce(twoActive)
+      .mockResolvedValueOnce(twoActive)
 
     await service.registerSubscription(user, {
       endpoint: 'https://push.example/device-a',
@@ -248,7 +298,6 @@ describe('PushSubscriptionService', () => {
     repository.save.mockImplementation(value =>
       Promise.resolve(value as PushSubscriptionEntity),
     )
-    repository.count.mockResolvedValue(1)
 
     const otherActive = {
       _id: 'other-sub',
@@ -259,7 +308,15 @@ describe('PushSubscriptionService', () => {
       failureCount: 0,
     } as PushSubscriptionEntity
 
-    repository.find.mockResolvedValue([otherActive])
+    repository.find
+      .mockResolvedValueOnce([otherActive])
+      .mockResolvedValueOnce([
+        {
+          _id: 'mine',
+          userId: user._id,
+          disabledAt: null,
+        } as PushSubscriptionEntity,
+      ])
 
     await service.registerSubscription(user, {
       endpoint: 'https://push.example/shared-device',
@@ -278,6 +335,7 @@ describe('PushSubscriptionService', () => {
 
   it('unsubscribe is idempotent and scoped to actor', async () => {
     repository.findOne.mockResolvedValue(null)
+    repository.find.mockResolvedValue([])
     const status = await service.disableSubscription(user, {
       endpoint: 'https://push.example/missing',
     })
@@ -293,7 +351,7 @@ describe('PushSubscriptionService', () => {
     } as PushSubscriptionEntity
     repository.findOne.mockResolvedValue(owned)
     repository.save.mockResolvedValue(owned)
-    repository.count.mockResolvedValue(0)
+    repository.find.mockResolvedValue([])
 
     await service.disableSubscription(user, {
       endpoint: 'https://push.example/device-1',

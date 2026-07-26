@@ -12,10 +12,15 @@ export const NOTIFICATION_RECIPIENT_EVENT_INDEX_NAME =
 export const LEGACY_NOTIFICATION_RECIPIENT_EVENT_INDEX_NAME =
   'UQ_notifications_recipient_event'
 
+/** Partial unique index: only string deduplicationKey values (null/absent allowed). */
+export const NOTIFICATION_DEDUPLICATION_KEY_INDEX_NAME =
+  'notifications_deduplicationKey_string_unique'
+
 export type MongoCollectionIndex = {
   name: string
   key: Record<string, number>
   unique?: boolean
+  sparse?: boolean
   partialFilterExpression?: Record<string, unknown>
 }
 
@@ -25,6 +30,15 @@ export const NOTIFICATION_RECIPIENT_EVENT_PARTIAL_INDEX = {
   unique: true,
   partialFilterExpression: {
     eventId: { $type: 'string' },
+  },
+} as const
+
+export const NOTIFICATION_DEDUPLICATION_KEY_PARTIAL_INDEX = {
+  key: { deduplicationKey: 1 },
+  name: NOTIFICATION_DEDUPLICATION_KEY_INDEX_NAME,
+  unique: true,
+  partialFilterExpression: {
+    deduplicationKey: { $type: 'string' },
   },
 } as const
 
@@ -68,6 +82,7 @@ export class NotificationPersistenceService implements OnModuleInit {
     const unsetDedupCount = await this.repairLegacyNullDeduplicationKeys()
     const backfilled = await this.backfillEventIdFromDeduplicationKey()
     await this.ensurePartialUniqueRecipientEventIndex()
+    await this.ensurePartialUniqueDeduplicationKeyIndex()
 
     if (unsetEventIdCount > 0) {
       this.logger.log(
@@ -183,5 +198,59 @@ export class NotificationPersistenceService implements OnModuleInit {
           NOTIFICATION_RECIPIENT_EVENT_PARTIAL_INDEX.partialFilterExpression,
       },
     )
+  }
+
+  /**
+   * Replaces TypeORM sparse-unique on deduplicationKey (indexes explicit null)
+   * with a partial unique index that only covers string keys.
+   */
+  async ensurePartialUniqueDeduplicationKeyIndex(): Promise<void> {
+    await this.dropLegacyDeduplicationKeyIndexes()
+
+    await this.notificationRepository.createCollectionIndex(
+      NOTIFICATION_DEDUPLICATION_KEY_PARTIAL_INDEX.key,
+      {
+        name: NOTIFICATION_DEDUPLICATION_KEY_PARTIAL_INDEX.name,
+        unique: NOTIFICATION_DEDUPLICATION_KEY_PARTIAL_INDEX.unique,
+        partialFilterExpression:
+          NOTIFICATION_DEDUPLICATION_KEY_PARTIAL_INDEX.partialFilterExpression,
+      },
+    )
+  }
+
+  async dropLegacyDeduplicationKeyIndexes(): Promise<void> {
+    let indexes: MongoCollectionIndex[]
+
+    try {
+      indexes =
+        (await this.notificationRepository.collectionIndexes()) as MongoCollectionIndex[]
+    } catch (error) {
+      if (isMongoNamespaceNotFound(error)) {
+        return
+      }
+      throw error
+    }
+
+    for (const index of indexes) {
+      if (index.name === '_id_') {
+        continue
+      }
+
+      if (index.name === NOTIFICATION_DEDUPLICATION_KEY_INDEX_NAME) {
+        continue
+      }
+
+      const keys = index.key ?? {}
+      const isDeduplicationKeyOnly =
+        Object.prototype.hasOwnProperty.call(keys, 'deduplicationKey') &&
+        Object.keys(keys).length === 1
+
+      if (isDeduplicationKeyOnly && index.unique) {
+        await this.notificationRepository.dropCollectionIndex(index.name)
+        this.logger.log(
+          `Dropped legacy notifications deduplicationKey index ${index.name}`,
+        )
+      }
+    }
   }
 }

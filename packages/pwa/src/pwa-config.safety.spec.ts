@@ -61,6 +61,15 @@ describe('PWA safety and configuration', () => {
     expect(swSource).toContain('/api')
   })
 
+  it('loads VITE_PWA_DEV from .env via loadEnv so local Web Push SW can enable', () => {
+    // Regression: process.env alone misses packages/pwa/.env during config eval.
+    expect(viteConfig).toContain('loadEnv')
+    expect(viteConfig).toMatch(/env\.VITE_PWA_DEV\s*===\s*['"]true['"]/)
+    expect(viteConfig).toMatch(
+      /process\.env\.VITE_PWA_DEV\s*===\s*['"]true['"]/,
+    )
+  })
+
   it('GraphQL endpoints are not runtime cached', () => {
     expect(viteConfig).not.toMatch(/urlPattern:.*graphql/i)
     expect(viteConfig).not.toMatch(/cacheName:\s*['"][^'"]*graphql[^'"]*['"]/i)
