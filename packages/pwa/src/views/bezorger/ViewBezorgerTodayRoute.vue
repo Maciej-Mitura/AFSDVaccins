@@ -5,12 +5,16 @@ import { useI18n } from 'vue-i18n'
 import CommonEmptyState from '@/components/common/CommonEmptyState.vue'
 import CommonErrorState from '@/components/common/CommonErrorState.vue'
 import CommonLoadingSkeleton from '@/components/common/CommonLoadingSkeleton.vue'
+import FeatureBezorgerDeliveryQrWorkflow from '@/components/feature/bezorger/FeatureBezorgerDeliveryQrWorkflow.vue'
 import { RouteStatus, useDeliveryRoutes } from '@/composables/useDeliveryRoutes'
 import { useOnlineStatus } from '@/composables/useOnlineStatus'
 import { useRealtimeConnection } from '@/composables/useRealtimeConnection'
-import { routeStatusLabel, translatePlural } from '@/i18n'
+import { formatDateTime, routeStatusLabel, translatePlural } from '@/i18n'
+import { UserRole } from '@vaccin-delivery/types'
+import { useCurrentUser } from '@/composables/useCurrentUser'
 
 const { t } = useI18n()
+const { currentUser } = useCurrentUser()
 const {
   myTodayRoute,
   loading,
@@ -30,6 +34,13 @@ const { isOnline } = useOnlineStatus()
 
 const confirmStart = ref(false)
 const confirmComplete = ref(false)
+
+const canScanDeliveryQr = computed(() => {
+  return (
+    currentUser.value?.role === UserRole.Bezorger &&
+    myTodayRoute.value?.status === RouteStatus.InProgress
+  )
+})
 
 const latestCancelReason = computed(() => {
   const route = myTodayRoute.value
@@ -204,6 +215,12 @@ onUnmounted(() => {
           {{ t('common.cancel') }}
         </UButton>
 
+        <FeatureBezorgerDeliveryQrWorkflow
+          v-if="myTodayRoute.status === RouteStatus.InProgress"
+          :enabled="canScanDeliveryQr"
+          :on-refresh-route="loadMyTodayRoute"
+        />
+
         <UButton
           v-if="myTodayRoute.status === RouteStatus.InProgress"
           block
@@ -263,15 +280,29 @@ onUnmounted(() => {
       <ol v-else class="space-y-4">
         <li
           v-for="stop in myTodayRoute.stops"
-          :key="`${stop.apothekerProfileId}-${stop.sequence}`"
+          :key="stop.stopId ?? `${stop.apothekerProfileId}-${stop.sequence}`"
           class="rounded-lg border border-default px-4 py-4"
           data-testid="route-stop"
+          :data-delivered="stop.qrConsumed || Boolean(stop.deliveredAt)"
         >
           <p class="text-xs font-medium uppercase tracking-wide text-muted">
             {{ t('bezorger.route.stop.label', { sequence: stop.sequence }) }}
           </p>
           <h2 class="mt-1 text-lg font-semibold">{{ stop.pharmacyName }}</h2>
           <p class="mt-1 text-sm">{{ formatAddress(stop) }}</p>
+          <p
+            v-if="stop.qrConsumed || stop.deliveredAt"
+            class="mt-2 text-sm font-medium text-success"
+            data-testid="route-stop-delivered"
+          >
+            {{
+              stop.deliveredAt
+                ? t('bezorger.route.stop.deliveredAt', {
+                    deliveredAt: formatDateTime(stop.deliveredAt),
+                  })
+                : t('bezorger.route.stop.delivered')
+            }}
+          </p>
           <p class="mt-3 text-sm font-medium">
             {{ stopTotalLabel(stop.totalQuantity) }}
             <span class="font-normal text-muted">

@@ -12,6 +12,7 @@ export const deliveryRoutesQuerySource = gql`
       deliveryDate
       status
       stops {
+        stopId
         sequence
         apothekerProfileId
         apothekerUserId
@@ -32,6 +33,9 @@ export const deliveryRoutesQuerySource = gql`
           manufacturer
           quantity
         }
+        qrAvailable
+        qrConsumed
+        deliveredAt
       }
       skippedApothekerProfileIds
       statusHistory {
@@ -64,6 +68,7 @@ export const deliveryRouteQuerySource = gql`
       deliveryDate
       status
       stops {
+        stopId
         sequence
         apothekerProfileId
         apothekerUserId
@@ -84,6 +89,9 @@ export const deliveryRouteQuerySource = gql`
           manufacturer
           quantity
         }
+        qrAvailable
+        qrConsumed
+        deliveredAt
       }
       skippedApothekerProfileIds
       statusHistory {
@@ -116,6 +124,7 @@ export const myTodayRouteQuerySource = gql`
       deliveryDate
       status
       stops {
+        stopId
         sequence
         apothekerProfileId
         apothekerUserId
@@ -136,6 +145,9 @@ export const myTodayRouteQuerySource = gql`
           manufacturer
           quantity
         }
+        qrAvailable
+        qrConsumed
+        deliveredAt
       }
       skippedApothekerProfileIds
       statusHistory {
@@ -171,6 +183,7 @@ export const generateDeliveryRouteMutationSource = gql`
       deliveryDate
       status
       stops {
+        stopId
         sequence
         apothekerProfileId
         apothekerUserId
@@ -191,6 +204,9 @@ export const generateDeliveryRouteMutationSource = gql`
           manufacturer
           quantity
         }
+        qrAvailable
+        qrConsumed
+        deliveredAt
       }
       skippedApothekerProfileIds
       statusHistory {
@@ -223,6 +239,7 @@ export const updateRouteStatusMutationSource = gql`
       deliveryDate
       status
       stops {
+        stopId
         sequence
         apothekerProfileId
         apothekerUserId
@@ -243,6 +260,9 @@ export const updateRouteStatusMutationSource = gql`
           manufacturer
           quantity
         }
+        qrAvailable
+        qrConsumed
+        deliveredAt
       }
       skippedApothekerProfileIds
       statusHistory {
@@ -275,6 +295,7 @@ export const bezorgerRouteUpdatesSubscriptionSource = gql`
       deliveryDate
       status
       stops {
+        stopId
         sequence
         apothekerProfileId
         apothekerUserId
@@ -295,6 +316,9 @@ export const bezorgerRouteUpdatesSubscriptionSource = gql`
           manufacturer
           quantity
         }
+        qrAvailable
+        qrConsumed
+        deliveredAt
       }
       skippedApothekerProfileIds
       statusHistory {
