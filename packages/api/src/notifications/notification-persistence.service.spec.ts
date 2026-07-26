@@ -66,6 +66,7 @@ describe('NotificationPersistenceService', () => {
   it('backfills eventId from deduplicationKey when missing', async () => {
     repository.updateMany
       .mockResolvedValueOnce({ modifiedCount: 0 })
+      .mockResolvedValueOnce({ modifiedCount: 0 })
       .mockResolvedValueOnce({ modifiedCount: 2 })
     repository.collectionIndexes.mockResolvedValue([
       { name: '_id_', key: { _id: 1 } },
@@ -74,7 +75,17 @@ describe('NotificationPersistenceService', () => {
     await service.initializeNotificationPersistence()
 
     expect(repository.updateMany).toHaveBeenNthCalledWith(
+      1,
+      { eventId: { $type: 'null' } },
+      { $unset: { eventId: '' } },
+    )
+    expect(repository.updateMany).toHaveBeenNthCalledWith(
       2,
+      { deduplicationKey: { $type: 'null' } },
+      { $unset: { deduplicationKey: '' } },
+    )
+    expect(repository.updateMany).toHaveBeenNthCalledWith(
+      3,
       {
         deduplicationKey: { $type: 'string' },
         $or: [
