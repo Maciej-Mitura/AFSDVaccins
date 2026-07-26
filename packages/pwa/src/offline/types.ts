@@ -22,8 +22,7 @@ export type OfflineDiagnosticCategory =
   | 'unknown'
 
 /**
- * Allowed pending-action types for the schema foundation.
- * Sync processing is Phase 28C — do not enqueue from UI yet.
+ * Allowed pending-action types (Phase 28C: courier stop arrival only).
  */
 export enum PendingActionType {
   CourierStopArrived = 'COURIER_STOP_ARRIVED',
@@ -65,6 +64,12 @@ export type CachedRouteLine = {
   quantity: number
 }
 
+export type CachedRouteStopArrival = {
+  clientArrivedAt: string
+  recordedAt: string
+  arrivedByUserId: string
+}
+
 export type CachedRouteStop = {
   stopId: string | null
   sequence: number
@@ -78,6 +83,8 @@ export type CachedRouteStop = {
   qrAvailable: boolean
   qrConsumed: boolean
   deliveredAt: string | null
+  /** Server-confirmed arrival only — never invent from pending overlay. */
+  arrival: CachedRouteStopArrival | null
 }
 
 /**
@@ -134,17 +141,20 @@ export type NotificationCacheRecord = {
 export type PendingActionPayload = {
   routeId: string
   stopId: string
+  clientArrivedAt: string
 }
 
 export type PendingActionRecord = {
   actionId: string
   ownerUserId: string
+  ownerBezorgerProfileId: string
   type: PendingActionType
   payload: PendingActionPayload
   createdAt: string
   updatedAt: string
   state: PendingActionState
   retryCount: number
+  lastAttemptAt: string | null
   lastErrorCode: string | null
   idempotencyKey: string
   expiresAt: string

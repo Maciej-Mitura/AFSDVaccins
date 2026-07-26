@@ -148,6 +148,7 @@ function sampleRoute(overrides: Record<string, unknown> = {}) {
         qrAvailable: true,
         qrConsumed: false,
         deliveredAt: null,
+        arrival: null,
       },
     ],
     ...overrides,

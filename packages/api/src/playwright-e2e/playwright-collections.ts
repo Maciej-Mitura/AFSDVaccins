@@ -7,6 +7,7 @@ import { BezorgerProfile } from '../profile/bezorger/bezorger-profile.entity'
 import { RouteTemplate } from '../route-templates/route-template.entity'
 import { DeliveryRoute } from '../routes/delivery-route.entity'
 import { DeliveryQrConfirmAuditEvent } from '../routes/qr/delivery-qr-confirm-audit.entity'
+import { DeliveryStopArrivalAuditEvent } from '../routes/arrival/delivery-stop-arrival-audit.entity'
 import { ApplicationSettings } from '../settings/settings.entity'
 import { StockAdjustment } from '../stock/stock-adjustment.entity'
 import { User } from '../user/user.entity'
@@ -19,6 +20,7 @@ const PLAYWRIGHT_ENTITIES = [
   Notification,
   DeliveryRoute,
   DeliveryQrConfirmAuditEvent,
+  DeliveryStopArrivalAuditEvent,
   RouteTemplate,
   Order,
   StockAdjustment,
@@ -28,6 +30,7 @@ const PLAYWRIGHT_ENTITIES = [
   BezorgerProfile,
   User,
 ] as const
+
 
 function assertSafePlaywrightDatabaseName(dbName: string): void {
   const normalized = dbName.trim().toLowerCase()

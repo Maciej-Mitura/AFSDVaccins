@@ -63,3 +63,19 @@ export function DeliveryQrConfirmThrottle(): MethodDecorator {
     },
   })
 }
+
+/**
+ * Courier stop-arrival throttle: 30 attempts per 10 minutes per identity.
+ * Allows offline queue flush without matching QR confirm strictness.
+ */
+export const DELIVERY_STOP_ARRIVAL_THROTTLE_LIMIT = 30
+export const DELIVERY_STOP_ARRIVAL_THROTTLE_TTL_MS = 600_000
+
+export function DeliveryStopArrivalThrottle(): MethodDecorator {
+  return Throttle({
+    [THROTTLER_STRICT]: {
+      limit: DELIVERY_STOP_ARRIVAL_THROTTLE_LIMIT,
+      ttl: DELIVERY_STOP_ARRIVAL_THROTTLE_TTL_MS,
+    },
+  })
+}

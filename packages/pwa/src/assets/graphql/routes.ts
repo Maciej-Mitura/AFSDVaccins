@@ -36,6 +36,11 @@ export const deliveryRoutesQuerySource = gql`
         qrAvailable
         qrConsumed
         deliveredAt
+        arrival {
+          clientArrivedAt
+          recordedAt
+          arrivedByUserId
+        }
       }
       skippedApothekerProfileIds
       statusHistory {
@@ -92,6 +97,11 @@ export const deliveryRouteQuerySource = gql`
         qrAvailable
         qrConsumed
         deliveredAt
+        arrival {
+          clientArrivedAt
+          recordedAt
+          arrivedByUserId
+        }
       }
       skippedApothekerProfileIds
       statusHistory {
@@ -148,6 +158,11 @@ export const myTodayRouteQuerySource = gql`
         qrAvailable
         qrConsumed
         deliveredAt
+        arrival {
+          clientArrivedAt
+          recordedAt
+          arrivedByUserId
+        }
       }
       skippedApothekerProfileIds
       statusHistory {
@@ -207,6 +222,11 @@ export const generateDeliveryRouteMutationSource = gql`
         qrAvailable
         qrConsumed
         deliveredAt
+        arrival {
+          clientArrivedAt
+          recordedAt
+          arrivedByUserId
+        }
       }
       skippedApothekerProfileIds
       statusHistory {
@@ -263,6 +283,11 @@ export const updateRouteStatusMutationSource = gql`
         qrAvailable
         qrConsumed
         deliveredAt
+        arrival {
+          clientArrivedAt
+          recordedAt
+          arrivedByUserId
+        }
       }
       skippedApothekerProfileIds
       statusHistory {
@@ -319,6 +344,11 @@ export const bezorgerRouteUpdatesSubscriptionSource = gql`
         qrAvailable
         qrConsumed
         deliveredAt
+        arrival {
+          clientArrivedAt
+          recordedAt
+          arrivedByUserId
+        }
       }
       skippedApothekerProfileIds
       statusHistory {

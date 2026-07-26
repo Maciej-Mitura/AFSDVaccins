@@ -70,6 +70,7 @@ function sampleRoute(overrides: Record<string, unknown> = {}) {
         qrAvailable: true,
         qrConsumed: false,
         deliveredAt: null,
+        arrival: null,
         apothekerProfileId: 'aph-1',
         apothekerUserId: 'user-aph',
       },
@@ -154,10 +155,12 @@ describe('Phase 28A offline IndexedDB foundation', () => {
           qrAvailable: true,
           qrConsumed: false,
           deliveredAt: null,
+          arrival: null,
         },
       ],
     })
     expect(snapshot).not.toHaveProperty('manufacturer')
+    expect(snapshot?.stops[0]?.arrival).toBeNull()
     expect(snapshot).not.toHaveProperty('routeTemplateId')
     expect(snapshot).not.toHaveProperty('statusHistory')
     expect(JSON.stringify(snapshot)).not.toContain('Maker')
@@ -272,8 +275,13 @@ describe('Phase 28A offline IndexedDB foundation', () => {
     ])
     await pendingService.enqueue({
       ownerUserId: 'user-a',
+      ownerBezorgerProfileId: 'bez-1',
       type: PendingActionType.CourierStopArrived,
-      payload: { routeId: 'route-1', stopId: 'stop-1' },
+      payload: {
+        routeId: 'route-1',
+        stopId: 'stop-1',
+        clientArrivedAt: '2026-07-26T10:00:00.000Z',
+      },
       idempotencyKey: 'idem-1',
     })
 
@@ -493,8 +501,14 @@ describe('Phase 28A offline IndexedDB foundation', () => {
     await expect(
       pendingService.enqueue({
         ownerUserId: 'user-a',
+        ownerBezorgerProfileId: 'bez-1',
         type: PendingActionType.CourierStopArrived,
-        payload: { routeId: 'r1', stopId: 's1', token: 'nope' },
+        payload: {
+          routeId: 'r1',
+          stopId: 's1',
+          clientArrivedAt: '2026-07-26T10:00:00.000Z',
+          token: 'nope',
+        },
         idempotencyKey: 'idem',
       }),
     ).rejects.toThrow()
@@ -507,8 +521,13 @@ describe('Phase 28A offline IndexedDB foundation', () => {
       await expect(
         pendingService.enqueue({
           ownerUserId: 'user-a',
+          ownerBezorgerProfileId: 'bez-1',
           type,
-          payload: { routeId: 'r1', stopId: 's1' },
+          payload: {
+            routeId: 'r1',
+            stopId: 's1',
+            clientArrivedAt: '2026-07-26T10:00:00.000Z',
+          },
           idempotencyKey: `idem-${type}`,
         }),
       ).rejects.toThrow(/PENDING_ACTION_TYPE_FORBIDDEN/)
@@ -516,8 +535,13 @@ describe('Phase 28A offline IndexedDB foundation', () => {
 
     const ok = await pendingService.enqueue({
       ownerUserId: 'user-a',
+      ownerBezorgerProfileId: 'bez-1',
       type: PendingActionType.CourierStopArrived,
-      payload: { routeId: 'r1', stopId: 's1' },
+      payload: {
+        routeId: 'r1',
+        stopId: 's1',
+        clientArrivedAt: '2026-07-26T10:00:00.000Z',
+      },
       idempotencyKey: 'idem-ok',
     })
     expect(ok.type).toBe(PendingActionType.CourierStopArrived)

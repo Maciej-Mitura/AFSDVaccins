@@ -281,6 +281,24 @@ export class OfflineCacheRepository {
     }, false)
   }
 
+  async getPendingAction(
+    actionId: string,
+  ): Promise<PendingActionRecord | null> {
+    if (!isOfflineSessionUnlocked()) {
+      return null
+    }
+    return this.withDb(async db => {
+      return (await db.get('pendingActions', actionId)) ?? null
+    }, null)
+  }
+
+  async deletePendingAction(actionId: string): Promise<boolean> {
+    return this.withDb(async db => {
+      await db.delete('pendingActions', actionId)
+      return true
+    }, false)
+  }
+
   async listPendingActionsForOwner(
     ownerUserId: string,
   ): Promise<PendingActionRecord[]> {

@@ -76,7 +76,8 @@ While `source = CACHE` (and whenever the browser is offline for mutation UX):
 Reason shown in text: “This action requires an internet connection.”
 
 The QR scanner must not request camera permission in cached/offline mode.
-**No actions are queued** in this phase.
+**No actions are queued** in this phase (stop arrival queue is Phase 28C —
+see `phase-28c-offline-stop-arrival.md`).
 
 ## Cached route UI
 
@@ -111,7 +112,7 @@ IndexedDB snapshot. Partial subscription payloads are not written directly.
 
 ## Explicitly out of Phase 28B
 
-- Offline mutation queue / sync (28C)
+- Offline mutation queue / sync → implemented in Phase 28C for stop arrival only
 - Offline QR preview or confirmation
 - Offline delivery completion
 - GPS, reports, push changes, unrelated UI redesign

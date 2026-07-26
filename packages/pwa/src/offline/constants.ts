@@ -13,10 +13,17 @@ export const OFFLINE_DB_VERSION = 1
 export const CACHE_TTL_MS = 48 * 60 * 60 * 1000
 
 /**
- * Safe default TTL for pending actions (Phase 28C may refine).
- * Not processed in Phase 28A.
+ * Pending arrival action TTL (Phase 28C):
+ * expire at the earlier of 48 hours after creation, or when the route is no
+ * longer active (checked at sync time against authoritative server state).
  */
-export const PENDING_ACTION_DEFAULT_TTL_MS = 7 * 24 * 60 * 60 * 1000
+export const PENDING_ACTION_DEFAULT_TTL_MS = CACHE_TTL_MS
+
+/** Max automatic retries for transient sync failures before manual retry. */
+export const PENDING_ACTION_MAX_AUTO_RETRIES = 5
+
+/** Base backoff for transient arrival sync failures (ms). */
+export const PENDING_ACTION_RETRY_BASE_MS = 2_000
 
 /** Bounded recent notification cache size. */
 export const NOTIFICATION_CACHE_LIMIT = 50

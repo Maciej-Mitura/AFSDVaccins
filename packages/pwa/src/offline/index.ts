@@ -86,6 +86,12 @@ export {
 } from '@/offline/pending-action-offline.service'
 
 export {
+  OfflineActionSyncService,
+  getOfflineActionSyncService,
+  __resetOfflineActionSyncServiceForTests,
+} from '@/offline/offline-action-sync.service'
+
+export {
   OfflineCacheOwnerService,
   getOfflineCacheOwnerService,
   resolveOfflineCacheOwnerSafe,
@@ -112,6 +118,8 @@ export async function __resetAllOfflineCacheForTests(): Promise<void> {
     await import('@/offline/notification-offline-cache.service')
   const { __resetPendingActionOfflineServiceForTests } =
     await import('@/offline/pending-action-offline.service')
+  const { __resetOfflineActionSyncServiceForTests } =
+    await import('@/offline/offline-action-sync.service')
   const { __resetOfflineCacheOwnerServiceForTests } =
     await import('@/offline/offline-cache-owner.service')
 
@@ -121,5 +129,6 @@ export async function __resetAllOfflineCacheForTests(): Promise<void> {
   __resetCourierRouteOfflineCacheServiceForTests()
   __resetNotificationOfflineCacheServiceForTests()
   __resetPendingActionOfflineServiceForTests()
+  __resetOfflineActionSyncServiceForTests()
   __resetOfflineCacheOwnerServiceForTests()
 }

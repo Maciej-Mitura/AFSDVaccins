@@ -6,6 +6,7 @@ import { ApothekerProfile } from '../../src/profile/apotheker/apotheker-profile.
 import { BezorgerProfile } from '../../src/profile/bezorger/bezorger-profile.entity'
 import { RouteTemplate } from '../../src/route-templates/route-template.entity'
 import { DeliveryRoute } from '../../src/routes/delivery-route.entity'
+import { DeliveryStopArrivalAuditEvent } from '../../src/routes/arrival/delivery-stop-arrival-audit.entity'
 import { DeliveryQrConfirmAuditEvent } from '../../src/routes/qr/delivery-qr-confirm-audit.entity'
 import { ApplicationSettings } from '../../src/settings/settings.entity'
 import { StockAdjustment } from '../../src/stock/stock-adjustment.entity'
@@ -17,6 +18,7 @@ const E2E_ENTITIES = [
   Notification,
   DeliveryRoute,
   DeliveryQrConfirmAuditEvent,
+  DeliveryStopArrivalAuditEvent,
   RouteTemplate,
   Order,
   StockAdjustment,

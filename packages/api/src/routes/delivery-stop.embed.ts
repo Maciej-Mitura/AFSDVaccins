@@ -2,6 +2,7 @@ import { Field, ID, Int, ObjectType } from '@nestjs/graphql'
 import { Column } from 'typeorm'
 
 import { Address } from '../profile/address.type'
+import { StopArrival } from './arrival/stop-arrival.embed'
 import { OrderLineSnapshot } from './order-line-snapshot.embed'
 import { StopConfirmationProcess } from './qr/stop-confirmation-process.embed'
 import { StopDeliveryProof } from './qr/stop-delivery-proof.embed'
@@ -75,4 +76,13 @@ export class DeliveryStop {
    */
   @Column({ nullable: true })
   confirmationProcess?: StopConfirmationProcess | null
+
+  /**
+   * Courier arrived-at-stop metadata (Phase 28C).
+   * Absent until first accepted arrival; immutable afterwards.
+   * Independent of deliveryProof — GraphQL exposes safe fields only.
+   */
+  @Column({ nullable: true })
+  @Field(() => StopArrival, { nullable: true })
+  arrival?: StopArrival | null
 }

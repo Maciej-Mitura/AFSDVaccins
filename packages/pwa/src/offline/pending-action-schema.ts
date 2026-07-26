@@ -14,6 +14,10 @@ const pendingActionPayloadSchema = z
   .object({
     routeId: z.string().min(1).max(PENDING_ACTION_PAYLOAD_MAX_STRING_LENGTH),
     stopId: z.string().min(1).max(PENDING_ACTION_PAYLOAD_MAX_STRING_LENGTH),
+    clientArrivedAt: z
+      .string()
+      .min(1)
+      .max(PENDING_ACTION_PAYLOAD_MAX_STRING_LENGTH),
   })
   .strict()
 
@@ -48,7 +52,6 @@ export function isAllowedPendingActionType(
 
 /**
  * Validates a pending-action payload. Rejects secrets and unknown keys.
- * Phase 28A foundation only — sync is not implemented.
  */
 export function parsePendingActionPayload(
   type: PendingActionType,

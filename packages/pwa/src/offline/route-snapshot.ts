@@ -99,7 +99,21 @@ function serializeStop(raw: unknown): CachedRouteStop | null {
     qrAvailable: asBoolean(raw.qrAvailable),
     qrConsumed: asBoolean(raw.qrConsumed),
     deliveredAt: asString(raw.deliveredAt),
+    arrival: serializeArrival(raw.arrival),
   }
+}
+
+function serializeArrival(raw: unknown): CachedRouteStop['arrival'] {
+  if (!isRecord(raw)) {
+    return null
+  }
+  const clientArrivedAt = asString(raw.clientArrivedAt)
+  const recordedAt = asString(raw.recordedAt)
+  const arrivedByUserId = asString(raw.arrivedByUserId)
+  if (!clientArrivedAt || !recordedAt || !arrivedByUserId) {
+    return null
+  }
+  return { clientArrivedAt, recordedAt, arrivedByUserId }
 }
 
 /**

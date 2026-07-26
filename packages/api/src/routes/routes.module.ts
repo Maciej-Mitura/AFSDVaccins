@@ -1,10 +1,16 @@
 import { Module } from '@nestjs/common'
+import { TypeOrmModule } from '@nestjs/typeorm'
 
 import { AuthenticationModule } from '../authentication/authentication.module'
 import { PubSubModule } from '../common/pubsub/pubsub.module'
 import { BusinessNotificationModule } from '../notifications/business-notification.module'
 import { CLOCK, SystemClock } from '../order/clock.provider'
 import { UserModule } from '../user/user.module'
+import { DeliveryStopArrivalAuditEvent } from './arrival/delivery-stop-arrival-audit.entity'
+import { DeliveryStopArrivalAuditPersistenceService } from './arrival/delivery-stop-arrival-audit.persistence'
+import { DeliveryStopArrivalAuditService } from './arrival/delivery-stop-arrival-audit.service'
+import { DeliveryStopArrivalController } from './arrival/delivery-stop-arrival.controller'
+import { DeliveryStopArrivalService } from './arrival/delivery-stop-arrival.service'
 import { DeliveryQrConfirmAuditEvent } from './qr/delivery-qr-confirm-audit.entity'
 import { DeliveryQrConfirmAuditService } from './qr/delivery-qr-confirm-audit.service'
 import { DeliveryQrConfirmController } from './qr/delivery-qr-confirm.controller'
@@ -21,7 +27,6 @@ import { RoutePreviewService } from './route-preview.service'
 import { RoutesCoreModule } from './routes-core.module'
 import { RoutesResolver } from './routes.resolver'
 import { RoutesService } from './routes.service'
-import { TypeOrmModule } from '@nestjs/typeorm'
 
 const isSchemaGeneration =
   process.argv.includes('--generate-schema-only') ||
@@ -109,9 +114,42 @@ const deliveryQrConfirmAuditServiceProvider = isSchemaGeneration
     }
   : DeliveryQrConfirmAuditService
 
+const deliveryStopArrivalServiceProvider = isSchemaGeneration
+  ? {
+      provide: DeliveryStopArrivalService,
+      useValue: {
+        recordArrivalForCourier: () => Promise.resolve(null),
+      },
+    }
+  : DeliveryStopArrivalService
+
+const deliveryStopArrivalAuditServiceProvider = isSchemaGeneration
+  ? {
+      provide: DeliveryStopArrivalAuditService,
+      useValue: {
+        record: () => Promise.resolve({ inserted: true, existing: null }),
+        findByActorAndKey: () => Promise.resolve(null),
+      },
+    }
+  : DeliveryStopArrivalAuditService
+
+const deliveryStopArrivalAuditPersistenceProvider = isSchemaGeneration
+  ? {
+      provide: DeliveryStopArrivalAuditPersistenceService,
+      useValue: {
+        onModuleInit: () => Promise.resolve(),
+        ensureIndexes: () => Promise.resolve(),
+      },
+    }
+  : DeliveryStopArrivalAuditPersistenceService
+
 const confirmAuditPersistence = isSchemaGeneration
   ? []
   : [TypeOrmModule.forFeature([DeliveryQrConfirmAuditEvent])]
+
+const arrivalAuditPersistence = isSchemaGeneration
+  ? []
+  : [TypeOrmModule.forFeature([DeliveryStopArrivalAuditEvent])]
 
 @Module({
   imports: [
@@ -121,6 +159,7 @@ const confirmAuditPersistence = isSchemaGeneration
     RoutesCoreModule,
     BusinessNotificationModule,
     ...confirmAuditPersistence,
+    ...arrivalAuditPersistence,
   ],
   controllers: isSchemaGeneration
     ? []
@@ -128,6 +167,7 @@ const confirmAuditPersistence = isSchemaGeneration
         DeliveryQrPreviewController,
         DeliveryQrConfirmController,
         DeliveryStopQrController,
+        DeliveryStopArrivalController,
       ],
   providers: [
     routePreviewServiceProvider,
@@ -137,6 +177,9 @@ const confirmAuditPersistence = isSchemaGeneration
     deliveryQrPreviewServiceProvider,
     deliveryQrConfirmServiceProvider,
     deliveryQrConfirmAuditServiceProvider,
+    deliveryStopArrivalServiceProvider,
+    deliveryStopArrivalAuditServiceProvider,
+    deliveryStopArrivalAuditPersistenceProvider,
     DeliveryStopQrImageService,
     RoutesResolver,
     DeliveryStopQrFieldsResolver,

@@ -61,6 +61,13 @@ export function hydrateDeliveryRouteFromCache(
       qrAvailable: stop.qrAvailable,
       qrConsumed: stop.qrConsumed,
       deliveredAt: stop.deliveredAt,
+      arrival: stop.arrival
+        ? {
+            clientArrivedAt: stop.arrival.clientArrivedAt,
+            recordedAt: stop.arrival.recordedAt,
+            arrivedByUserId: stop.arrival.arrivedByUserId,
+          }
+        : null,
       address: {
         street: stop.address.street,
         houseNumber: stop.address.houseNumber,

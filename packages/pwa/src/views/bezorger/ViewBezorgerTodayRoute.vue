@@ -1,16 +1,19 @@
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, ref } from 'vue'
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 
 import CommonEmptyState from '@/components/common/CommonEmptyState.vue'
 import CommonErrorState from '@/components/common/CommonErrorState.vue'
 import CommonLoadingSkeleton from '@/components/common/CommonLoadingSkeleton.vue'
 import FeatureBezorgerDeliveryQrWorkflow from '@/components/feature/bezorger/FeatureBezorgerDeliveryQrWorkflow.vue'
+import { useCourierStopArrival } from '@/composables/useCourierStopArrival'
 import { RouteStatus, useDeliveryRoutes } from '@/composables/useDeliveryRoutes'
 import { useRealtimeConnection } from '@/composables/useRealtimeConnection'
 import { formatDateTime, routeStatusLabel, translatePlural } from '@/i18n'
 import { UserRole } from '@vaccin-delivery/types'
 import { useCurrentUser } from '@/composables/useCurrentUser'
+import { mapDeliveryArrivalErrorCode } from '@/api/delivery-arrival-errors'
+import { registerReconnectHandler } from '@/composables/useGraphQL'
 
 const { t } = useI18n()
 const { currentUser, initialized } = useCurrentUser()
@@ -38,6 +41,31 @@ const { connectionState } = useRealtimeConnection()
 
 const confirmStart = ref(false)
 const confirmComplete = ref(false)
+const confirmCancelArrivalStopId = ref<string | null>(null)
+
+const ownerUserId = computed(() => currentUser.value?.id ?? null)
+const ownerBezorgerProfileId = computed(
+  () => currentUser.value?.bezorgerProfile?.id ?? null,
+)
+
+const {
+  viewModelForStop,
+  feedbackMessage,
+  feedbackTone,
+  reloadPendingActions,
+  markArrived,
+  cancelPending,
+  discardPending,
+  retrySync,
+  syncOnReconnect,
+} = useCourierStopArrival({
+  route: myTodayRoute,
+  routeSource: todayRouteSource,
+  isOnline,
+  ownerUserId,
+  ownerBezorgerProfileId,
+  refreshAuthoritativeRoute: () => loadMyTodayRoute({ isRefresh: true }),
+})
 
 const canScanDeliveryQr = computed(() => {
   return (
@@ -49,6 +77,17 @@ const canScanDeliveryQr = computed(() => {
 const actionsEnabled = computed(
   () => !todayRouteIsReadOnly.value && isOnline.value && !updatingStatus.value,
 )
+
+const arrivalFeedbackText = computed(() => {
+  const key = feedbackMessage.value
+  if (!key) {
+    return null
+  }
+  if (key.startsWith('arrival.') || key.startsWith('errors.')) {
+    return t(key)
+  }
+  return key
+})
 
 const latestCancelReason = computed(() => {
   const route = myTodayRoute.value
@@ -91,6 +130,13 @@ function orderReferencesLabel(orderIds: string[]): string {
   })
 }
 
+function arrivalErrorLabel(code: string | null): string {
+  if (!code) {
+    return t('arrival.unableToRecord')
+  }
+  return mapDeliveryArrivalErrorCode(code)
+}
+
 async function onStartRoute(): Promise<void> {
   if (!myTodayRoute.value || !actionsEnabled.value) {
     return
@@ -131,13 +177,54 @@ async function onRetryRefresh(): Promise<void> {
   await loadMyTodayRoute({ isRefresh: Boolean(myTodayRoute.value) })
 }
 
+async function onMarkArrived(stopId: string): Promise<void> {
+  await markArrived(stopId)
+}
+
+async function onCancelPendingArrival(stopId: string): Promise<void> {
+  if (confirmCancelArrivalStopId.value !== stopId) {
+    confirmCancelArrivalStopId.value = stopId
+    return
+  }
+  const vm = viewModelForStop(stopId)
+  if (vm?.pendingActionId) {
+    await cancelPending(vm.pendingActionId)
+  }
+  confirmCancelArrivalStopId.value = null
+}
+
+function dismissCancelArrivalConfirm(): void {
+  confirmCancelArrivalStopId.value = null
+}
+
+async function onDiscardPending(stopId: string): Promise<void> {
+  const vm = viewModelForStop(stopId)
+  if (vm?.pendingActionId) {
+    await discardPending(vm.pendingActionId)
+  }
+}
+
+let arrivalReconnectCleanup: (() => void) | null = null
+
 onMounted(() => {
   void loadMyTodayRoute()
   subscribeToTodayRouteUpdates()
+  void reloadPendingActions()
+  arrivalReconnectCleanup = registerReconnectHandler(() => {
+    void syncOnReconnect()
+  })
 })
 
 onUnmounted(() => {
   stopTodayRouteSubscription()
+  arrivalReconnectCleanup?.()
+})
+
+watch([ownerUserId, ownerBezorgerProfileId, isOnline], () => {
+  void reloadPendingActions()
+  if (isOnline.value) {
+    void syncOnReconnect()
+  }
 })
 </script>
 
@@ -226,6 +313,22 @@ onUnmounted(() => {
           </UButton>
         </template>
       </UAlert>
+
+      <UAlert
+        v-if="arrivalFeedbackText"
+        :color="
+          feedbackTone === 'success'
+            ? 'success'
+            : feedbackTone === 'error'
+              ? 'error'
+              : 'warning'
+        "
+        variant="subtle"
+        role="status"
+        aria-live="polite"
+        data-testid="arrival-feedback"
+        :title="arrivalFeedbackText"
+      />
 
       <div class="rounded-lg bg-elevated/50 px-4 py-3">
         <p class="text-sm text-muted">{{ t('bezorger.route.status') }}</p>
@@ -415,6 +518,154 @@ onUnmounted(() => {
                 : t('bezorger.route.stop.delivered')
             }}
           </p>
+
+          <template
+            v-else-if="
+              stop.stopId &&
+              (myTodayRoute.status === RouteStatus.InProgress ||
+                viewModelForStop(stop.stopId)?.state === 'confirmed' ||
+                viewModelForStop(stop.stopId)?.state === 'pending' ||
+                viewModelForStop(stop.stopId)?.state === 'syncing' ||
+                viewModelForStop(stop.stopId)?.state === 'failed' ||
+                viewModelForStop(stop.stopId)?.state === 'conflict')
+            "
+          >
+            <div
+              v-if="viewModelForStop(stop.stopId)"
+              class="mt-3 space-y-2"
+              data-testid="route-stop-arrival"
+            >
+              <p
+                v-if="viewModelForStop(stop.stopId)?.state === 'confirmed'"
+                class="text-sm font-medium"
+                data-testid="route-stop-arrived"
+                role="status"
+              >
+                {{
+                  t('arrival.arrivedAt', {
+                    time: formatDateTime(
+                      viewModelForStop(stop.stopId)?.clientArrivedAt ??
+                        viewModelForStop(stop.stopId)?.recordedAt ??
+                        '',
+                    ),
+                  })
+                }}
+              </p>
+
+              <p
+                v-else-if="viewModelForStop(stop.stopId)?.state === 'syncing'"
+                class="text-sm"
+                role="status"
+                aria-live="polite"
+                data-testid="route-stop-arrival-syncing"
+              >
+                {{ t('arrival.synchronising') }}
+                <span class="text-muted">
+                  ({{
+                    formatDateTime(
+                      viewModelForStop(stop.stopId)?.clientArrivedAt ?? '',
+                    )
+                  }})
+                </span>
+              </p>
+
+              <template
+                v-else-if="viewModelForStop(stop.stopId)?.state === 'pending'"
+              >
+                <p
+                  class="text-sm font-medium"
+                  role="status"
+                  data-testid="route-stop-arrival-pending"
+                >
+                  {{ t('arrival.pending') }}
+                  <span class="font-normal text-muted">
+                    ({{
+                      formatDateTime(
+                        viewModelForStop(stop.stopId)?.clientArrivedAt ?? '',
+                      )
+                    }})
+                  </span>
+                </p>
+                <p class="text-xs text-muted">
+                  {{ t('arrival.willSyncWhenOnline') }}
+                </p>
+                <UButton
+                  v-if="viewModelForStop(stop.stopId)?.canCancelPending"
+                  size="sm"
+                  variant="ghost"
+                  data-testid="route-stop-arrival-cancel"
+                  @click="onCancelPendingArrival(stop.stopId!)"
+                >
+                  {{
+                    confirmCancelArrivalStopId === stop.stopId
+                      ? t('arrival.cancelPendingConfirm')
+                      : t('arrival.cancelPending')
+                  }}
+                </UButton>
+                <UButton
+                  v-if="confirmCancelArrivalStopId === stop.stopId"
+                  size="sm"
+                  variant="ghost"
+                  @click="dismissCancelArrivalConfirm"
+                >
+                  {{ t('common.cancel') }}
+                </UButton>
+              </template>
+
+              <template
+                v-else-if="
+                  viewModelForStop(stop.stopId)?.state === 'failed' ||
+                  viewModelForStop(stop.stopId)?.state === 'conflict'
+                "
+              >
+                <p
+                  class="text-sm"
+                  role="alert"
+                  data-testid="route-stop-arrival-error"
+                >
+                  {{
+                    viewModelForStop(stop.stopId)?.state === 'conflict'
+                      ? t('arrival.conflict')
+                      : arrivalErrorLabel(
+                          viewModelForStop(stop.stopId)?.errorCode ?? null,
+                        )
+                  }}
+                </p>
+                <div class="flex flex-wrap gap-2">
+                  <UButton
+                    v-if="viewModelForStop(stop.stopId)?.canRetry"
+                    size="sm"
+                    variant="soft"
+                    data-testid="route-stop-arrival-retry"
+                    @click="retrySync"
+                  >
+                    {{ t('arrival.retrySync') }}
+                  </UButton>
+                  <UButton
+                    v-if="viewModelForStop(stop.stopId)?.canDiscard"
+                    size="sm"
+                    variant="ghost"
+                    data-testid="route-stop-arrival-discard"
+                    @click="onDiscardPending(stop.stopId!)"
+                  >
+                    {{ t('arrival.discardPending') }}
+                  </UButton>
+                </div>
+              </template>
+
+              <UButton
+                v-else-if="viewModelForStop(stop.stopId)?.canMarkArrived"
+                size="md"
+                block
+                data-testid="route-stop-mark-arrived"
+                :aria-label="t('arrival.markArrived')"
+                @click="onMarkArrived(stop.stopId!)"
+              >
+                {{ t('arrival.markArrived') }}
+              </UButton>
+            </div>
+          </template>
+
           <p class="mt-3 text-sm font-medium">
             {{ stopTotalLabel(stop.totalQuantity) }}
             <span class="font-normal text-muted">
