@@ -49,6 +49,34 @@ export function hydrateDeliveryRouteFromCache(
     createdAt: record.fetchedAt,
     updatedAt: record.serverUpdatedAt ?? record.fetchedAt,
     statusHistory: [],
+    locationStatus:
+      snapshot.lastKnownCourierCity || snapshot.nextStopSequence != null
+        ? {
+            hasLocation: Boolean(snapshot.lastKnownCourierCity),
+            city: snapshot.lastKnownCourierCity,
+            recordedAt: snapshot.lastKnownLocationRecordedAt,
+            source: snapshot.locationSource as never,
+            stopSequence: null,
+            hasNextStop: snapshot.nextStopSequence != null,
+            nextStop:
+              snapshot.nextStopSequence != null
+                ? {
+                    stopId: '',
+                    sequence: snapshot.nextStopSequence,
+                    pharmacyName: snapshot.nextStopPharmacyName ?? '',
+                    city: snapshot.nextStopCity ?? '',
+                  }
+                : null,
+          }
+        : {
+            hasLocation: false,
+            city: null,
+            recordedAt: null,
+            source: null,
+            stopSequence: null,
+            hasNextStop: false,
+            nextStop: null,
+          },
     stops: snapshot.stops.map(stop => ({
       stopId: stop.stopId,
       sequence: stop.sequence,

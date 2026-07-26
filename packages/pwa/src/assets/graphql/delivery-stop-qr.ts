@@ -63,6 +63,10 @@ export const myPlannedDeliveriesQuerySource = gql`
       qrConsumed
       deliveredAt
       qrImagePath
+      isNextStop
+      lastKnownCourierCity
+      lastKnownLocationRecordedAt
+      courierLocationSource
     }
   }
 `

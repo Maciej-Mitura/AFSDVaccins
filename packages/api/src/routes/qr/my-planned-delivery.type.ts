@@ -2,6 +2,7 @@ import { Field, ID, Int, ObjectType } from '@nestjs/graphql'
 
 import { OrderStatus } from '../../order/order-status.enum'
 import { Address } from '../../profile/address.type'
+import { RouteLocationSource } from '../location/route-location-source.enum'
 import { RouteStatus } from '../route-status.enum'
 
 /**
@@ -89,4 +90,23 @@ export class MyPlannedDelivery {
    */
   @Field(() => String, { nullable: true })
   qrImagePath!: string | null
+
+  /**
+   * Phase 30A: true only when this pharmacist stop is the derived next upcoming
+   * stop on an IN_PROGRESS route (never trusts a client profile id).
+   */
+  @Field(() => Boolean)
+  isNextStop!: boolean
+
+  /**
+   * Coarse courier city — populated only when isNextStop is true.
+   */
+  @Field(() => String, { nullable: true })
+  lastKnownCourierCity!: string | null
+
+  @Field(() => Date, { nullable: true })
+  lastKnownLocationRecordedAt!: Date | null
+
+  @Field(() => RouteLocationSource, { nullable: true })
+  courierLocationSource!: RouteLocationSource | null
 }

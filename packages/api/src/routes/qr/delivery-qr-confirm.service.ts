@@ -15,6 +15,7 @@ import { UserRole } from '../../user/user-role.enum'
 import { DeliveryRoute } from '../delivery-route.entity'
 import { DeliveryRouteEventsService } from '../delivery-route-events.service'
 import { DeliveryStop } from '../delivery-stop.embed'
+import { DeliveryRouteProgressLocationService } from '../location/delivery-route-progress-location.service'
 import { RouteStatus } from '../route-status.enum'
 import { DELIVERY_QR_TOKEN_SERVICE } from './delivery-qr.constants'
 import {
@@ -90,6 +91,7 @@ export class DeliveryQrConfirmService {
     private readonly deliveryRouteEventsService: DeliveryRouteEventsService,
     private readonly auditService: DeliveryQrConfirmAuditService,
     private readonly businessNotificationProducer: BusinessNotificationProducerService,
+    private readonly progressLocationService: DeliveryRouteProgressLocationService,
     @Inject(DELIVERY_QR_TOKEN_SERVICE)
     private readonly tokenService: DeliveryQrTokenService,
   ) {}
@@ -117,7 +119,8 @@ export class DeliveryQrConfirmService {
     }
 
     const courierUserId = actor._id.toString()
-    await this.assertAssignedCourier(actor, route)
+    const courierProfile = await this.assertAssignedCourier(actor, route)
+    const courierBezorgerProfileId = courierProfile.id.toString()
 
     const stop = (route.stops ?? []).find(
       candidate => candidate.stopId === payload.stopId,
@@ -284,23 +287,58 @@ export class DeliveryQrConfirmService {
     }
 
     const persistedRoute = finalised.route
-    await this.deliveryRouteEventsService.publishBezorgerRouteUpdated(
-      persistedRoute,
-    )
-    await this.orderService.publishQrDeliveredOrderUpdates(deliveredOrders)
-
     const completedStop =
       persistedRoute.stops?.find(s => s.stopId === stop.stopId) ?? stop
 
+    let routeForPublish = persistedRoute
+    let nextStopForNotify =
+      this.progressLocationService.deriveNextStop(
+        persistedRoute,
+        completedStop,
+      )
+
+    try {
+      const locationResult =
+        await this.progressLocationService.recordDeliveryLocation({
+          route: persistedRoute,
+          stop: completedStop,
+          deliveredAt,
+          courierUserId,
+          courierBezorgerProfileId,
+          confirmationEventId,
+          publishRouteUpdate: false,
+        })
+      routeForPublish = locationResult.route
+      nextStopForNotify = locationResult.nextStop
+    } catch (error) {
+      // Reliability: delivery confirmation remains successful; location can be recomputed.
+      this.logger.warn({
+        event: 'delivery_qr_confirm_location_update_failed',
+        routeId: parsedRouteId.stringValue,
+        stopId: stop.stopId,
+        confirmationEventId,
+        error:
+          error instanceof Error
+            ? { name: error.name, message: error.message }
+            : { message: 'unknown' },
+      })
+    }
+
+    await this.deliveryRouteEventsService.publishBezorgerRouteUpdated(
+      routeForPublish,
+    )
+    await this.orderService.publishQrDeliveredOrderUpdates(deliveredOrders)
+
     await this.businessNotificationProducer.notifyPharmacyDeliveryConfirmed({
-      route: persistedRoute,
+      route: routeForPublish,
       stop: completedStop,
       confirmationEventId,
       orderCount: orderIds.length,
     })
     await this.businessNotificationProducer.notifyNextPharmacy(
-      persistedRoute,
+      routeForPublish,
       completedStop,
+      nextStopForNotify,
     )
 
     return {
@@ -312,8 +350,8 @@ export class DeliveryQrConfirmService {
       orderCount: orderIds.length,
       recipientCity,
       proofMethod: DeliveryProofMethod.QR,
-      routeStatus: persistedRoute.status,
-      remainingStopCount: countRemainingUndeliveredStops(persistedRoute.stops),
+      routeStatus: routeForPublish.status,
+      remainingStopCount: countRemainingUndeliveredStops(routeForPublish.stops),
     }
   }
 
@@ -445,7 +483,7 @@ export class DeliveryQrConfirmService {
   private async assertAssignedCourier(
     actor: User,
     route: DeliveryRoute,
-  ): Promise<void> {
+  ): Promise<{ id: { toString(): string } }> {
     if (actor.role !== UserRole.BEZORGER) {
       throw new DeliveryQrConfirmForbiddenException()
     }
@@ -466,6 +504,8 @@ export class DeliveryQrConfirmService {
       )
       throw new DeliveryQrConfirmForbiddenException()
     }
+
+    return profile
   }
 
   private assertRouteStatusForConfirm(status: RouteStatus): void {

@@ -54,6 +54,20 @@ export const deliveryRoutesQuerySource = gql`
       generatedByUserId
       createdAt
       updatedAt
+      locationStatus {
+        hasLocation
+        city
+        recordedAt
+        source
+        stopSequence
+        hasNextStop
+        nextStop {
+          stopId
+          sequence
+          pharmacyName
+          city
+        }
+      }
     }
   }
 `
@@ -115,6 +129,20 @@ export const deliveryRouteQuerySource = gql`
       generatedByUserId
       createdAt
       updatedAt
+      locationStatus {
+        hasLocation
+        city
+        recordedAt
+        source
+        stopSequence
+        hasNextStop
+        nextStop {
+          stopId
+          sequence
+          pharmacyName
+          city
+        }
+      }
     }
   }
 `
@@ -176,6 +204,20 @@ export const myTodayRouteQuerySource = gql`
       generatedByUserId
       createdAt
       updatedAt
+      locationStatus {
+        hasLocation
+        city
+        recordedAt
+        source
+        stopSequence
+        hasNextStop
+        nextStop {
+          stopId
+          sequence
+          pharmacyName
+          city
+        }
+      }
     }
   }
 `
@@ -240,6 +282,20 @@ export const generateDeliveryRouteMutationSource = gql`
       generatedByUserId
       createdAt
       updatedAt
+      locationStatus {
+        hasLocation
+        city
+        recordedAt
+        source
+        stopSequence
+        hasNextStop
+        nextStop {
+          stopId
+          sequence
+          pharmacyName
+          city
+        }
+      }
     }
   }
 `
@@ -301,6 +357,20 @@ export const updateRouteStatusMutationSource = gql`
       generatedByUserId
       createdAt
       updatedAt
+      locationStatus {
+        hasLocation
+        city
+        recordedAt
+        source
+        stopSequence
+        hasNextStop
+        nextStop {
+          stopId
+          sequence
+          pharmacyName
+          city
+        }
+      }
     }
   }
 `
@@ -362,6 +432,20 @@ export const bezorgerRouteUpdatesSubscriptionSource = gql`
       generatedByUserId
       createdAt
       updatedAt
+      locationStatus {
+        hasLocation
+        city
+        recordedAt
+        source
+        stopSequence
+        hasNextStop
+        nextStop {
+          stopId
+          sequence
+          pharmacyName
+          city
+        }
+      }
     }
   }
 `

@@ -177,24 +177,34 @@ export class BusinessNotificationProducerService {
 
   /**
    * Notify the next higher-sequence undelivered pharmacy after a stop is confirmed.
-   * City is the completed stop’s persisted address city (no GPS).
+   * City comes from route lastKnownLocation (Phase 30A) when present, else the
+   * completed stop’s snapshotted address city (no GPS).
+   *
+   * Uses the central next-stop derivation — pass `nextStop` when already derived
+   * by DeliveryRouteProgressLocationService to avoid a second algorithm.
    */
   async notifyNextPharmacy(
     route: DeliveryRoute,
     completedStop: DeliveryStop,
+    nextStopOverride?: DeliveryStop | null,
   ): Promise<void> {
     try {
       if (!completedStop.stopId) {
         return
       }
 
-      const nextStop = selectNextUndeliveredStop(route.stops ?? [], completedStop)
+      const nextStop =
+        nextStopOverride !== undefined
+          ? nextStopOverride
+          : selectNextUndeliveredStop(route.stops ?? [], completedStop)
 
       if (!nextStop?.stopId || !nextStop.apothekerUserId) {
         return
       }
 
-      const lastKnownCourierCity = completedStop.address?.city?.trim()
+      const lastKnownCourierCity =
+        route.lastKnownLocation?.city?.trim() ||
+        completedStop.address?.city?.trim()
       if (!lastKnownCourierCity) {
         this.logger.warn({
           event: 'business_notification_next_stop_missing_city',

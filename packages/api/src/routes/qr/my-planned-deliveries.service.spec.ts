@@ -125,10 +125,20 @@ function makeRoute(overrides?: {
 }
 
 describe('MyPlannedDeliveriesService', () => {
+  const progressLocationService = {
+    getPharmacistLocationVisibility: jest.fn().mockReturnValue({
+      isNextStop: false,
+      lastKnownCourierCity: null,
+      lastKnownLocationRecordedAt: null,
+      courierLocationSource: null,
+    }),
+  }
+
   it('rejects non-APOTHEKER actors', async () => {
     const service = new MyPlannedDeliveriesService(
       { find: jest.fn() } as never,
       { findOne: jest.fn() } as never,
+      progressLocationService as never,
     )
 
     await expect(service.listForApotheker(adminUser())).rejects.toBeInstanceOf(
@@ -178,6 +188,7 @@ describe('MyPlannedDeliveriesService', () => {
     const service = new MyPlannedDeliveriesService(
       routeRepo as never,
       orderRepo as never,
+      progressLocationService as never,
     )
 
     const groups = await service.listForApotheker(apothekerUser(ownerId))
@@ -205,6 +216,7 @@ describe('MyPlannedDeliveriesService', () => {
     const service = new MyPlannedDeliveriesService(
       routeRepo as never,
       { findOne: jest.fn() } as never,
+      progressLocationService as never,
     )
 
     const groups = await service.listForApotheker(apothekerUser())
@@ -239,6 +251,7 @@ describe('MyPlannedDeliveriesService', () => {
     const service = new MyPlannedDeliveriesService(
       routeRepo as never,
       orderRepo as never,
+      progressLocationService as never,
     )
 
     const groups = await service.listForApotheker(apothekerUser(ownerId))
@@ -262,6 +275,7 @@ describe('MyPlannedDeliveriesService', () => {
     const service = new MyPlannedDeliveriesService(
       routeRepo as never,
       { findOne: jest.fn() } as never,
+      progressLocationService as never,
     )
 
     await service.listForApotheker(apothekerUser(ownerId))

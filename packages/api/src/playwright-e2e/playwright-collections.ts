@@ -8,6 +8,7 @@ import { RouteTemplate } from '../route-templates/route-template.entity'
 import { DeliveryRoute } from '../routes/delivery-route.entity'
 import { DeliveryQrConfirmAuditEvent } from '../routes/qr/delivery-qr-confirm-audit.entity'
 import { DeliveryStopArrivalAuditEvent } from '../routes/arrival/delivery-stop-arrival-audit.entity'
+import { DeliveryRouteLocationAuditEvent } from '../routes/location/delivery-route-location-audit.entity'
 import { ApplicationSettings } from '../settings/settings.entity'
 import { StockAdjustment } from '../stock/stock-adjustment.entity'
 import { User } from '../user/user.entity'
@@ -21,6 +22,7 @@ const PLAYWRIGHT_ENTITIES = [
   DeliveryRoute,
   DeliveryQrConfirmAuditEvent,
   DeliveryStopArrivalAuditEvent,
+  DeliveryRouteLocationAuditEvent,
   RouteTemplate,
   Order,
   StockAdjustment,

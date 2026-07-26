@@ -65,4 +65,27 @@ describe('redactDeliveryRouteForEvents', () => {
       payload.bezorgerRouteUpdates.stops[0].qrConfirmation,
     ).not.toHaveProperty('encodedToken')
   })
+
+  it('strips location eventId and profile ids from event projections', () => {
+    const withLocation = {
+      ...route,
+      lastKnownLocation: {
+        stopId: 'stop-1',
+        stopSequence: 1,
+        city: 'Gent',
+        recordedAt: new Date('2026-07-26T10:00:00.000Z'),
+        source: 'ARRIVAL',
+        recordedByUserId: 'courier-uid',
+        recordedByBezorgerProfileId: 'bez-profile',
+        eventId: 'location:arrival:secret',
+      },
+    } as unknown as DeliveryRoute
+
+    const redacted = redactDeliveryRouteForEvents(withLocation)
+    expect(redacted.lastKnownLocation?.city).toBe('Gent')
+    expect(redacted.lastKnownLocation?.eventId).toBe('')
+    expect(redacted.lastKnownLocation?.recordedByUserId).toBe('')
+    expect(JSON.stringify(redacted)).not.toContain('location:arrival:secret')
+    expect(JSON.stringify(redacted)).not.toContain('courier-uid')
+  })
 })

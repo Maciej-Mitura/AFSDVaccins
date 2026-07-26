@@ -158,6 +158,12 @@ describe('Phase 28A offline IndexedDB foundation', () => {
           arrival: null,
         },
       ],
+      lastKnownCourierCity: null,
+      lastKnownLocationRecordedAt: null,
+      locationSource: null,
+      nextStopSequence: null,
+      nextStopPharmacyName: null,
+      nextStopCity: null,
     })
     expect(snapshot).not.toHaveProperty('manufacturer')
     expect(snapshot?.stops[0]?.arrival).toBeNull()

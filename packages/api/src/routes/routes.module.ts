@@ -11,6 +11,10 @@ import { DeliveryStopArrivalAuditPersistenceService } from './arrival/delivery-s
 import { DeliveryStopArrivalAuditService } from './arrival/delivery-stop-arrival-audit.service'
 import { DeliveryStopArrivalController } from './arrival/delivery-stop-arrival.controller'
 import { DeliveryStopArrivalService } from './arrival/delivery-stop-arrival.service'
+import { DeliveryRouteLocationAuditEvent } from './location/delivery-route-location-audit.entity'
+import { DeliveryRouteLocationAuditService } from './location/delivery-route-location-audit.service'
+import { DeliveryRouteLocationFieldsResolver } from './location/delivery-route-location-fields.resolver'
+import { DeliveryRouteProgressLocationService } from './location/delivery-route-progress-location.service'
 import { DeliveryManifestAuditEvent } from './manifest/delivery-manifest-audit.entity'
 import { DeliveryManifestAuditService } from './manifest/delivery-manifest-audit.service'
 import { DeliveryManifestController } from './manifest/delivery-manifest.controller'
@@ -149,6 +153,43 @@ const deliveryStopArrivalAuditPersistenceProvider = isSchemaGeneration
     }
   : DeliveryStopArrivalAuditPersistenceService
 
+const deliveryRouteProgressLocationServiceProvider = isSchemaGeneration
+  ? {
+      provide: DeliveryRouteProgressLocationService,
+      useValue: {
+        recordArrivalLocation: () => Promise.resolve(null),
+        recordDeliveryLocation: () => Promise.resolve(null),
+        deriveNextStop: () => null,
+        getSafeLocationForActor: () => null,
+        getPharmacistLocationVisibility: () => ({
+          isNextStop: false,
+          lastKnownCourierCity: null,
+          lastKnownLocationRecordedAt: null,
+          courierLocationSource: null,
+        }),
+        buildSafeLocationStatus: () => ({
+          hasLocation: false,
+          city: null,
+          recordedAt: null,
+          source: null,
+          stopSequence: null,
+          hasNextStop: false,
+          nextStop: null,
+        }),
+        recomputeRouteLocation: () => Promise.resolve(null),
+      },
+    }
+  : DeliveryRouteProgressLocationService
+
+const deliveryRouteLocationAuditServiceProvider = isSchemaGeneration
+  ? {
+      provide: DeliveryRouteLocationAuditService,
+      useValue: {
+        record: () => Promise.resolve({ inserted: true }),
+      },
+    }
+  : DeliveryRouteLocationAuditService
+
 const deliveryManifestDataServiceProvider = isSchemaGeneration
   ? {
       provide: DeliveryManifestDataService,
@@ -195,6 +236,10 @@ const arrivalAuditPersistence = isSchemaGeneration
   ? []
   : [TypeOrmModule.forFeature([DeliveryStopArrivalAuditEvent])]
 
+const locationAuditPersistence = isSchemaGeneration
+  ? []
+  : [TypeOrmModule.forFeature([DeliveryRouteLocationAuditEvent])]
+
 const manifestAuditPersistence = isSchemaGeneration
   ? []
   : [TypeOrmModule.forFeature([DeliveryManifestAuditEvent])]
@@ -208,6 +253,7 @@ const manifestAuditPersistence = isSchemaGeneration
     BusinessNotificationModule,
     ...confirmAuditPersistence,
     ...arrivalAuditPersistence,
+    ...locationAuditPersistence,
     ...manifestAuditPersistence,
   ],
   controllers: isSchemaGeneration
@@ -230,6 +276,8 @@ const manifestAuditPersistence = isSchemaGeneration
     deliveryStopArrivalServiceProvider,
     deliveryStopArrivalAuditServiceProvider,
     deliveryStopArrivalAuditPersistenceProvider,
+    deliveryRouteProgressLocationServiceProvider,
+    deliveryRouteLocationAuditServiceProvider,
     deliveryManifestDataServiceProvider,
     deliveryManifestPdfServiceProvider,
     deliveryManifestServiceProvider,
@@ -237,12 +285,18 @@ const manifestAuditPersistence = isSchemaGeneration
     DeliveryStopQrImageService,
     RoutesResolver,
     DeliveryStopQrFieldsResolver,
+    DeliveryRouteLocationFieldsResolver,
     DeliveryStopQrResolver,
     {
       provide: CLOCK,
       useClass: SystemClock,
     },
   ],
-  exports: [RoutesCoreModule, RoutesService, RoutePreviewService],
+  exports: [
+    RoutesCoreModule,
+    RoutesService,
+    RoutePreviewService,
+    DeliveryRouteProgressLocationService,
+  ],
 })
 export class RoutesModule {}

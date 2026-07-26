@@ -9,6 +9,7 @@ import { User } from '../../user/user.entity'
 import { UserRole } from '../../user/user-role.enum'
 import { DeliveryRoute } from '../delivery-route.entity'
 import { DeliveryStop } from '../delivery-stop.embed'
+import { DeliveryRouteProgressLocationService } from '../location/delivery-route-progress-location.service'
 import { RouteStatus } from '../route-status.enum'
 import { buildDeliveryStopQrImagePath } from './delivery-stop-qr-image.constants'
 import { DeliveryQrForbiddenException } from './delivery-stop-qr.exceptions'
@@ -39,6 +40,7 @@ export class MyPlannedDeliveriesService {
     private readonly deliveryRouteRepository: MongoRepository<DeliveryRoute>,
     @InjectRepository(Order)
     private readonly orderRepository: MongoRepository<Order>,
+    private readonly progressLocationService: DeliveryRouteProgressLocationService,
   ) {}
 
   /**
@@ -137,6 +139,9 @@ export class MyPlannedDeliveriesService {
       }
     }
 
+    const locationVisibility =
+      this.progressLocationService.getPharmacistLocationVisibility(route, stop)
+
     return {
       routeId,
       stopId,
@@ -155,6 +160,11 @@ export class MyPlannedDeliveriesService {
       qrConsumed,
       deliveredAt,
       qrImagePath,
+      isNextStop: locationVisibility.isNextStop,
+      lastKnownCourierCity: locationVisibility.lastKnownCourierCity,
+      lastKnownLocationRecordedAt:
+        locationVisibility.lastKnownLocationRecordedAt,
+      courierLocationSource: locationVisibility.courierLocationSource,
     }
   }
 

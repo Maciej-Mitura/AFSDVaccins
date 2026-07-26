@@ -139,6 +139,16 @@ describe('DeliveryStopArrivalService', () => {
     const findByActorAndKey = jest
       .fn()
       .mockResolvedValue(deps.priorAudit ?? null)
+    const recordArrivalLocation = jest.fn().mockImplementation(
+      (input: { route: typeof currentRoute }) =>
+        Promise.resolve({
+          route: input.route,
+          applied: true,
+          location: null,
+          nextStop: null,
+          published: false,
+        }),
+    )
 
     const service = new DeliveryStopArrivalService(
       deliveryRouteRepository as never,
@@ -149,6 +159,7 @@ describe('DeliveryStopArrivalService', () => {
       } as never,
       { publishBezorgerRouteUpdated } as never,
       { record: auditRecord, findByActorAndKey } as never,
+      { recordArrivalLocation } as never,
     )
 
     return {
@@ -156,6 +167,7 @@ describe('DeliveryStopArrivalService', () => {
       deliveryRouteRepository,
       publishBezorgerRouteUpdated,
       auditRecord,
+      recordArrivalLocation,
       actor:
         deps.actorRole === undefined
           ? actor

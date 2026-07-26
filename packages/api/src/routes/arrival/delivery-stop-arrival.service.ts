@@ -8,6 +8,7 @@ import { User } from '../../user/user.entity'
 import { UserRole } from '../../user/user-role.enum'
 import { DeliveryRoute } from '../delivery-route.entity'
 import { DeliveryRouteEventsService } from '../delivery-route-events.service'
+import { DeliveryRouteProgressLocationService } from '../location/delivery-route-progress-location.service'
 import { RouteStatus } from '../route-status.enum'
 import { DeliveryStopArrivalAuditService } from './delivery-stop-arrival-audit.service'
 import { DELIVERY_ARRIVAL_STATUS_RECORDED } from './delivery-stop-arrival.constants'
@@ -46,7 +47,10 @@ import { StopArrivalSource } from './stop-arrival-source.enum'
  * - consume QR / write deliveryProof
  * - decrement stock
  * - complete the route
- * - notify pharmacists
+ * - notify pharmacists (including APOTHEKER_NEXT_STOP)
+ *
+ * After first successful persistence, Phase 30A updates route lastKnownLocation
+ * from the stop city snapshot. Location failure does not roll back arrival.
  *
  * Delivered-stop compatibility: if deliveryProof already exists, reject with
  * STOP_ALREADY_DELIVERED and do not create synthetic arrival metadata.
@@ -61,6 +65,7 @@ export class DeliveryStopArrivalService {
     private readonly bezorgerProfileService: BezorgerProfileService,
     private readonly deliveryRouteEventsService: DeliveryRouteEventsService,
     private readonly auditService: DeliveryStopArrivalAuditService,
+    private readonly progressLocationService: DeliveryRouteProgressLocationService,
   ) {}
 
   async recordArrivalForCourier(
@@ -226,8 +231,34 @@ export class DeliveryStopArrivalService {
       throw new DeliveryArrivalAlreadyRecordedException()
     }
 
+    let routeForPublish = writeResult.route
+    try {
+      const locationResult =
+        await this.progressLocationService.recordArrivalLocation({
+          route: writeResult.route,
+          stop,
+          recordedAt: now,
+          courierUserId,
+          courierBezorgerProfileId: courierProfileId,
+          arrivalEventKey: idempotencyKey,
+          publishRouteUpdate: false,
+        })
+      routeForPublish = locationResult.route
+    } catch (error) {
+      // Reliability: arrival remains successful; location can be recomputed later.
+      this.logger.warn({
+        event: 'delivery_arrival_location_update_failed',
+        routeId: parsedRouteId.stringValue,
+        stopId: stop.stopId,
+        error:
+          error instanceof Error
+            ? { name: error.name, message: error.message }
+            : { message: 'unknown' },
+      })
+    }
+
     await this.deliveryRouteEventsService.publishBezorgerRouteUpdated(
-      writeResult.route,
+      routeForPublish,
     )
 
     return this.toResponse({
@@ -248,7 +279,7 @@ export class DeliveryStopArrivalService {
       if (input.existingArrival.arrivedByUserId !== input.courierUserId) {
         throw new DeliveryArrivalForbiddenException()
       }
-      // Idempotent replay — no new audit / PubSub.
+      // Idempotent replay — no new audit / PubSub / location write.
       return this.toResponse({
         routeId: input.routeId,
         stopId: input.stopId,

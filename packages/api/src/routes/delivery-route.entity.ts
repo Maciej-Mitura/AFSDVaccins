@@ -9,6 +9,7 @@ import {
 } from 'typeorm'
 
 import { DeliveryStop } from './delivery-stop.embed'
+import { RouteLastKnownLocation } from './location/route-last-known-location.embed'
 import { RouteStatus } from './route-status.enum'
 import { RouteStatusHistoryEntry } from './route-status-history.type'
 
@@ -47,6 +48,14 @@ export class DeliveryRoute {
   @Column()
   @Field(() => [DeliveryStop])
   stops!: DeliveryStop[]
+
+  /**
+   * Coarse courier city from the latest accepted stop arrival or QR delivery
+   * (Phase 30A). Persistence embed — GraphQL exposes safe projection via
+   * `locationStatus` ResolveField. Never stores GPS coordinates.
+   */
+  @Column({ nullable: true })
+  lastKnownLocation?: RouteLastKnownLocation | null
 
   /**
    * Apotheker profile IDs from the template that were skipped because they had

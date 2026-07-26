@@ -97,6 +97,13 @@ export type CachedRouteSnapshot = {
   routeStatus: string
   assignedCourierProfileId: string
   stops: CachedRouteStop[]
+  /** Phase 30A safe coarse location — assigned courier only; no coordinates. */
+  lastKnownCourierCity: string | null
+  lastKnownLocationRecordedAt: string | null
+  locationSource: string | null
+  nextStopSequence: number | null
+  nextStopPharmacyName: string | null
+  nextStopCity: string | null
 }
 
 export type CourierRouteCacheRecord = {

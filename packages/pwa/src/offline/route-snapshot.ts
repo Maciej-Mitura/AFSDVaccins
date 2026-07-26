@@ -44,6 +44,9 @@ function asString(value: unknown): string | null {
   if (typeof value === 'number' && Number.isFinite(value)) {
     return String(value)
   }
+  if (value instanceof Date && !Number.isNaN(value.getTime())) {
+    return value.toISOString()
+  }
   return null
 }
 
@@ -145,16 +148,60 @@ export function serializeCourierRouteSnapshot(
     .map(serializeStop)
     .filter((stop): stop is CachedRouteStop => stop !== null)
 
+  const location = serializeLocationStatus(route.locationStatus)
+
   const snapshot: CachedRouteSnapshot = {
     routeId,
     routeDate,
     routeStatus,
     assignedCourierProfileId,
     stops,
+    lastKnownCourierCity: location.city,
+    lastKnownLocationRecordedAt: location.recordedAt,
+    locationSource: location.source,
+    nextStopSequence: location.nextStopSequence,
+    nextStopPharmacyName: location.nextStopPharmacyName,
+    nextStopCity: location.nextStopCity,
   }
 
   assertNoForbiddenRouteCacheFields(snapshot)
   return snapshot
+}
+
+function serializeLocationStatus(raw: unknown): {
+  city: string | null
+  recordedAt: string | null
+  source: string | null
+  nextStopSequence: number | null
+  nextStopPharmacyName: string | null
+  nextStopCity: string | null
+} {
+  const empty = {
+    city: null,
+    recordedAt: null,
+    source: null,
+    nextStopSequence: null,
+    nextStopPharmacyName: null,
+    nextStopCity: null,
+  }
+
+  if (!isRecord(raw)) {
+    return empty
+  }
+
+  const nextStop = isRecord(raw.nextStop) ? raw.nextStop : null
+
+  return {
+    city: asString(raw.city),
+    recordedAt: asString(raw.recordedAt),
+    source: asString(raw.source),
+    nextStopSequence:
+      nextStop && typeof nextStop.sequence === 'number'
+        ? nextStop.sequence
+        : null,
+    nextStopPharmacyName: nextStop ? asString(nextStop.pharmacyName) : null,
+    nextStopCity: nextStop ? asString(nextStop.city) : null,
+  }
 }
 
 /** Deep scan for forbidden property names (safety net after whitelist). */

@@ -178,6 +178,20 @@ describe('DeliveryQrConfirmService', () => {
       notifyNextPharmacy: jest.fn().mockResolvedValue(undefined),
     }
 
+    const progressLocationService = {
+      recordDeliveryLocation: jest.fn().mockImplementation(
+        (input: { route: typeof currentRoute }) =>
+          Promise.resolve({
+            route: input.route,
+            applied: true,
+            location: null,
+            nextStop: null,
+            published: false,
+          }),
+      ),
+      deriveNextStop: jest.fn().mockReturnValue(null),
+    }
+
     const service = new DeliveryQrConfirmService(
       deliveryRouteRepository as never,
       orderRepository as never,
@@ -186,6 +200,7 @@ describe('DeliveryQrConfirmService', () => {
       deliveryRouteEventsService as never,
       auditService as never,
       businessNotificationProducer as never,
+      progressLocationService as never,
       tokenService,
     )
 
