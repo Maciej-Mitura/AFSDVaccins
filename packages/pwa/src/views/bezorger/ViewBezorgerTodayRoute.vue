@@ -7,20 +7,25 @@ import CommonErrorState from '@/components/common/CommonErrorState.vue'
 import CommonLoadingSkeleton from '@/components/common/CommonLoadingSkeleton.vue'
 import FeatureBezorgerDeliveryQrWorkflow from '@/components/feature/bezorger/FeatureBezorgerDeliveryQrWorkflow.vue'
 import { RouteStatus, useDeliveryRoutes } from '@/composables/useDeliveryRoutes'
-import { useOnlineStatus } from '@/composables/useOnlineStatus'
 import { useRealtimeConnection } from '@/composables/useRealtimeConnection'
 import { formatDateTime, routeStatusLabel, translatePlural } from '@/i18n'
 import { UserRole } from '@vaccin-delivery/types'
 import { useCurrentUser } from '@/composables/useCurrentUser'
 
 const { t } = useI18n()
-const { currentUser } = useCurrentUser()
+const { currentUser, initialized } = useCurrentUser()
 const {
   myTodayRoute,
   loading,
+  refreshing,
   updatingStatus,
   errorMessage,
   statusError,
+  todayRouteSource,
+  todayRouteCachedAt,
+  todayRouteRefreshError,
+  todayRouteIsReadOnly,
+  isOnline,
   loadMyTodayRoute,
   updateRouteStatus,
   subscribeToTodayRouteUpdates,
@@ -30,7 +35,6 @@ const {
 } = useDeliveryRoutes()
 
 const { connectionState } = useRealtimeConnection()
-const { isOnline } = useOnlineStatus()
 
 const confirmStart = ref(false)
 const confirmComplete = ref(false)
@@ -41,6 +45,10 @@ const canScanDeliveryQr = computed(() => {
     myTodayRoute.value?.status === RouteStatus.InProgress
   )
 })
+
+const actionsEnabled = computed(
+  () => !todayRouteIsReadOnly.value && isOnline.value && !updatingStatus.value,
+)
 
 const latestCancelReason = computed(() => {
   const route = myTodayRoute.value
@@ -56,6 +64,15 @@ const latestCancelReason = computed(() => {
   return cancelEntry?.reason ?? null
 })
 
+const cachedAtLabel = computed(() => {
+  if (!todayRouteCachedAt.value) {
+    return null
+  }
+  return t('offline.lastUpdated', {
+    dateTime: formatDateTime(todayRouteCachedAt.value),
+  })
+})
+
 function stopTotalLabel(totalQuantity: number): string {
   const doses = translatePlural('routes.stop.doses', totalQuantity)
   return t('bezorger.route.stop.total', { doses })
@@ -65,8 +82,17 @@ function stopOrdersLabel(orderCount: number): string {
   return translatePlural('routes.stop.orders', orderCount)
 }
 
+function orderReferencesLabel(orderIds: string[]): string {
+  if (orderIds.length === 0) {
+    return t('offline.route.orderReferencesOmitted')
+  }
+  return t('offline.route.orderReferences', {
+    references: orderIds.join(', '),
+  })
+}
+
 async function onStartRoute(): Promise<void> {
-  if (!myTodayRoute.value) {
+  if (!myTodayRoute.value || !actionsEnabled.value) {
     return
   }
 
@@ -80,7 +106,7 @@ async function onStartRoute(): Promise<void> {
 }
 
 async function onCompleteRoute(): Promise<void> {
-  if (!myTodayRoute.value) {
+  if (!myTodayRoute.value || !actionsEnabled.value) {
     return
   }
 
@@ -99,6 +125,10 @@ function cancelStartConfirm(): void {
 
 function cancelCompleteConfirm(): void {
   confirmComplete.value = false
+}
+
+async function onRetryRefresh(): Promise<void> {
+  await loadMyTodayRoute({ isRefresh: Boolean(myTodayRoute.value) })
 }
 
 onMounted(() => {
@@ -128,7 +158,8 @@ onUnmounted(() => {
       </p>
     </div>
 
-    <CommonLoadingSkeleton v-if="loading && !myTodayRoute" />
+    <CommonLoadingSkeleton v-if="(!initialized || loading) && !myTodayRoute" />
+
     <CommonErrorState
       v-else-if="errorMessage && !myTodayRoute"
       :title="t('bezorger.route.today.loadFailed')"
@@ -136,12 +167,66 @@ onUnmounted(() => {
     />
 
     <CommonEmptyState
-      v-else-if="!loading && !myTodayRoute"
+      v-else-if="initialized && !loading && !myTodayRoute"
       :title="t('bezorger.route.today.empty.title')"
-      :description="t('bezorger.route.today.empty.description')"
+      :description="
+        todayRouteSource === 'NONE' && !isOnline
+          ? t('offline.route.openOnlineFirst')
+          : t('bezorger.route.today.empty.description')
+      "
     />
 
     <template v-else-if="myTodayRoute">
+      <UAlert
+        v-if="todayRouteIsReadOnly"
+        color="warning"
+        variant="subtle"
+        icon="i-lucide-wifi-off"
+        role="status"
+        data-testid="offline-route-banner"
+        :title="t('offline.copy.title')"
+        :description="t('offline.copy.description')"
+      />
+
+      <p
+        v-if="cachedAtLabel"
+        class="text-sm text-muted"
+        data-testid="offline-route-cached-at"
+      >
+        {{ cachedAtLabel }}
+      </p>
+
+      <p
+        v-if="refreshing"
+        class="text-sm text-muted"
+        role="status"
+        aria-live="polite"
+        data-testid="offline-route-refreshing"
+      >
+        {{ t('offline.route.refreshing') }}
+      </p>
+
+      <UAlert
+        v-if="todayRouteRefreshError"
+        color="warning"
+        variant="subtle"
+        role="status"
+        data-testid="offline-route-refresh-error"
+        :title="todayRouteRefreshError"
+      >
+        <template #actions>
+          <UButton
+            size="xs"
+            variant="soft"
+            data-testid="offline-route-retry"
+            :loading="refreshing"
+            @click="onRetryRefresh"
+          >
+            {{ t('common.retry') }}
+          </UButton>
+        </template>
+      </UAlert>
+
       <div class="rounded-lg bg-elevated/50 px-4 py-3">
         <p class="text-sm text-muted">{{ t('bezorger.route.status') }}</p>
         <p class="text-lg font-semibold" data-testid="route-status">
@@ -173,15 +258,24 @@ onUnmounted(() => {
         "
         class="space-y-3"
       >
+        <p
+          v-if="todayRouteIsReadOnly"
+          class="text-sm text-muted"
+          role="status"
+          data-testid="offline-actions-disabled-reason"
+        >
+          {{ t('offline.action.requiresConnection') }}
+        </p>
+
         <UAlert
-          v-if="confirmStart"
+          v-if="confirmStart && actionsEnabled"
           color="warning"
           variant="subtle"
           :title="t('bezorger.route.start.title')"
           :description="t('bezorger.route.start.description')"
         />
         <UAlert
-          v-if="confirmComplete"
+          v-if="confirmComplete && actionsEnabled"
           color="warning"
           variant="subtle"
           :title="t('bezorger.route.complete.title')"
@@ -195,21 +289,27 @@ onUnmounted(() => {
           class="min-h-14 text-base"
           data-testid="route-start"
           :loading="updatingStatus"
-          :disabled="!isOnline || updatingStatus"
+          :disabled="!actionsEnabled"
+          :aria-disabled="!actionsEnabled"
+          :title="
+            todayRouteIsReadOnly
+              ? t('offline.action.requiresConnection')
+              : undefined
+          "
           @click="onStartRoute"
         >
           {{
-            confirmStart
+            confirmStart && actionsEnabled
               ? t('bezorger.route.start.confirm')
               : t('bezorger.route.start')
           }}
         </UButton>
         <UButton
-          v-if="confirmStart"
+          v-if="confirmStart && actionsEnabled"
           block
           size="lg"
           variant="ghost"
-          :disabled="!isOnline || updatingStatus"
+          :disabled="updatingStatus"
           @click="cancelStartConfirm"
         >
           {{ t('common.cancel') }}
@@ -218,7 +318,8 @@ onUnmounted(() => {
         <FeatureBezorgerDeliveryQrWorkflow
           v-if="myTodayRoute.status === RouteStatus.InProgress"
           :enabled="canScanDeliveryQr"
-          :on-refresh-route="loadMyTodayRoute"
+          :read-only-offline="todayRouteIsReadOnly"
+          :on-refresh-route="() => loadMyTodayRoute({ isRefresh: true })"
         />
 
         <UButton
@@ -229,21 +330,27 @@ onUnmounted(() => {
           color="primary"
           data-testid="route-complete"
           :loading="updatingStatus"
-          :disabled="!isOnline || updatingStatus"
+          :disabled="!actionsEnabled"
+          :aria-disabled="!actionsEnabled"
+          :title="
+            todayRouteIsReadOnly
+              ? t('offline.action.requiresConnection')
+              : undefined
+          "
           @click="onCompleteRoute"
         >
           {{
-            confirmComplete
+            confirmComplete && actionsEnabled
               ? t('bezorger.route.complete.confirm')
               : t('bezorger.route.complete')
           }}
         </UButton>
         <UButton
-          v-if="confirmComplete"
+          v-if="confirmComplete && actionsEnabled"
           block
           size="lg"
           variant="ghost"
-          :disabled="!isOnline || updatingStatus"
+          :disabled="updatingStatus"
           @click="cancelCompleteConfirm"
         >
           {{ t('common.cancel') }}
@@ -257,7 +364,9 @@ onUnmounted(() => {
       />
 
       <div
-        v-if="myTodayRoute.statusHistory.length > 0"
+        v-if="
+          todayRouteSource === 'SERVER' && myTodayRoute.statusHistory.length > 0
+        "
         class="rounded-lg border border-default px-4 py-3"
       >
         <p class="text-sm font-medium">{{ t('routes.statusHistory') }}</p>
@@ -277,7 +386,7 @@ onUnmounted(() => {
         :description="t('bezorger.route.today.emptyStops.description')"
       />
 
-      <ol v-else class="space-y-4">
+      <ol v-else class="space-y-4" role="list">
         <li
           v-for="stop in myTodayRoute.stops"
           :key="stop.stopId ?? `${stop.apothekerProfileId}-${stop.sequence}`"
@@ -290,6 +399,9 @@ onUnmounted(() => {
           </p>
           <h2 class="mt-1 text-lg font-semibold">{{ stop.pharmacyName }}</h2>
           <p class="mt-1 text-sm">{{ formatAddress(stop) }}</p>
+          <p class="mt-1 text-sm text-muted" data-testid="route-stop-orders">
+            {{ orderReferencesLabel(stop.orderIds) }}
+          </p>
           <p
             v-if="stop.qrConsumed || stop.deliveredAt"
             class="mt-2 text-sm font-medium text-success"
@@ -309,7 +421,7 @@ onUnmounted(() => {
               ({{ stopOrdersLabel(stop.orderCount) }})
             </span>
           </p>
-          <ul class="mt-2 space-y-1 text-sm">
+          <ul class="mt-2 space-y-1 text-sm" role="list">
             <li
               v-for="line in stop.lines"
               :key="line.vaccineId"

@@ -1,8 +1,6 @@
 /**
  * Phase 28A offline IndexedDB foundation — public surface.
- *
- * Library: `idb` (see INDEXED_DB_LIBRARY_RATIONALE).
- * Do not use cached data for route UI rendering until Phase 28B.
+ * Phase 28B consumes valid snapshots for courier route/notification UI.
  */
 
 export {
@@ -32,6 +30,23 @@ export {
   containsForbiddenRouteCacheField,
   FORBIDDEN_ROUTE_CACHE_FIELD_NAMES,
 } from '@/offline/route-snapshot'
+
+export {
+  hydrateDeliveryRouteFromCache,
+  hydrateNotificationsFromCache,
+} from '@/offline/hydrate-from-cache'
+
+export {
+  classifyRequestFailure,
+  isNetworkUnavailableFailure,
+  isAuthBarrierFailure,
+  offlineUiErrorMessageKey,
+  type OfflineUiErrorCategory,
+  type RouteDataSource,
+  type NotificationDataSource,
+} from '@/offline/ui-error-category'
+
+export { brusselsCalendarDate } from '@/offline/brussels-date'
 
 export {
   isBrowserIndexedDbAvailable,

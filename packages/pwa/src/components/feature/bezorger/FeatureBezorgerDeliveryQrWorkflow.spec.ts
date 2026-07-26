@@ -54,9 +54,15 @@ vi.mock('@/composables/useDeliveryRoutes', () => ({
   useDeliveryRoutes: () => ({
     myTodayRoute,
     loading: ref(false),
+    refreshing: ref(false),
     updatingStatus: ref(false),
     errorMessage: ref(null),
     statusError: ref(null),
+    todayRouteSource: ref('SERVER'),
+    todayRouteCachedAt: ref(null),
+    todayRouteRefreshError: ref(null),
+    todayRouteIsReadOnly: ref(false),
+    isOnline: useOnlineStatus().isOnline,
     loadMyTodayRoute,
     updateRouteStatus: vi.fn(),
     subscribeToTodayRouteUpdates: vi.fn(),
@@ -67,7 +73,7 @@ vi.mock('@/composables/useDeliveryRoutes', () => ({
 }))
 
 vi.mock('@/composables/useCurrentUser', () => ({
-  useCurrentUser: () => ({ currentUser }),
+  useCurrentUser: () => ({ currentUser, initialized: ref(true) }),
 }))
 
 vi.mock('@/composables/useRealtimeConnection', () => ({

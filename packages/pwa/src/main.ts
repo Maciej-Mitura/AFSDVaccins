@@ -14,6 +14,7 @@ import {
   markAppUpdateAvailable,
 } from './composables/useAppUpdate'
 import { useCurrentUser } from './composables/useCurrentUser'
+import { useDeliveryRoutes } from './composables/useDeliveryRoutes'
 import { useFirebase } from './composables/useFirebase'
 import { useNotifications } from './composables/useNotifications'
 import { bootstrapI18n } from './i18n'
@@ -36,12 +37,14 @@ configureAppUpdate({ updateServiceWorker })
 const { waitForAuthRestoration, logout } = useFirebase()
 const { clearCurrentUser } = useCurrentUser()
 const { clearNotificationState } = useNotifications()
+const { clearTodayRouteState } = useDeliveryRoutes()
 const authReady = ref(false)
 
 registerSessionExpiredHandler(async message => {
   await logout()
   clearCurrentUser()
   clearNotificationState()
+  clearTodayRouteState()
   const { clearNotificationToastState } =
     await import('./composables/useNotificationToast')
   const { usePushNotifications } =

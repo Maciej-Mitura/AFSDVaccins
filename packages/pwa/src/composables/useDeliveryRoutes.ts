@@ -1,6 +1,6 @@
 import { ApolloError } from '@apollo/client/core'
 import { RouteStatus } from '@vaccin-delivery/types'
-import { ref } from 'vue'
+import { computed, ref } from 'vue'
 
 import {
   BEZORGER_ROUTE_UPDATES_SUBSCRIPTION,
@@ -23,7 +23,23 @@ import { ROUTE_TEMPLATES_QUERY } from '@/assets/graphql/route-templates'
 import type { RouteTemplatesQuery } from '@/assets/graphql/route-templates'
 import { mapGraphQLError, useCurrentUser } from '@/composables/useCurrentUser'
 import useGraphQL, { registerReconnectHandler } from '@/composables/useGraphQL'
-import { getCourierRouteOfflineCacheService } from '@/offline'
+import { useOnlineStatus } from '@/composables/useOnlineStatus'
+import {
+  getCourierRouteOfflineCacheService,
+  getOfflineCacheOwnerService,
+  getOfflineStorageStatus,
+  isOfflineSessionUnlocked,
+  type CacheOwnerIdentity,
+} from '@/offline'
+import { hydrateDeliveryRouteFromCache } from '@/offline/hydrate-from-cache'
+import {
+  classifyRequestFailure,
+  isAuthBarrierFailure,
+  isNetworkUnavailableFailure,
+  offlineUiErrorMessageKey,
+  type OfflineUiErrorCategory,
+  type RouteDataSource,
+} from '@/offline/ui-error-category'
 import {
   formatDateTime,
   routeStatusLabel,
@@ -43,12 +59,14 @@ export type ActiveRouteTemplateOption =
   RouteTemplatesQuery['routeTemplates'][number]
 export type RouteStatusValue = RouteStatus
 export { RouteStatus }
+export type { OfflineUiErrorCategory, RouteDataSource }
 
 const deliveryRoutes = ref<DeliveryRouteItem[]>([])
 const myTodayRoute = ref<DeliveryRouteItem | null>(null)
 const myTomorrowRoutePreview = ref<RoutePreviewItem | null>(null)
 const activeTemplates = ref<ActiveRouteTemplateOption[]>([])
 const loading = ref(false)
+const refreshing = ref(false)
 const previewLoading = ref(false)
 const templatesLoading = ref(false)
 const generating = ref(false)
@@ -60,9 +78,16 @@ const generateError = ref<string | null>(null)
 const statusError = ref<string | null>(null)
 const successMessage = ref<string | null>(null)
 
+const todayRouteSource = ref<RouteDataSource>('NONE')
+const todayRouteCachedAt = ref<string | null>(null)
+const todayRouteExpiresAt = ref<string | null>(null)
+const todayRouteErrorCategory = ref<OfflineUiErrorCategory | null>(null)
+const todayRouteRefreshError = ref<string | null>(null)
+
 let todayRouteSubscriptionCleanup: (() => void) | null = null
 let todayRouteReconnectCleanup: (() => void) | null = null
 let tomorrowPreviewReconnectCleanup: (() => void) | null = null
+let todayRouteLoadGeneration = 0
 
 function extractGraphQLErrorCode(error: unknown): string | null {
   if (!(error instanceof ApolloError)) {
@@ -90,8 +115,89 @@ function upsertDeliveryRoute(route: DeliveryRouteItem): void {
   }
 }
 
+function setServerRouteState(route: DeliveryRouteItem | null): void {
+  myTodayRoute.value = route
+  todayRouteSource.value = route ? 'SERVER' : 'NONE'
+  todayRouteCachedAt.value = null
+  todayRouteExpiresAt.value = null
+  todayRouteErrorCategory.value = null
+  todayRouteRefreshError.value = null
+  errorMessage.value = null
+}
+
+function setCachedRouteState(
+  route: DeliveryRouteItem,
+  cachedAt: string,
+  expiresAt: string,
+): void {
+  myTodayRoute.value = route
+  todayRouteSource.value = 'CACHE'
+  todayRouteCachedAt.value = cachedAt
+  todayRouteExpiresAt.value = expiresAt
+  todayRouteErrorCategory.value = null
+  errorMessage.value = null
+}
+
+function setUnavailableRouteState(
+  category: OfflineUiErrorCategory,
+  messageKey?: string,
+): void {
+  myTodayRoute.value = null
+  todayRouteSource.value = 'NONE'
+  todayRouteCachedAt.value = null
+  todayRouteExpiresAt.value = null
+  todayRouteErrorCategory.value = category
+  errorMessage.value = translate(
+    messageKey ?? offlineUiErrorMessageKey(category),
+  )
+}
+
+async function resolveCourierCacheOwner(): Promise<CacheOwnerIdentity | null> {
+  const { currentUser, initialized } = useCurrentUser()
+
+  if (!initialized.value) {
+    return null
+  }
+
+  const user = currentUser.value
+  const bezorgerProfileId = user?.bezorgerProfile?.id
+  if (!user?.id || !bezorgerProfileId) {
+    return null
+  }
+
+  // Only re-bind when locked — avoid wiping expired rows before category detection.
+  if (!isOfflineSessionUnlocked()) {
+    try {
+      await getOfflineCacheOwnerService().resolveAuthenticatedOwner({
+        role: user.role,
+        userId: user.id,
+        bezorgerProfileId,
+      })
+    } catch {
+      return null
+    }
+  }
+
+  if (!isOfflineSessionUnlocked()) {
+    return null
+  }
+
+  return {
+    userId: user.id,
+    bezorgerProfileId,
+  }
+}
+
 export function useDeliveryRoutes() {
   const { apolloClient } = useGraphQL()
+  const { isOnline } = useOnlineStatus()
+
+  const todayRouteIsReadOnly = computed(
+    () => todayRouteSource.value === 'CACHE',
+  )
+  const todayRouteIsStaleSnapshot = computed(
+    () => todayRouteSource.value === 'CACHE',
+  )
 
   async function loadActiveTemplates(): Promise<void> {
     templatesLoading.value = true
@@ -133,30 +239,187 @@ export function useDeliveryRoutes() {
     }
   }
 
-  async function loadMyTodayRoute(): Promise<void> {
-    loading.value = true
-    errorMessage.value = null
+  async function tryLoadCachedTodayRoute(options?: {
+    preferExpiredCategory?: boolean
+  }): Promise<boolean> {
+    const storage = getOfflineStorageStatus()
+    if (storage.mode === 'online-only' || storage.mode === 'unavailable') {
+      setUnavailableRouteState('CACHE_UNAVAILABLE')
+      return false
+    }
+
+    const owner = await resolveCourierCacheOwner()
+    if (!owner) {
+      setUnavailableRouteState('AUTH_REQUIRED')
+      return false
+    }
+
+    try {
+      const { record, expiredFound } =
+        await getCourierRouteOfflineCacheService().readValidRouteForOwner(owner)
+
+      if (record) {
+        setCachedRouteState(
+          hydrateDeliveryRouteFromCache(record),
+          record.fetchedAt,
+          record.expiresAt,
+        )
+        return true
+      }
+
+      if (expiredFound || options?.preferExpiredCategory) {
+        setUnavailableRouteState('OFFLINE_CACHE_EXPIRED')
+        return false
+      }
+
+      setUnavailableRouteState('OFFLINE_NO_CACHE', 'offline.route.unavailable')
+      return false
+    } catch {
+      setUnavailableRouteState('CACHE_UNAVAILABLE')
+      return false
+    }
+  }
+
+  async function applyServerTodayRoute(
+    route: DeliveryRouteItem | null,
+  ): Promise<void> {
+    setServerRouteState(route)
+    apolloClient.writeQuery({
+      query: MY_TODAY_ROUTE_QUERY,
+      data: { myTodayRoute: route },
+    })
+
+    const owner = await resolveCourierCacheOwner()
+    if (!owner) {
+      return
+    }
+
+    try {
+      if (route) {
+        await getCourierRouteOfflineCacheService().writeFromOnlineRoute({
+          owner,
+          route,
+          enforceAssignedCourier: true,
+        })
+      } else {
+        await getCourierRouteOfflineCacheService().clearOwnerRoutes(owner)
+      }
+    } catch {
+      // IndexedDB failure must not break the online route flow.
+    }
+  }
+
+  async function loadMyTodayRoute(options?: {
+    isRefresh?: boolean
+  }): Promise<void> {
+    const generation = ++todayRouteLoadGeneration
+    const isRefresh = options?.isRefresh === true
+    const keepShowingRoute = isRefresh && myTodayRoute.value !== null
+    const wasCached = todayRouteSource.value === 'CACHE'
+
+    if (keepShowingRoute) {
+      refreshing.value = true
+      todayRouteRefreshError.value = null
+    } else {
+      loading.value = true
+      errorMessage.value = null
+      todayRouteErrorCategory.value = null
+      todayRouteRefreshError.value = null
+    }
+
+    const { currentUser, initialized } = useCurrentUser()
+
+    // Never render private cache until auth identity has fully resolved.
+    if (!initialized.value) {
+      if (!keepShowingRoute) {
+        myTodayRoute.value = null
+        todayRouteSource.value = 'NONE'
+      }
+      loading.value = false
+      refreshing.value = false
+      return
+    }
+
+    if (!currentUser.value?.id || !currentUser.value.bezorgerProfile?.id) {
+      clearTodayRouteState()
+      setUnavailableRouteState('AUTH_REQUIRED')
+      loading.value = false
+      refreshing.value = false
+      return
+    }
+
+    // Browser offline: skip unnecessary online refetch; read cache directly.
+    if (!isOnline.value) {
+      await tryLoadCachedTodayRoute()
+      if (generation !== todayRouteLoadGeneration) {
+        return
+      }
+      loading.value = false
+      refreshing.value = false
+      return
+    }
 
     try {
       const result = await apolloClient.query<MyTodayRouteQuery>({
         query: MY_TODAY_ROUTE_QUERY,
         fetchPolicy: 'network-only',
       })
-      // Always replace from network — including null after a real miss —
-      // so a stale empty/null cache cannot stay authoritative.
-      myTodayRoute.value = result.data.myTodayRoute ?? null
-      apolloClient.writeQuery({
-        query: MY_TODAY_ROUTE_QUERY,
-        data: { myTodayRoute: myTodayRoute.value },
-      })
 
-      // Phase 28A write-only hook — UI still renders from network/memory only.
-      void cacheMyTodayRouteSnapshot(myTodayRoute.value)
+      if (generation !== todayRouteLoadGeneration) {
+        return
+      }
+
+      // Server result always wins — including null (no current route).
+      await applyServerTodayRoute(result.data.myTodayRoute ?? null)
     } catch (error) {
+      if (generation !== todayRouteLoadGeneration) {
+        return
+      }
+
+      if (isAuthBarrierFailure(error)) {
+        clearTodayRouteState()
+        const category = classifyRequestFailure(error)
+        setUnavailableRouteState(category)
+        return
+      }
+
+      if (isNetworkUnavailableFailure(error)) {
+        if (keepShowingRoute && wasCached) {
+          todayRouteRefreshError.value = translate(
+            'offline.route.refreshFailed',
+          )
+          return
+        }
+
+        if (keepShowingRoute && !wasCached) {
+          // Keep prior server route visible on transient network errors.
+          todayRouteRefreshError.value = translate(
+            'offline.route.refreshFailed',
+          )
+          return
+        }
+
+        await tryLoadCachedTodayRoute()
+        return
+      }
+
+      // Domain / GraphQL errors: do not fall back to cache.
+      if (keepShowingRoute && wasCached) {
+        todayRouteRefreshError.value = mapGraphQLError(error)
+        return
+      }
+
+      myTodayRoute.value = null
+      todayRouteSource.value = 'NONE'
+      todayRouteCachedAt.value = null
+      todayRouteExpiresAt.value = null
+      todayRouteErrorCategory.value = 'SERVER_ERROR'
       errorMessage.value = mapGraphQLError(error)
-      // Keep any previously loaded route visible on transient refetch errors.
     } finally {
-      loading.value = false
+      if (generation === todayRouteLoadGeneration) {
+        loading.value = false
+        refreshing.value = false
+      }
     }
   }
 
@@ -168,18 +431,13 @@ export function useDeliveryRoutes() {
     }
 
     try {
-      const { currentUser } = useCurrentUser()
-      const user = currentUser.value
-      const bezorgerProfileId = user?.bezorgerProfile?.id
-      if (!user?.id || !bezorgerProfileId) {
+      const owner = await resolveCourierCacheOwner()
+      if (!owner) {
         return
       }
 
       await getCourierRouteOfflineCacheService().writeFromOnlineRoute({
-        owner: {
-          userId: user.id,
-          bezorgerProfileId,
-        },
+        owner,
         route,
         enforceAssignedCourier: true,
       })
@@ -253,6 +511,11 @@ export function useDeliveryRoutes() {
     status: RouteStatusValue,
     reason?: string | null,
   ): Promise<DeliveryRouteItem | null> {
+    if (todayRouteIsReadOnly.value) {
+      statusError.value = translate('offline.action.requiresConnection')
+      return null
+    }
+
     updatingStatus.value = true
     statusError.value = null
     successMessage.value = null
@@ -276,7 +539,7 @@ export function useDeliveryRoutes() {
         upsertDeliveryRoute(route)
 
         if (myTodayRoute.value?.id === route.id) {
-          myTodayRoute.value = route
+          setServerRouteState(route)
           apolloClient.writeQuery({
             query: MY_TODAY_ROUTE_QUERY,
             data: { myTodayRoute: route },
@@ -332,18 +595,25 @@ export function useDeliveryRoutes() {
           const route = data?.bezorgerRouteUpdates
 
           if (route) {
+            // Update online UI immediately from the event.
             myTodayRoute.value = route
+            todayRouteSource.value = 'SERVER'
+            todayRouteCachedAt.value = null
+            todayRouteExpiresAt.value = null
+            todayRouteErrorCategory.value = null
             apolloClient.writeQuery({
               query: MY_TODAY_ROUTE_QUERY,
               data: { myTodayRoute: route },
             })
-            void cacheMyTodayRouteSnapshot(route)
+            // Do not write subscription payloads into IndexedDB — refetch a
+            // complete validated snapshot after meaningful realtime changes.
+            void loadMyTodayRoute({ isRefresh: true })
           }
         },
       })
 
     todayRouteReconnectCleanup = registerReconnectHandler(() => {
-      void loadMyTodayRoute()
+      void loadMyTodayRoute({ isRefresh: true })
     })
 
     const cleanup = (): void => {
@@ -356,6 +626,21 @@ export function useDeliveryRoutes() {
     todayRouteSubscriptionCleanup = cleanup
 
     return cleanup
+  }
+
+  function clearTodayRouteState(): void {
+    todayRouteLoadGeneration += 1
+    myTodayRoute.value = null
+    todayRouteSource.value = 'NONE'
+    todayRouteCachedAt.value = null
+    todayRouteExpiresAt.value = null
+    todayRouteErrorCategory.value = null
+    todayRouteRefreshError.value = null
+    errorMessage.value = null
+    statusError.value = null
+    loading.value = false
+    refreshing.value = false
+    updatingStatus.value = false
   }
 
   function formatAddress(
@@ -408,6 +693,7 @@ export function useDeliveryRoutes() {
     myTomorrowRoutePreview,
     activeTemplates,
     loading,
+    refreshing,
     previewLoading,
     templatesLoading,
     generating,
@@ -418,6 +704,14 @@ export function useDeliveryRoutes() {
     generateError,
     statusError,
     successMessage,
+    todayRouteSource,
+    todayRouteCachedAt,
+    todayRouteExpiresAt,
+    todayRouteErrorCategory,
+    todayRouteRefreshError,
+    todayRouteIsReadOnly,
+    todayRouteIsStaleSnapshot,
+    isOnline,
     loadActiveTemplates,
     loadDeliveryRoutes,
     loadMyTodayRoute,
@@ -428,6 +722,7 @@ export function useDeliveryRoutes() {
     stopTodayRouteSubscription,
     subscribeToTomorrowPreviewReconnect,
     stopTomorrowPreviewReconnect,
+    clearTodayRouteState,
     formatAddress,
     formatStatusHistoryEntry,
     isRouteTemplateInactiveError,
@@ -436,4 +731,20 @@ export function useDeliveryRoutes() {
     canRegenerateRoute,
     mapGraphQLError,
   }
+}
+
+/** Test-only reset for module-level today-route state. */
+export function __resetTodayRouteStateForTests(): void {
+  myTodayRoute.value = null
+  todayRouteSource.value = 'NONE'
+  todayRouteCachedAt.value = null
+  todayRouteExpiresAt.value = null
+  todayRouteErrorCategory.value = null
+  todayRouteRefreshError.value = null
+  errorMessage.value = null
+  statusError.value = null
+  loading.value = false
+  refreshing.value = false
+  updatingStatus.value = false
+  todayRouteLoadGeneration += 1
 }

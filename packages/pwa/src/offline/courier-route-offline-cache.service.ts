@@ -1,3 +1,4 @@
+import { brusselsCalendarDate } from '@/offline/brussels-date'
 import {
   getOfflineCacheRepository,
   type OfflineCacheRepository,
@@ -12,7 +13,18 @@ import type {
   CourierRouteCacheRecord,
   RouteCacheDiagnostics,
 } from '@/offline/types'
-import { buildRouteCacheKey, expiresAtFromNow, nowUtcIso } from '@/offline/time'
+import {
+  buildRouteCacheKey,
+  expiresAtFromNow,
+  isExpired,
+  nowUtcIso,
+} from '@/offline/time'
+
+export type ReadValidRouteResult = {
+  record: CourierRouteCacheRecord | null
+  /** True when an owner-scoped route existed but was past expiresAt. */
+  expiredFound: boolean
+}
 
 export type WriteCourierRouteInput = {
   owner: CacheOwnerIdentity
@@ -117,6 +129,43 @@ export class CourierRouteOfflineCacheService {
     return record
   }
 
+  /**
+   * Read a valid owner-scoped route for offline UI.
+   * Prefers today's Brussels calendar date; falls back to the sole cached date
+   * (Phase 28A keeps at most one date per owner after prune).
+   */
+  async readValidRouteForOwner(
+    owner: CacheOwnerIdentity,
+    routeDate: string = brusselsCalendarDate(),
+  ): Promise<ReadValidRouteResult> {
+    if (!isOfflineSessionUnlocked()) {
+      return { record: null, expiredFound: false }
+    }
+
+    const listed = await this.repository.listCourierRoutesByOwner(owner.userId)
+    const owned = listed.filter(
+      record =>
+        record.ownerUserId === owner.userId &&
+        record.ownerBezorgerProfileId === owner.bezorgerProfileId,
+    )
+
+    const valid = owned.filter(record => !isExpired(record.expiresAt))
+    const expiredFound = owned.some(record => isExpired(record.expiresAt))
+
+    if (expiredFound) {
+      await this.repository.removeExpiredRecords()
+    }
+
+    if (valid.length === 0) {
+      return { record: null, expiredFound }
+    }
+
+    const preferred =
+      valid.find(record => record.routeDate === routeDate) ?? valid[0]
+
+    return { record: preferred, expiredFound: false }
+  }
+
   async deleteRoute(
     owner: CacheOwnerIdentity,
     routeDate: string,
@@ -124,6 +173,10 @@ export class CourierRouteOfflineCacheService {
     await this.repository.deleteCourierRoute(
       buildRouteCacheKey(owner.userId, routeDate),
     )
+  }
+
+  async clearOwnerRoutes(owner: CacheOwnerIdentity): Promise<void> {
+    await this.repository.deleteCourierRoutesForOwner(owner.userId)
   }
 
   async getDiagnostics(

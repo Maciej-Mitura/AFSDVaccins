@@ -26,8 +26,12 @@ const router = useRouter()
 const {
   notifications,
   loading,
+  refreshing,
   errorMessage,
   hasUnread,
+  notificationCachedAt,
+  notificationRefreshError,
+  notificationsAreReadOnly,
   loadNotifications,
   loadUnreadCount,
   markNotificationRead,
@@ -52,8 +56,20 @@ const displayItems = computed(() =>
   }),
 )
 
+const cachedAtLabel = computed(() => {
+  if (!notificationCachedAt.value) {
+    return null
+  }
+  return t('offline.lastUpdated', {
+    dateTime: formatDateTime(notificationCachedAt.value),
+  })
+})
+
 async function refresh(): Promise<void> {
-  await Promise.all([loadNotifications(), loadUnreadCount()])
+  await Promise.all([
+    loadNotifications(false, { isRefresh: notifications.value.length > 0 }),
+    loadUnreadCount(),
+  ])
 }
 
 onMounted(() => {
@@ -62,6 +78,11 @@ onMounted(() => {
 })
 
 async function onMarkRead(id: string): Promise<void> {
+  if (notificationsAreReadOnly.value) {
+    actionError.value = t('offline.notifications.readRequiresConnection')
+    return
+  }
+
   actionError.value = null
   markingId.value = id
 
@@ -78,6 +99,11 @@ async function onMarkRead(id: string): Promise<void> {
 }
 
 async function onMarkAllRead(): Promise<void> {
+  if (notificationsAreReadOnly.value) {
+    actionError.value = t('offline.notifications.readRequiresConnection')
+    return
+  }
+
   actionError.value = null
   markingAll.value = true
 
@@ -98,7 +124,7 @@ async function onOpenAction(
   notificationId: string,
   isRead: boolean,
 ): Promise<void> {
-  if (!isRead) {
+  if (!isRead && !notificationsAreReadOnly.value) {
     try {
       await markNotificationRead(notificationId)
     } catch {
@@ -118,7 +144,7 @@ async function onOpenAction(
       </h2>
 
       <UButton
-        v-if="hasUnread"
+        v-if="hasUnread && !notificationsAreReadOnly"
         size="sm"
         variant="soft"
         color="primary"
@@ -130,10 +156,66 @@ async function onOpenAction(
       </UButton>
     </div>
 
+    <UAlert
+      v-if="notificationsAreReadOnly"
+      color="warning"
+      variant="subtle"
+      icon="i-lucide-wifi-off"
+      role="status"
+      data-testid="offline-notifications-banner"
+      :title="t('offline.notifications.banner')"
+      :description="t('offline.copy.description')"
+    />
+
+    <p
+      v-if="cachedAtLabel"
+      class="text-sm text-muted"
+      data-testid="offline-notifications-cached-at"
+    >
+      {{ cachedAtLabel }}
+    </p>
+
+    <p
+      v-if="refreshing"
+      class="text-sm text-muted"
+      role="status"
+      aria-live="polite"
+    >
+      {{ t('offline.route.refreshing') }}
+    </p>
+
+    <UAlert
+      v-if="notificationRefreshError"
+      color="warning"
+      variant="subtle"
+      role="status"
+      :title="notificationRefreshError"
+    >
+      <template #actions>
+        <UButton
+          size="xs"
+          variant="soft"
+          :loading="refreshing"
+          @click="refresh"
+        >
+          {{ t('common.retry') }}
+        </UButton>
+      </template>
+    </UAlert>
+
+    <p
+      v-if="notificationsAreReadOnly && hasUnread"
+      class="text-sm text-muted"
+      role="status"
+      data-testid="offline-notifications-read-disabled"
+    >
+      {{ t('offline.notifications.readRequiresConnection') }}
+    </p>
+
     <CommonLoadingSkeleton v-if="loading && notifications.length === 0" />
 
     <CommonErrorState
-      v-else-if="errorMessage"
+      v-else-if="errorMessage && notifications.length === 0"
       :title="t('notifications.centre.loadFailed')"
       :description="errorMessage"
     />
@@ -216,11 +298,12 @@ async function onOpenAction(
               </UButton>
 
               <UButton
-                v-if="!notification.read"
+                v-if="!notification.read && !notificationsAreReadOnly"
                 size="xs"
                 variant="soft"
                 color="primary"
                 :loading="markingId === notification.id"
+                data-testid="notifications-mark-read"
                 @click="onMarkRead(notification.id)"
               >
                 {{ t('notifications.centre.markRead') }}

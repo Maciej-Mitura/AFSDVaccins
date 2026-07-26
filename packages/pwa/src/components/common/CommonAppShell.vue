@@ -57,6 +57,7 @@ import CommonLanguageSelector from '@/components/common/CommonLanguageSelector.v
 import CommonPushPermissionBanner from '@/components/common/CommonPushPermissionBanner.vue'
 import { clearApolloCache } from '@/composables/useGraphQL'
 import { useCurrentUser } from '@/composables/useCurrentUser'
+import { useDeliveryRoutes } from '@/composables/useDeliveryRoutes'
 import { useFirebase } from '@/composables/useFirebase'
 import {
   setNotificationToastNavigate,
@@ -85,6 +86,7 @@ const router = useRouter()
 const { isAuthenticated, logout } = useFirebase()
 const { clearCurrentUser } = useCurrentUser()
 const { clearNotificationState } = useNotifications()
+const { clearTodayRouteState } = useDeliveryRoutes()
 const { resetSession: resetPushSession } = usePushNotifications()
 const loggingOut = ref(false)
 
@@ -112,6 +114,7 @@ async function onLogout() {
     await logout()
     clearCurrentUser()
     clearNotificationState()
+    clearTodayRouteState()
     clearNotificationToastState()
     resetPushSession()
     await clearApolloCache()

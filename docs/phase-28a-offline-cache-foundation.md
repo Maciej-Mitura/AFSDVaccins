@@ -138,7 +138,8 @@ Online-only detection continues to reuse `useOnlineStatus` (no second detector).
 
 ## Explicitly out of Phase 28A
 
-- Offline route UI consumption (28B)
+- Offline route UI consumption (**done in Phase 28B** — see
+  `phase-28b-offline-route-notification-viewing.md`)
 - Offline “arrived” local state UX
 - Pending-action sync / conflict resolution (28C)
 - Offline QR / delivery confirmation

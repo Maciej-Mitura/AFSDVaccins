@@ -8,7 +8,7 @@ import type {
   NotificationCacheRecord,
   NotificationInterpolationSnapshot,
 } from '@/offline/types'
-import { expiresAtFromNow, nowUtcIso } from '@/offline/time'
+import { expiresAtFromNow, isExpired, nowUtcIso } from '@/offline/time'
 
 export type NotificationCacheSource = {
   id: string
@@ -75,6 +75,56 @@ export class NotificationOfflineCacheService {
     await this.repository.trimNotificationsForOwner(ownerUserId)
     await this.repository.removeExpiredRecords()
     return written
+  }
+
+  /**
+   * Server-wins replace: drop prior owner rows, then write the online list.
+   * Prevents duplicates across reconnect refreshes.
+   */
+  async replaceCacheFromOnlineList(
+    ownerUserId: string,
+    notifications: NotificationCacheSource[],
+  ): Promise<number> {
+    await this.repository.deleteNotificationsForOwner(ownerUserId)
+    return this.cacheFromOnlineList(ownerUserId, notifications)
+  }
+
+  /**
+   * Read valid cached notifications, distinguishing expiry vs empty.
+   */
+  async readValidNotificationsForOwner(ownerUserId: string): Promise<{
+    records: NotificationCacheRecord[]
+    expiredFound: boolean
+    cachedAt: string | null
+  }> {
+    if (!isOfflineSessionUnlocked()) {
+      return { records: [], expiredFound: false, cachedAt: null }
+    }
+
+    const owned =
+      await this.repository.listNotificationsForOwnerIncludingExpired(
+        ownerUserId,
+      )
+    const valid = owned.filter(record => !isExpired(record.expiresAt))
+    const expiredFound = owned.some(record => isExpired(record.expiresAt))
+
+    if (expiredFound) {
+      await this.repository.removeExpiredRecords()
+    }
+
+    const records = [...valid].sort((a, b) =>
+      b.createdAt.localeCompare(a.createdAt),
+    )
+    const cachedAt =
+      records.length > 0
+        ? records.reduce(
+            (latest, record) =>
+              record.cachedAt > latest ? record.cachedAt : latest,
+            records[0].cachedAt,
+          )
+        : null
+
+    return { records, expiredFound, cachedAt }
   }
 
   /**

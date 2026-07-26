@@ -229,6 +229,21 @@ export class OfflineCacheRepository {
     }, [])
   }
 
+  /**
+   * Lists owner notifications without removing expired rows first.
+   * Used to distinguish empty vs expired cache for offline UI.
+   */
+  async listNotificationsForOwnerIncludingExpired(
+    ownerUserId: string,
+  ): Promise<NotificationCacheRecord[]> {
+    if (!isOfflineSessionUnlocked()) {
+      return []
+    }
+    return this.withDb(async db => {
+      return db.getAllFromIndex('notifications', 'by-owner', ownerUserId)
+    }, [])
+  }
+
   async trimNotificationsForOwner(ownerUserId: string): Promise<void> {
     await this.withDb(async db => {
       const records = await db.getAllFromIndex(

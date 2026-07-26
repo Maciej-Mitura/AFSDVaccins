@@ -11,6 +11,8 @@ import { useOnlineStatus } from '@/composables/useOnlineStatus'
 const props = defineProps<{
   /** Authenticated courier with an IN_PROGRESS assigned route. */
   enabled: boolean
+  /** Cached/offline read-only mode — never request camera. */
+  readOnlyOffline?: boolean
   onRefreshRoute: () => Promise<void> | void
 }>()
 
@@ -19,6 +21,10 @@ const { isOnline } = useOnlineStatus()
 
 const scanButtonRef = ref<{ $el?: HTMLElement } | null>(null)
 const cameraRef = ref<{ stopTrackedStream?: () => void } | null>(null)
+
+const isMutationAllowed = computed(
+  () => props.enabled && isOnline.value && !props.readOnlyOffline,
+)
 
 const {
   phase,
@@ -45,8 +51,8 @@ const {
   acknowledgeSuccess,
   clearTransientToken,
 } = useDeliveryQrScanSession({
-  canOpen: () => props.enabled,
-  isOnline: () => isOnline.value,
+  canOpen: () => isMutationAllowed.value,
+  isOnline: () => isOnline.value && !props.readOnlyOffline,
   onRefreshRoute: () => props.onRefreshRoute(),
 })
 
@@ -66,15 +72,15 @@ const showCameraPanel = computed(
 )
 
 const canShowScanAction = computed(
-  () => props.enabled && isOnline.value && phase.value === 'closed',
+  () => isMutationAllowed.value && phase.value === 'closed',
 )
 
 const scanDisabledReason = computed(() => {
   if (!props.enabled) {
     return null
   }
-  if (!isOnline.value) {
-    return t('bezorger.route.qr.offline')
+  if (props.readOnlyOffline || !isOnline.value) {
+    return t('offline.action.requiresConnection')
   }
   return null
 })
@@ -93,13 +99,26 @@ function closeEverything(): void {
 }
 
 watch(isOnline, online => {
-  if (!online) {
+  if (!online || props.readOnlyOffline) {
     cameraRef.value?.stopTrackedStream?.()
     markOffline()
   } else {
     markOnline()
   }
 })
+
+watch(
+  () => props.readOnlyOffline,
+  readOnly => {
+    if (readOnly) {
+      cameraRef.value?.stopTrackedStream?.()
+      markOffline()
+      if (scannerOpen.value) {
+        closeEverything()
+      }
+    }
+  },
+)
 
 watch(
   () => props.enabled,
@@ -145,16 +164,16 @@ function onPreviewCancel(): void {
 <template>
   <div class="space-y-3" data-testid="delivery-qr-workflow">
     <p
-      v-if="enabled && !isOnline"
+      v-if="enabled && (readOnlyOffline || !isOnline)"
       class="text-sm text-warning"
       role="status"
       data-testid="delivery-qr-offline-hint"
     >
-      {{ t('bezorger.route.qr.offline') }}
+      {{ t('offline.action.requiresConnection') }}
     </p>
 
     <UButton
-      v-if="enabled"
+      v-if="enabled && !readOnlyOffline"
       ref="scanButtonRef"
       block
       size="xl"
