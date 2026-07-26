@@ -12,8 +12,9 @@ import {
   type MyUnreadNotificationCountQuery,
   type NotificationReceivedSubscription,
 } from '@/assets/graphql/notification'
-import { mapGraphQLError } from '@/composables/useCurrentUser'
+import { mapGraphQLError, useCurrentUser } from '@/composables/useCurrentUser'
 import useGraphQL, { registerReconnectHandler } from '@/composables/useGraphQL'
+import { getNotificationOfflineCacheService } from '@/offline'
 import { resolveNotificationCopy } from '@/utils/notification-display'
 
 export type NotificationListItem =
@@ -107,11 +108,32 @@ export function useNotifications() {
       const { markNotificationsSeenForToast } =
         await import('@/composables/useNotificationToast')
       markNotificationsSeenForToast(notifications.value)
+
+      // Phase 28A write-only hook — never toast from IndexedDB reads.
+      void cacheNotificationsSnapshot(notifications.value)
     } catch (error: unknown) {
       errorMessage.value = mapGraphQLError(error)
       throw error
     } finally {
       loading.value = false
+    }
+  }
+
+  async function cacheNotificationsSnapshot(
+    items: NotificationListItem[],
+  ): Promise<void> {
+    try {
+      const { currentUser } = useCurrentUser()
+      const userId = currentUser.value?.id
+      if (!userId) {
+        return
+      }
+      await getNotificationOfflineCacheService().cacheFromOnlineList(
+        userId,
+        items,
+      )
+    } catch {
+      // IndexedDB failure must not break online notification loading.
     }
   }
 

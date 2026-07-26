@@ -82,6 +82,24 @@ describe('PWA safety and configuration', () => {
     expect(viteConfig).not.toContain('StaleWhileRevalidate')
   })
 
+  it('authenticated GraphQL route responses are not service-worker cached', () => {
+    // IndexedDB is the explicit private-data cache (Phase 28A).
+    expect(swSource).not.toMatch(/registerRoute\([^)]*graphql/i)
+    expect(swSource).not.toMatch(/urlPattern:.*graphql/i)
+    expect(swSource).toContain('/graphql')
+    expect(swSource).toMatch(/pathname\.includes\(['"]\/graphql['"]\)/)
+    expect(swSource).not.toContain('CacheFirst')
+    expect(swSource).not.toContain('NetworkFirst')
+    expect(swSource).not.toContain('StaleWhileRevalidate')
+  })
+
+  it('QR SVG / delivery-route REST endpoints are not service-worker cached', () => {
+    expect(swSource).not.toMatch(/delivery-routes.*qr|\/qr['"]/i)
+    expect(swSource).not.toContain('delivery-routes')
+    expect(viteConfig).not.toMatch(/delivery-routes|qrImage|qr\.svg/i)
+    expect(swSource).not.toContain('CacheFirst')
+  })
+
   it('Firebase Auth endpoints are not runtime cached', () => {
     expect(viteConfig).not.toMatch(
       /urlPattern:\s*.*(identitytoolkit|securetoken\.google|googleapis\.com\/identitytoolkit)/i,

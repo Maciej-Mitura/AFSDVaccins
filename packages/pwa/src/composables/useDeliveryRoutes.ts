@@ -21,8 +21,9 @@ import {
 } from '@/assets/graphql/routes'
 import { ROUTE_TEMPLATES_QUERY } from '@/assets/graphql/route-templates'
 import type { RouteTemplatesQuery } from '@/assets/graphql/route-templates'
-import { mapGraphQLError } from '@/composables/useCurrentUser'
+import { mapGraphQLError, useCurrentUser } from '@/composables/useCurrentUser'
 import useGraphQL, { registerReconnectHandler } from '@/composables/useGraphQL'
+import { getCourierRouteOfflineCacheService } from '@/offline'
 import {
   formatDateTime,
   routeStatusLabel,
@@ -148,11 +149,42 @@ export function useDeliveryRoutes() {
         query: MY_TODAY_ROUTE_QUERY,
         data: { myTodayRoute: myTodayRoute.value },
       })
+
+      // Phase 28A write-only hook — UI still renders from network/memory only.
+      void cacheMyTodayRouteSnapshot(myTodayRoute.value)
     } catch (error) {
       errorMessage.value = mapGraphQLError(error)
       // Keep any previously loaded route visible on transient refetch errors.
     } finally {
       loading.value = false
+    }
+  }
+
+  async function cacheMyTodayRouteSnapshot(
+    route: DeliveryRouteItem | null,
+  ): Promise<void> {
+    if (!route) {
+      return
+    }
+
+    try {
+      const { currentUser } = useCurrentUser()
+      const user = currentUser.value
+      const bezorgerProfileId = user?.bezorgerProfile?.id
+      if (!user?.id || !bezorgerProfileId) {
+        return
+      }
+
+      await getCourierRouteOfflineCacheService().writeFromOnlineRoute({
+        owner: {
+          userId: user.id,
+          bezorgerProfileId,
+        },
+        route,
+        enforceAssignedCourier: true,
+      })
+    } catch {
+      // IndexedDB failure must not break the online route flow.
     }
   }
 
@@ -249,6 +281,7 @@ export function useDeliveryRoutes() {
             query: MY_TODAY_ROUTE_QUERY,
             data: { myTodayRoute: route },
           })
+          void cacheMyTodayRouteSnapshot(route)
         }
 
         successMessage.value = translate('success.routes.statusUpdated', {
@@ -304,6 +337,7 @@ export function useDeliveryRoutes() {
               query: MY_TODAY_ROUTE_QUERY,
               data: { myTodayRoute: route },
             })
+            void cacheMyTodayRouteSnapshot(route)
           }
         },
       })

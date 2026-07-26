@@ -28,6 +28,10 @@ import {
 } from '@/assets/graphql/profile.mutation'
 import useGraphQL from '@/composables/useGraphQL'
 import { mapGraphQLError, mapUserFacingGraphQLError, translate } from '@/i18n'
+import {
+  lockOfflineCacheForLogout,
+  resolveOfflineCacheOwnerSafe,
+} from '@/offline'
 
 export type ApplicationUser = NonNullable<CurrentUserQuery['currentUser']>
 export type ApplicationRole = ApplicationUser['role']
@@ -137,6 +141,13 @@ export function useCurrentUser() {
 
         currentUser.value = result.data.currentUser ?? null
         missingProfile.value = currentUser.value === null
+
+        // Phase 28A: bind / clear courier IndexedDB owner (never blocks auth).
+        resolveOfflineCacheOwnerSafe({
+          role: currentUser.value?.role ?? null,
+          userId: currentUser.value?.id ?? null,
+          bezorgerProfileId: currentUser.value?.bezorgerProfile?.id ?? null,
+        })
       } catch (error: unknown) {
         if (generation !== loadGeneration) {
           return
@@ -145,6 +156,11 @@ export function useCurrentUser() {
         if (isUserNotRegisteredError(error)) {
           currentUser.value = null
           missingProfile.value = true
+          resolveOfflineCacheOwnerSafe({
+            role: null,
+            userId: null,
+            bezorgerProfileId: null,
+          })
         } else {
           throw error
         }
@@ -289,6 +305,8 @@ export function useCurrentUser() {
     loading.value = false
     loadPromise = null
     loadGeneration += 1
+    // Preserve IndexedDB for same-courier re-login; hide until next resolve.
+    lockOfflineCacheForLogout()
   }
 
   return {
