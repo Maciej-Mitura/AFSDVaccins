@@ -47,6 +47,8 @@
     "seed:database:all": "npm run seed:database:all --workspace=@vaccin-delivery/api",
     "test:docker:safety": "node --test infrastructure/docker-production.safety.test.mjs",
     "diagnose:voice-reports:azure": "npm run diagnose:voice-reports:azure --workspace=@vaccin-delivery/api",
+    "diagnose:route-template-assignments": "npm run diagnose:route-template-assignments --workspace=@vaccin-delivery/api",
+    "repair:route-template-assignments": "npm run repair:route-template-assignments --workspace=@vaccin-delivery/api",
     "test:voice-reports:azure-storage": "npm run test:voice-reports:azure-storage --workspace=@vaccin-delivery/api",
     "test:voice-reports:azure-speech": "npm run test:voice-reports:azure-speech --workspace=@vaccin-delivery/api",
     "test:voice-reports:azure": "npm run test:voice-reports:azure --workspace=@vaccin-delivery/api"

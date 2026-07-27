@@ -16,11 +16,14 @@ import { Order } from '../src/order/order.entity'
 const CREATE_TEMPLATE = `
   mutation CreateTemplate($input: CreateRouteTemplateInput!) {
     createRouteTemplate(input: $input) {
-      id
-      name
-      active
-      bezorgerProfileId
-      stops { sequence apothekerProfileId }
+      deactivatedTemplateIds
+      template {
+        id
+        name
+        active
+        bezorgerProfileId
+        stops { sequence apothekerProfileId }
+      }
     }
   }
 `
@@ -85,10 +88,13 @@ describe('GraphQL E2E — route templates and generation', () => {
 
     const template = await graphqlRequest<{
       createRouteTemplate: {
-        id: string
-        active: boolean
-        bezorgerProfileId: string
-        stops: Array<{ sequence: number; apothekerProfileId: string }>
+        deactivatedTemplateIds: string[]
+        template: {
+          id: string
+          active: boolean
+          bezorgerProfileId: string
+          stops: Array<{ sequence: number; apothekerProfileId: string }>
+        }
       }
     }>(harness.app, {
       query: CREATE_TEMPLATE,
@@ -106,11 +112,11 @@ describe('GraphQL E2E — route templates and generation', () => {
     })
 
     expect(template.errors).toBeUndefined()
-    expect(template.data?.createRouteTemplate.active).toBe(true)
+    expect(template.data?.createRouteTemplate.template.active).toBe(true)
     expect(
-      String(template.data?.createRouteTemplate.bezorgerProfileId),
+      String(template.data?.createRouteTemplate.template.bezorgerProfileId),
     ).toBe(String(courier.profile.id))
-    expect(template.data?.createRouteTemplate.stops).toHaveLength(2)
+    expect(template.data?.createRouteTemplate.template.stops).toHaveLength(2)
 
     const generated = await graphqlRequest<{
       generateDeliveryRoute: {
@@ -124,7 +130,7 @@ describe('GraphQL E2E — route templates and generation', () => {
       query: GENERATE,
       token: E2E_TOKENS.admin,
       variables: {
-        routeTemplateId: template.data!.createRouteTemplate.id,
+        routeTemplateId: template.data!.createRouteTemplate.template.id,
         deliveryDate: today,
       },
     })
@@ -154,7 +160,7 @@ describe('GraphQL E2E — route templates and generation', () => {
       query: GENERATE,
       token: E2E_TOKENS.admin,
       variables: {
-        routeTemplateId: template.data!.createRouteTemplate.id,
+        routeTemplateId: template.data!.createRouteTemplate.template.id,
         deliveryDate: today,
       },
     })
@@ -167,7 +173,7 @@ describe('GraphQL E2E — route templates and generation', () => {
       query: GENERATE,
       token: E2E_TOKENS.apotheker1,
       variables: {
-        routeTemplateId: template.data!.createRouteTemplate.id,
+        routeTemplateId: template.data!.createRouteTemplate.template.id,
         deliveryDate: today,
       },
     })

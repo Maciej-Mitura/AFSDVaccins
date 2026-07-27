@@ -94,11 +94,26 @@ function extractGraphQLErrorCode(error: unknown): string | null {
     return null
   }
 
-  const graphQLError = error.graphQLErrors[0]
-  const originalError = graphQLError?.extensions?.originalError as
-    { error?: string } | undefined
+  for (const graphQLError of error.graphQLErrors) {
+    const code = graphQLError.extensions?.code
+    if (
+      typeof code === 'string' &&
+      code.length > 0 &&
+      code !== 'INTERNAL_SERVER_ERROR' &&
+      code !== 'GRAPHQL_VALIDATION_FAILED'
+    ) {
+      return code
+    }
 
-  return originalError?.error ?? null
+    const originalError = graphQLError.extensions?.originalError as
+      | { error?: string }
+      | undefined
+    if (typeof originalError?.error === 'string' && originalError.error.length > 0) {
+      return originalError.error
+    }
+  }
+
+  return null
 }
 
 function upsertDeliveryRoute(route: DeliveryRouteItem): void {
@@ -678,8 +693,14 @@ export function useDeliveryRoutes() {
   function isMissingTemplatePreviewError(code: string | null): boolean {
     return (
       code === 'ROUTE_TEMPLATE_NOT_ASSIGNED' ||
-      code === 'MULTIPLE_ACTIVE_ROUTE_TEMPLATES' ||
       code === 'BEZORGER_PROFILE_NOT_FOUND'
+    )
+  }
+
+  function isMultipleActiveTemplatePreviewError(code: string | null): boolean {
+    return (
+      code === 'ROUTE_TEMPLATE_MULTIPLE_ACTIVE_FOR_COURIER' ||
+      code === 'MULTIPLE_ACTIVE_ROUTE_TEMPLATES'
     )
   }
 
@@ -728,6 +749,7 @@ export function useDeliveryRoutes() {
     isRouteTemplateInactiveError,
     isDeliveryRouteNotRegenerableError,
     isMissingTemplatePreviewError,
+    isMultipleActiveTemplatePreviewError,
     canRegenerateRoute,
     mapGraphQLError,
   }

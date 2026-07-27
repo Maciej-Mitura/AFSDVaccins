@@ -33,6 +33,12 @@ export class RouteTemplate {
   @Field(() => String, { nullable: true })
   description?: string | null
 
+  /**
+   * Lifecycle flag: `true` means this is the courier's currently active plan.
+   * Invariant: at most one document with `active: true` per `bezorgerProfileId`
+   * (enforced in service writes + partial unique Mongo index).
+   * Inactive/historical templates remain stored; there is no hard delete.
+   */
   @Column({ default: true })
   @Field()
   active!: boolean

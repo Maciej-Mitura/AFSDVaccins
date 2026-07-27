@@ -12,6 +12,7 @@ import {
   UpdateRouteTemplateInput,
 } from './dto/route-template.inputs'
 import { RouteTemplate } from './route-template.entity'
+import { RouteTemplateWriteResult } from './route-template-write-result.type'
 import { RouteTemplatesService } from './route-templates.service'
 
 @Resolver(() => RouteTemplate)
@@ -41,20 +42,22 @@ export class RouteTemplatesResolver {
     return this.routeTemplatesService.findRouteTemplateById(id)
   }
 
-  @Mutation(() => RouteTemplate, {
-    description: 'Creates a reusable delivery route template',
+  @Mutation(() => RouteTemplateWriteResult, {
+    description:
+      'Creates an active delivery route template; deactivates any prior active template for the same courier',
   })
   @UseGuards(AuthorizationGuard, RolesGuard)
   @Roles(UserRole.ADMIN)
   createRouteTemplate(
     @CurrentUser() user: User,
     @Args('input') input: CreateRouteTemplateInput,
-  ): Promise<RouteTemplate> {
+  ): Promise<RouteTemplateWriteResult> {
     return this.routeTemplatesService.createRouteTemplate(input, user)
   }
 
-  @Mutation(() => RouteTemplate, {
-    description: 'Updates an existing route template',
+  @Mutation(() => RouteTemplateWriteResult, {
+    description:
+      'Updates an existing route template; reassignment of an active template deactivates conflicts on the target courier',
   })
   @UseGuards(AuthorizationGuard, RolesGuard)
   @Roles(UserRole.ADMIN)
@@ -62,12 +65,13 @@ export class RouteTemplatesResolver {
     @CurrentUser() user: User,
     @Args('id', { type: () => ID }) id: string,
     @Args('input') input: UpdateRouteTemplateInput,
-  ): Promise<RouteTemplate> {
+  ): Promise<RouteTemplateWriteResult> {
     return this.routeTemplatesService.updateRouteTemplate(id, input, user)
   }
 
-  @Mutation(() => RouteTemplate, {
-    description: 'Activates or deactivates a route template',
+  @Mutation(() => RouteTemplateWriteResult, {
+    description:
+      'Activates or deactivates a route template; activation deactivates any other active template for the same courier',
   })
   @UseGuards(AuthorizationGuard, RolesGuard)
   @Roles(UserRole.ADMIN)
@@ -75,7 +79,7 @@ export class RouteTemplatesResolver {
     @CurrentUser() user: User,
     @Args('id', { type: () => ID }) id: string,
     @Args('active', { type: () => Boolean }) active: boolean,
-  ): Promise<RouteTemplate> {
+  ): Promise<RouteTemplateWriteResult> {
     return this.routeTemplatesService.setRouteTemplateActive(id, active, user)
   }
 }

@@ -244,7 +244,16 @@ describe('SeedService', () => {
 
     const templates = new Map<
       string,
-      { _id: string; normalizedName: string; bezorgerProfileId: string }
+      {
+        _id: string
+        normalizedName: string
+        bezorgerProfileId: string
+        active: boolean
+        name?: string
+        description?: string
+        stops?: unknown
+        updatedByUserId?: string
+      }
     >()
     const routeTemplateRepository = {
       findOne: jest
@@ -254,11 +263,25 @@ describe('SeedService', () => {
             return templates.get(where.normalizedName) ?? null
           },
         ),
+      find: jest.fn().mockImplementation(
+        async ({
+          where,
+        }: {
+          where: { bezorgerProfileId: string; active: boolean }
+        }) => {
+          return [...templates.values()].filter(
+            template =>
+              template.bezorgerProfileId === where.bezorgerProfileId &&
+              template.active === where.active,
+          )
+        },
+      ),
       create: jest.fn().mockImplementation(payload => payload),
       save: jest.fn().mockImplementation(async payload => {
         const saved = {
           ...payload,
           _id: payload._id ?? new ObjectId().toString(),
+          active: payload.active ?? true,
         }
         templates.set(saved.normalizedName, saved)
         return saved
@@ -415,6 +438,58 @@ describe('SeedService', () => {
     expect(mocks.apothekerProfileRepository.remove).toHaveBeenCalledWith(
       expect.objectContaining({ userId: personalUser._id }),
     )
+  })
+
+  it('reuses route templates on a second run without duplicate actives per courier', async () => {
+    const mocks = createMocks()
+
+    const first = await mocks.service.run()
+    expect(first.templatesCreated).toBe(2)
+
+    const activeByCourier = new Map<string, number>()
+    for (const template of mocks.templates.values()) {
+      if (!template.active) {
+        continue
+      }
+      activeByCourier.set(
+        template.bezorgerProfileId,
+        (activeByCourier.get(template.bezorgerProfileId) ?? 0) + 1,
+      )
+    }
+    expect([...activeByCourier.values()].every(count => count === 1)).toBe(true)
+
+    // Simulate a manually created active duplicate before re-seed.
+    const existing = [...mocks.templates.values()][0]
+    mocks.templates.set('manual duplicate', {
+      _id: new ObjectId().toString(),
+      normalizedName: 'manual duplicate',
+      bezorgerProfileId: existing.bezorgerProfileId,
+      active: true,
+      name: 'manual duplicate',
+    })
+
+    const second = await mocks.service.run()
+    expect(second.templatesCreated).toBe(0)
+    expect(second.templatesReused).toBe(2)
+
+    const activeAfter = new Map<string, number>()
+    for (const template of mocks.templates.values()) {
+      if (!template.active) {
+        continue
+      }
+      activeAfter.set(
+        template.bezorgerProfileId,
+        (activeAfter.get(template.bezorgerProfileId) ?? 0) + 1,
+      )
+    }
+    expect([...activeAfter.values()].every(count => count === 1)).toBe(true)
+    expect(
+      [...mocks.templates.values()].some(
+        template =>
+          template.normalizedName === 'manual duplicate' &&
+          template.active === false,
+      ),
+    ).toBe(true)
   })
 
   it('reuses users and profiles on a second run without duplicates', async () => {

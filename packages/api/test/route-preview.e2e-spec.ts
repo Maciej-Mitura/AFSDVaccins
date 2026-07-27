@@ -79,11 +79,11 @@ describe('GraphQL E2E — tomorrow route preview', () => {
     })
 
     const templateResponse = await graphqlRequest<{
-      createRouteTemplate: { id: string }
+      createRouteTemplate: { template: { id: string } }
     }>(harness.app, {
       query: `
         mutation CreateTemplate($input: CreateRouteTemplateInput!) {
-          createRouteTemplate(input: $input) { id }
+          createRouteTemplate(input: $input) { template { id } }
         }
       `,
       token: E2E_TOKENS.admin,
@@ -99,7 +99,7 @@ describe('GraphQL E2E — tomorrow route preview', () => {
       },
     })
     expect(templateResponse.errors).toBeUndefined()
-    const templateId = templateResponse.data!.createRouteTemplate.id
+    const templateId = templateResponse.data!.createRouteTemplate.template.id
 
     const routesBefore = await countCollection(harness.dataSource, DeliveryRoute)
     const ordersBefore = await countCollection(harness.dataSource, Order)

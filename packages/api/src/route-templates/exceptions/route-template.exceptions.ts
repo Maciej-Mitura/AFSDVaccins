@@ -58,12 +58,26 @@ export class RouteTemplateNotAssignedException extends NotFoundException {
   }
 }
 
+/**
+ * Data-integrity conflict: more than one active RouteTemplate for one courier.
+ * Stable code for PWA mapping. Prefer repair over arbitrary selection.
+ */
 export class MultipleActiveRouteTemplatesException extends ConflictException {
   constructor() {
     super({
       message:
-        'Er zijn meerdere actieve routetemplates aan jouw bezorgerprofiel gekoppeld.',
-      error: 'MULTIPLE_ACTIVE_ROUTE_TEMPLATES',
+        'Er zijn meerdere actieve routetemplates aan jouw bezorgerprofiel gekoppeld. Vraag een beheerder om de dubbele toewijzing te herstellen. / Multiple active route templates are linked to your courier profile. Ask an administrator to resolve the duplicate assignment.',
+      error: 'ROUTE_TEMPLATE_MULTIPLE_ACTIVE_FOR_COURIER',
+    })
+  }
+}
+
+export class RouteTemplateActiveOwnerConflictException extends ConflictException {
+  constructor() {
+    super({
+      message:
+        'Another active route template for this courier was created concurrently. Retry the operation.',
+      error: 'ROUTE_TEMPLATE_ACTIVE_OWNER_CONFLICT',
     })
   }
 }

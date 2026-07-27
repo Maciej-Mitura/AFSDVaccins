@@ -16,6 +16,7 @@ import {
   UpdateRouteTemplateInput,
 } from './dto/route-template.inputs'
 import {
+  RouteTemplateActiveOwnerConflictException,
   RouteTemplateAlreadyExistsException,
   RouteTemplateDuplicateStopException,
   RouteTemplateEmptyStopsException,
@@ -23,6 +24,7 @@ import {
 } from './exceptions/route-template.exceptions'
 import { RouteTemplateStop } from './route-template-stop.embed'
 import { RouteTemplate } from './route-template.entity'
+import { RouteTemplateWriteResult } from './route-template-write-result.type'
 import {
   normalizeRouteTemplateName,
   orderStopsBySequence,
@@ -35,6 +37,31 @@ function isDuplicateKeyError(error: unknown): boolean {
     'code' in error &&
     (error as { code?: number }).code === 11000
   )
+}
+
+function duplicateKeyField(error: unknown): string | null {
+  if (!isDuplicateKeyError(error)) {
+    return null
+  }
+
+  const keyPattern = (error as { keyPattern?: Record<string, unknown> })
+    .keyPattern
+  if (keyPattern && typeof keyPattern === 'object') {
+    const keys = Object.keys(keyPattern)
+    if (keys.length > 0) {
+      return keys[0]
+    }
+  }
+
+  const message = error instanceof Error ? error.message : String(error)
+  if (message.includes('bezorgerProfileId')) {
+    return 'bezorgerProfileId'
+  }
+  if (message.includes('normalizedName')) {
+    return 'normalizedName'
+  }
+
+  return null
 }
 
 @Injectable()
@@ -152,10 +179,58 @@ export class RouteTemplatesService {
     return trimmed.length > 0 ? trimmed : null
   }
 
+  /**
+   * Domain invariant: at most one active template per bezorgerProfileId.
+   * Deactivates siblings in the same bounded write; never deletes history.
+   */
+  async deactivateOtherActiveTemplatesForCourier(params: {
+    bezorgerProfileId: string
+    keepTemplateId: string
+    actorUserId: string
+  }): Promise<string[]> {
+    const keepParsed = tryParseGraphqlObjectId(params.keepTemplateId)
+    if (!keepParsed) {
+      return []
+    }
+
+    const siblings = await this.routeTemplateRepository.find({
+      where: {
+        bezorgerProfileId: params.bezorgerProfileId,
+        active: true,
+      },
+    })
+
+    const deactivatedIds: string[] = []
+    const now = new Date()
+
+    for (const sibling of siblings) {
+      const siblingId = sibling._id.toString()
+      if (siblingId === keepParsed.stringValue) {
+        continue
+      }
+
+      sibling.active = false
+      sibling.updatedByUserId = params.actorUserId
+      sibling.updatedAt = now
+      await this.routeTemplateRepository.save(sibling)
+      deactivatedIds.push(siblingId)
+    }
+
+    return deactivatedIds
+  }
+
+  private mapSaveDuplicateKey(error: unknown): never {
+    const field = duplicateKeyField(error)
+    if (field === 'bezorgerProfileId') {
+      throw new RouteTemplateActiveOwnerConflictException()
+    }
+    throw new RouteTemplateAlreadyExistsException()
+  }
+
   async createRouteTemplate(
     input: CreateRouteTemplateInput,
     actor: User,
-  ): Promise<RouteTemplate> {
+  ): Promise<RouteTemplateWriteResult> {
     const name = input.name.trim()
     const normalizedName = normalizeRouteTemplateName(name)
     await this.assertUniqueName(normalizedName)
@@ -165,6 +240,18 @@ export class RouteTemplatesService {
     )
     const stops = await this.normalizeStops(input.stops)
     const actorId = actor._id.toString()
+
+    // Deactivate existing actives first so the new template can claim the
+    // partial unique active-owner slot (never delete historical rows).
+    const priorActive =
+      await this.findActiveTemplatesForBezorgerProfile(bezorgerProfileId)
+    const deactivatedTemplateIds: string[] = []
+    for (const existing of priorActive) {
+      existing.active = false
+      existing.updatedByUserId = actorId
+      await this.routeTemplateRepository.save(existing)
+      deactivatedTemplateIds.push(existing._id.toString())
+    }
 
     const template = this.routeTemplateRepository.create({
       name,
@@ -177,15 +264,50 @@ export class RouteTemplatesService {
       updatedByUserId: actorId,
     })
 
+    let saved: RouteTemplate
     try {
-      const saved = await this.routeTemplateRepository.save(template)
-      return this.withOrderedStops(saved)
+      saved = await this.routeTemplateRepository.save(template)
     } catch (error) {
       if (isDuplicateKeyError(error)) {
-        throw new RouteTemplateAlreadyExistsException()
+        // Concurrent create race: clear actives again and retry once.
+        const field = duplicateKeyField(error)
+        if (field === 'bezorgerProfileId') {
+          const racedPrior =
+            await this.findActiveTemplatesForBezorgerProfile(bezorgerProfileId)
+          for (const existing of racedPrior) {
+            existing.active = false
+            existing.updatedByUserId = actorId
+            await this.routeTemplateRepository.save(existing)
+            deactivatedTemplateIds.push(existing._id.toString())
+          }
+          try {
+            saved = await this.routeTemplateRepository.save(template)
+          } catch (retryError) {
+            if (isDuplicateKeyError(retryError)) {
+              this.mapSaveDuplicateKey(retryError)
+            }
+            throw retryError
+          }
+        } else {
+          this.mapSaveDuplicateKey(error)
+        }
+      } else {
+        throw error
       }
+    }
 
-      throw error
+    const racedAfterInsert =
+      await this.deactivateOtherActiveTemplatesForCourier({
+        bezorgerProfileId,
+        keepTemplateId: saved._id.toString(),
+        actorUserId: actorId,
+      })
+
+    return {
+      template: this.withOrderedStops(saved),
+      deactivatedTemplateIds: [
+        ...new Set([...deactivatedTemplateIds, ...racedAfterInsert]),
+      ],
     }
   }
 
@@ -230,8 +352,10 @@ export class RouteTemplatesService {
     id: string,
     input: UpdateRouteTemplateInput,
     actor: User,
-  ): Promise<RouteTemplate> {
+  ): Promise<RouteTemplateWriteResult> {
     const template = await this.requireById(id)
+    const actorId = actor._id.toString()
+    let ownershipChanged = false
 
     if (input.name !== undefined) {
       const name = input.name.trim()
@@ -246,26 +370,44 @@ export class RouteTemplatesService {
     }
 
     if (input.bezorgerProfileId !== undefined) {
-      template.bezorgerProfileId = await this.requireBezorgerProfileId(
+      const nextBezorgerProfileId = await this.requireBezorgerProfileId(
         input.bezorgerProfileId,
       )
+      if (nextBezorgerProfileId !== template.bezorgerProfileId) {
+        ownershipChanged = true
+      }
+      template.bezorgerProfileId = nextBezorgerProfileId
     }
 
     if (input.stops !== undefined) {
       template.stops = await this.normalizeStops(input.stops)
     }
 
-    template.updatedByUserId = actor._id.toString()
+    template.updatedByUserId = actorId
 
+    let deactivatedTemplateIds: string[] = []
+    if (template.active && ownershipChanged) {
+      deactivatedTemplateIds =
+        await this.deactivateOtherActiveTemplatesForCourier({
+          bezorgerProfileId: template.bezorgerProfileId,
+          keepTemplateId: template._id.toString(),
+          actorUserId: actorId,
+        })
+    }
+
+    let saved: RouteTemplate
     try {
-      const saved = await this.routeTemplateRepository.save(template)
-      return this.withOrderedStops(saved)
+      saved = await this.routeTemplateRepository.save(template)
     } catch (error) {
       if (isDuplicateKeyError(error)) {
-        throw new RouteTemplateAlreadyExistsException()
+        this.mapSaveDuplicateKey(error)
       }
-
       throw error
+    }
+
+    return {
+      template: this.withOrderedStops(saved),
+      deactivatedTemplateIds,
     }
   }
 
@@ -273,11 +415,71 @@ export class RouteTemplatesService {
     id: string,
     active: boolean,
     actor: User,
-  ): Promise<RouteTemplate> {
+  ): Promise<RouteTemplateWriteResult> {
     const template = await this.requireById(id)
+    const actorId = actor._id.toString()
+    let deactivatedTemplateIds: string[] = []
+
+    if (active) {
+      deactivatedTemplateIds =
+        await this.deactivateOtherActiveTemplatesForCourier({
+          bezorgerProfileId: template.bezorgerProfileId,
+          keepTemplateId: template._id.toString(),
+          actorUserId: actorId,
+        })
+    }
+
     template.active = active
-    template.updatedByUserId = actor._id.toString()
-    const saved = await this.routeTemplateRepository.save(template)
-    return this.withOrderedStops(saved)
+    template.updatedByUserId = actorId
+
+    let saved: RouteTemplate
+    try {
+      saved = await this.routeTemplateRepository.save(template)
+    } catch (error) {
+      if (isDuplicateKeyError(error) && active) {
+        // Concurrent activation race: retry once after another deactivation pass.
+        deactivatedTemplateIds = [
+          ...deactivatedTemplateIds,
+          ...(await this.deactivateOtherActiveTemplatesForCourier({
+            bezorgerProfileId: template.bezorgerProfileId,
+            keepTemplateId: template._id.toString(),
+            actorUserId: actorId,
+          })),
+        ]
+        try {
+          saved = await this.routeTemplateRepository.save(template)
+        } catch (retryError) {
+          if (isDuplicateKeyError(retryError)) {
+            throw new RouteTemplateActiveOwnerConflictException()
+          }
+          throw retryError
+        }
+      } else if (isDuplicateKeyError(error)) {
+        this.mapSaveDuplicateKey(error)
+      } else {
+        throw error
+      }
+    }
+
+    return {
+      template: this.withOrderedStops(saved),
+      deactivatedTemplateIds: [...new Set(deactivatedTemplateIds)],
+    }
+  }
+
+  async countActiveTemplatesForCourier(
+    bezorgerProfileId: string,
+  ): Promise<number> {
+    const parsed = tryParseGraphqlObjectId(bezorgerProfileId)
+    if (!parsed) {
+      return 0
+    }
+
+    return this.routeTemplateRepository.count({
+      where: {
+        bezorgerProfileId: parsed.stringValue,
+        active: true,
+      },
+    })
   }
 }

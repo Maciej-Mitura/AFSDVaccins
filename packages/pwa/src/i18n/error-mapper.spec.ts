@@ -90,4 +90,18 @@ describe('error mapper', () => {
     expect(message).not.toContain('at Object')
     expect(message).not.toContain(err.stack)
   })
+
+  it('maps GraphQL route-template integrity codes', () => {
+    expect(
+      mapUserFacingGraphQLError(
+        graphqlErrorWithCode('ROUTE_TEMPLATE_MULTIPLE_ACTIVE_FOR_COURIER'),
+      ),
+    ).toBe(translate('errors.routeTemplate.multipleActiveForCourier'))
+
+    expect(
+      mapUserFacingGraphQLError(
+        graphqlErrorWithCode('ROUTE_TEMPLATE_NOT_ASSIGNED'),
+      ),
+    ).toBe(translate('errors.routeTemplate.notAssigned'))
+  })
 })

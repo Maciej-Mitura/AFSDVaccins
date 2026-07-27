@@ -722,6 +722,11 @@ export class SeedService {
     })
 
     if (existing) {
+      await this.deactivateOtherActiveSeedTemplates(
+        bezorgerProfileId,
+        existing._id.toString(),
+        adminId,
+      )
       existing.name = params.name
       existing.description = params.description
       existing.active = true
@@ -732,6 +737,12 @@ export class SeedService {
       params.counters.templatesReused += 1
       return saved
     }
+
+    await this.deactivateOtherActiveSeedTemplates(
+      bezorgerProfileId,
+      /* keep none yet */ '',
+      adminId,
+    )
 
     const created = this.routeTemplateRepository.create({
       name: params.name,
@@ -746,6 +757,33 @@ export class SeedService {
     const saved = await this.routeTemplateRepository.save(created)
     params.counters.templatesCreated += 1
     return saved
+  }
+
+  /**
+   * Seed idempotency: keep the intended seed template active and deactivate
+   * any other active templates for the same courier. Never deletes history and
+   * never rewrites unrelated template names/stops — only clears `active`.
+   */
+  private async deactivateOtherActiveSeedTemplates(
+    bezorgerProfileId: string,
+    keepTemplateId: string,
+    actorUserId: string,
+  ): Promise<void> {
+    const siblings = await this.routeTemplateRepository.find({
+      where: {
+        bezorgerProfileId,
+        active: true,
+      },
+    })
+
+    for (const sibling of siblings) {
+      if (keepTemplateId && sibling._id.toString() === keepTemplateId) {
+        continue
+      }
+      sibling.active = false
+      sibling.updatedByUserId = actorUserId
+      await this.routeTemplateRepository.save(sibling)
+    }
   }
 
   private async seedTodayRoute(

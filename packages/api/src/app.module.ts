@@ -26,6 +26,7 @@ import {
   createComplexityApolloPlugin,
   createMaxDepthRule,
 } from './common/graphql/query-protection'
+import { formatGraphqlHttpException } from './common/graphql/format-http-exception'
 import { PubSubModule } from './common/pubsub/pubsub.module'
 import { ThrottlingModule } from './common/throttling/throttling.module'
 import { HealthModule } from './health/health.module'
@@ -80,6 +81,7 @@ const sharedImports = [
         // Each POST /graphql carries a single operation document.
         validationRules: [createMaxDepthRule(maxDepth)],
         plugins: [createComplexityApolloPlugin(maxComplexity)],
+        formatError: formatGraphqlHttpException,
         subscriptions: {
           'graphql-ws': {
             onConnect: async (context: {

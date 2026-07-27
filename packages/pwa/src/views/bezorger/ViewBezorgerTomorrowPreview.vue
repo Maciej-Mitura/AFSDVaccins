@@ -21,12 +21,17 @@ const {
   stopTomorrowPreviewReconnect,
   formatAddress,
   isMissingTemplatePreviewError,
+  isMultipleActiveTemplatePreviewError,
 } = useDeliveryRoutes()
 
 const { connectionState } = useRealtimeConnection()
 
 const missingTemplate = computed(() =>
   isMissingTemplatePreviewError(previewErrorCode.value),
+)
+
+const multipleActiveTemplates = computed(() =>
+  isMultipleActiveTemplatePreviewError(previewErrorCode.value),
 )
 
 const previewSummary = computed(() => {
@@ -100,6 +105,12 @@ onUnmounted(() => {
     <CommonErrorState
       v-else-if="previewErrorMessage && missingTemplate"
       :title="t('bezorger.route.tomorrow.noTemplate.title')"
+      :description="previewErrorMessage"
+    />
+
+    <CommonErrorState
+      v-else-if="previewErrorMessage && multipleActiveTemplates"
+      :title="t('bezorger.route.tomorrow.multipleTemplates.title')"
       :description="previewErrorMessage"
     />
 

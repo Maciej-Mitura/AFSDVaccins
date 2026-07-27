@@ -55,19 +55,22 @@ export { RouteTemplateDocument as ROUTE_TEMPLATE_QUERY } from '@vaccin-delivery/
 export const createRouteTemplateMutationSource = gql`
   mutation CreateRouteTemplate($input: CreateRouteTemplateInput!) {
     createRouteTemplate(input: $input) {
-      id
-      name
-      description
-      active
-      bezorgerProfileId
-      stops {
-        apothekerProfileId
-        sequence
+      deactivatedTemplateIds
+      template {
+        id
+        name
+        description
+        active
+        bezorgerProfileId
+        stops {
+          apothekerProfileId
+          sequence
+        }
+        createdAt
+        updatedAt
+        createdByUserId
+        updatedByUserId
       }
-      createdAt
-      updatedAt
-      createdByUserId
-      updatedByUserId
     }
   }
 `
@@ -81,19 +84,22 @@ export { CreateRouteTemplateDocument as CREATE_ROUTE_TEMPLATE_MUTATION } from '@
 export const updateRouteTemplateMutationSource = gql`
   mutation UpdateRouteTemplate($id: ID!, $input: UpdateRouteTemplateInput!) {
     updateRouteTemplate(id: $id, input: $input) {
-      id
-      name
-      description
-      active
-      bezorgerProfileId
-      stops {
-        apothekerProfileId
-        sequence
+      deactivatedTemplateIds
+      template {
+        id
+        name
+        description
+        active
+        bezorgerProfileId
+        stops {
+          apothekerProfileId
+          sequence
+        }
+        createdAt
+        updatedAt
+        createdByUserId
+        updatedByUserId
       }
-      createdAt
-      updatedAt
-      createdByUserId
-      updatedByUserId
     }
   }
 `
@@ -107,10 +113,13 @@ export { UpdateRouteTemplateDocument as UPDATE_ROUTE_TEMPLATE_MUTATION } from '@
 export const setRouteTemplateActiveMutationSource = gql`
   mutation SetRouteTemplateActive($id: ID!, $active: Boolean!) {
     setRouteTemplateActive(id: $id, active: $active) {
-      id
-      active
-      updatedAt
-      updatedByUserId
+      deactivatedTemplateIds
+      template {
+        id
+        active
+        updatedAt
+        updatedByUserId
+      }
     }
   }
 `

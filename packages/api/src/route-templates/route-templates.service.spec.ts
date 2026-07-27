@@ -120,7 +120,7 @@ describe('RouteTemplatesService', () => {
   beforeEach(async () => {
     repository = {
       findOne: jest.fn(),
-      find: jest.fn(),
+      find: jest.fn().mockResolvedValue([]),
       create: jest.fn(),
       save: jest.fn(),
     }
@@ -208,8 +208,9 @@ describe('RouteTemplatesService', () => {
         updatedByUserId: adminUserId,
       }),
     )
-    expect(result.stops.map(stop => stop.sequence)).toEqual([1, 2, 3])
-    expect(result.createdByUserId).toBe(adminUserId)
+    expect(result.template.stops.map(stop => stop.sequence)).toEqual([1, 2, 3])
+    expect(result.template.createdByUserId).toBe(adminUserId)
+    expect(result.deactivatedTemplateIds).toEqual([])
   })
 
   it('normalizes unique names with trimming, whitespace collapse, and case-folding', () => {
@@ -234,8 +235,12 @@ describe('RouteTemplatesService', () => {
 
   it('maps duplicate-key save errors to already-exists', async () => {
     repository.findOne.mockResolvedValue(null)
+    repository.find.mockResolvedValue([])
     repository.create.mockImplementation(value => value as RouteTemplate)
-    repository.save.mockRejectedValue({ code: 11000 })
+    repository.save.mockRejectedValue({
+      code: 11000,
+      keyPattern: { normalizedName: 1 },
+    })
 
     await expect(
       service.createRouteTemplate(
@@ -247,6 +252,62 @@ describe('RouteTemplatesService', () => {
         adminUser,
       ),
     ).rejects.toBeInstanceOf(RouteTemplateAlreadyExistsException)
+  })
+
+  it('deactivates prior active template when creating another for same courier', async () => {
+    const priorId = '507f1f77bcf86cd799439099'
+    const prior = {
+      ...activeTemplate,
+      _id: priorId,
+      name: 'Oud',
+      normalizedName: 'oud',
+      active: true,
+    } as RouteTemplate
+
+    repository.findOne.mockResolvedValue(null)
+    repository.find.mockResolvedValue([prior])
+    repository.create.mockImplementation(value => value as RouteTemplate)
+    repository.save.mockImplementation(value => {
+      const saved = value as RouteTemplate
+      if (!saved._id) {
+        return Promise.resolve({
+          ...activeTemplate,
+          ...saved,
+          _id: templateId,
+        } as RouteTemplate)
+      }
+      return Promise.resolve(saved)
+    })
+
+    const result = await service.createRouteTemplate(
+      {
+        name: 'Nieuw',
+        bezorgerProfileId,
+        stops: [{ apothekerProfileId: pharmacyAId }],
+      },
+      adminUser,
+    )
+
+    expect(result.template.active).toBe(true)
+    expect(result.deactivatedTemplateIds).toContain(priorId)
+    expect(prior.active).toBe(false)
+  })
+
+  it('allows inactive historical templates for the same courier', async () => {
+    mockTemplateLookup({ ...activeTemplate, active: false } as RouteTemplate)
+    repository.find.mockResolvedValue([])
+    repository.save.mockImplementation(value =>
+      Promise.resolve(value as RouteTemplate),
+    )
+
+    const result = await service.setRouteTemplateActive(
+      templateId,
+      true,
+      adminUser,
+    )
+
+    expect(result.template.active).toBe(true)
+    expect(result.deactivatedTemplateIds).toEqual([])
   })
 
   it('sets authenticated audit fields on update', async () => {
@@ -261,9 +322,9 @@ describe('RouteTemplatesService', () => {
       otherAdminUser,
     )
 
-    expect(result.description).toBe('Avondronde')
-    expect(result.updatedByUserId).toBe(otherAdminUserId)
-    expect(result.createdByUserId).toBe(adminUserId)
+    expect(result.template.description).toBe('Avondronde')
+    expect(result.template.updatedByUserId).toBe(otherAdminUserId)
+    expect(result.template.createdByUserId).toBe(adminUserId)
   })
 
   it('rejects unknown courier profiles', async () => {
@@ -352,7 +413,7 @@ describe('RouteTemplatesService', () => {
       adminUser,
     )
 
-    expect(result.stops).toEqual([
+    expect(result.template.stops).toEqual([
       { apothekerProfileId: pharmacyCId, sequence: 1 },
       { apothekerProfileId: pharmacyAId, sequence: 2 },
     ])
@@ -379,6 +440,7 @@ describe('RouteTemplatesService', () => {
 
   it('deactivates and reactivates a template', async () => {
     mockTemplateLookup(activeTemplate)
+    repository.find.mockResolvedValue([])
     repository.save.mockImplementation(value =>
       Promise.resolve(value as RouteTemplate),
     )
@@ -388,17 +450,82 @@ describe('RouteTemplatesService', () => {
       false,
       adminUser,
     )
-    expect(deactivated.active).toBe(false)
-    expect(deactivated.updatedByUserId).toBe(adminUserId)
+    expect(deactivated.template.active).toBe(false)
+    expect(deactivated.template.updatedByUserId).toBe(adminUserId)
 
     mockTemplateLookup({ ...activeTemplate, active: false } as RouteTemplate)
+    repository.find.mockResolvedValue([])
     const reactivated = await service.setRouteTemplateActive(
       templateId,
       true,
       otherAdminUser,
     )
-    expect(reactivated.active).toBe(true)
-    expect(reactivated.updatedByUserId).toBe(otherAdminUserId)
+    expect(reactivated.template.active).toBe(true)
+    expect(reactivated.template.updatedByUserId).toBe(otherAdminUserId)
+  })
+
+  it('activating a template deactivates the previous active for the same courier', async () => {
+    const otherId = '507f1f77bcf86cd799439088'
+    const inactive = {
+      ...activeTemplate,
+      active: false,
+    } as RouteTemplate
+    const otherActive = {
+      ...activeTemplate,
+      _id: otherId,
+      name: 'Andere',
+      normalizedName: 'andere',
+      active: true,
+    } as RouteTemplate
+
+    mockTemplateLookup(inactive)
+    repository.find.mockResolvedValue([otherActive])
+    repository.save.mockImplementation(value =>
+      Promise.resolve(value as RouteTemplate),
+    )
+
+    const result = await service.setRouteTemplateActive(
+      templateId,
+      true,
+      adminUser,
+    )
+
+    expect(result.template.active).toBe(true)
+    expect(result.deactivatedTemplateIds).toEqual([otherId])
+    expect(otherActive.active).toBe(false)
+  })
+
+  it('reassigning an active template deactivates conflicts on the target courier', async () => {
+    const otherCourierId = '607f1f77bcf86cd799439088'
+    const conflictId = '507f1f77bcf86cd799439077'
+    const conflict = {
+      ...activeTemplate,
+      _id: conflictId,
+      bezorgerProfileId: otherCourierId,
+      name: 'Conflict',
+      normalizedName: 'conflict',
+      active: true,
+    } as RouteTemplate
+
+    mockTemplateLookup(activeTemplate)
+    bezorgerProfileService.findBezorgerProfileById.mockResolvedValue({
+      _id: otherCourierId,
+      id: otherCourierId,
+    } as never)
+    repository.find.mockResolvedValue([conflict])
+    repository.save.mockImplementation(value =>
+      Promise.resolve(value as RouteTemplate),
+    )
+
+    const result = await service.updateRouteTemplate(
+      templateId,
+      { bezorgerProfileId: otherCourierId },
+      adminUser,
+    )
+
+    expect(result.template.bezorgerProfileId).toBe(otherCourierId)
+    expect(result.deactivatedTemplateIds).toEqual([conflictId])
+    expect(conflict.active).toBe(false)
   })
 
   it('lists only active templates by default', async () => {

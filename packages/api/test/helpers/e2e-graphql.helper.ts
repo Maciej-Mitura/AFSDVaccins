@@ -70,10 +70,6 @@ export function firstErrorCode(
     return undefined
   }
 
-  if (typeof extensions.code === 'string') {
-    return extensions.code
-  }
-
   const original = extensions.originalError
   if (original && typeof original === 'object') {
     if (typeof original.error === 'string') {
@@ -89,6 +85,18 @@ export function firstErrorCode(
     ) {
       return message.error
     }
+  }
+
+  if (
+    typeof extensions.code === 'string' &&
+    extensions.code !== 'INTERNAL_SERVER_ERROR' &&
+    extensions.code !== 'GRAPHQL_VALIDATION_FAILED'
+  ) {
+    return extensions.code
+  }
+
+  if (typeof extensions.code === 'string') {
+    return extensions.code
   }
 
   return undefined

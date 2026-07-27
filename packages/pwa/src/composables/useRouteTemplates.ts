@@ -30,6 +30,11 @@ export type ApothekerProfileOption =
 export type BezorgerProfileOption =
   BezorgerProfilesQuery['bezorgerProfiles'][number]
 
+export type RouteTemplateWriteOutcome = {
+  template: RouteTemplateListItem
+  deactivatedTemplateIds: string[]
+}
+
 const templates = ref<RouteTemplateListItem[]>([])
 const apothekerProfiles = ref<ApothekerProfileOption[]>([])
 const bezorgerProfiles = ref<BezorgerProfileOption[]>([])
@@ -42,11 +47,37 @@ function extractGraphQLErrorCode(error: unknown): string | null {
     return null
   }
 
-  const graphQLError = error.graphQLErrors[0]
-  const originalError = graphQLError?.extensions?.originalError as
-    { error?: string } | undefined
+  for (const graphQLError of error.graphQLErrors) {
+    const code = graphQLError.extensions?.code
+    if (
+      typeof code === 'string' &&
+      code.length > 0 &&
+      code !== 'INTERNAL_SERVER_ERROR' &&
+      code !== 'GRAPHQL_VALIDATION_FAILED'
+    ) {
+      return code
+    }
 
-  return originalError?.error ?? null
+    const originalError = graphQLError.extensions?.originalError as
+      | { error?: string }
+      | undefined
+    if (typeof originalError?.error === 'string' && originalError.error.length > 0) {
+      return originalError.error
+    }
+  }
+
+  return null
+}
+
+function markDeactivatedLocally(deactivatedTemplateIds: string[]): void {
+  if (deactivatedTemplateIds.length === 0) {
+    return
+  }
+
+  const deactivated = new Set(deactivatedTemplateIds)
+  templates.value = templates.value.map(template =>
+    deactivated.has(template.id) ? { ...template, active: false } : template,
+  )
 }
 
 export function useRouteTemplates() {
@@ -103,61 +134,74 @@ export function useRouteTemplates() {
 
   async function createRouteTemplate(
     input: CreateRouteTemplateMutationVariables['input'],
-  ): Promise<RouteTemplateListItem> {
+  ): Promise<RouteTemplateWriteOutcome> {
     const result = await apolloClient.mutate<CreateRouteTemplateMutation>({
       mutation: CREATE_ROUTE_TEMPLATE_MUTATION,
       variables: { input },
     })
 
-    if (!result.data?.createRouteTemplate) {
+    const writeResult = result.data?.createRouteTemplate
+    if (!writeResult?.template) {
       throw new Error(translate('errors.routeTemplate.createFailed'))
     }
 
-    const created = result.data.createRouteTemplate
-    templates.value = [...templates.value, created]
-    return created
+    markDeactivatedLocally(writeResult.deactivatedTemplateIds)
+    templates.value = [...templates.value, writeResult.template]
+    return {
+      template: writeResult.template,
+      deactivatedTemplateIds: writeResult.deactivatedTemplateIds,
+    }
   }
 
   async function updateRouteTemplate(
     id: string,
     input: UpdateRouteTemplateMutationVariables['input'],
-  ): Promise<RouteTemplateListItem> {
+  ): Promise<RouteTemplateWriteOutcome> {
     const result = await apolloClient.mutate<UpdateRouteTemplateMutation>({
       mutation: UPDATE_ROUTE_TEMPLATE_MUTATION,
       variables: { id, input },
     })
 
-    if (!result.data?.updateRouteTemplate) {
+    const writeResult = result.data?.updateRouteTemplate
+    if (!writeResult?.template) {
       throw new Error(translate('errors.routeTemplate.updateFailed'))
     }
 
-    const updated = result.data.updateRouteTemplate
+    markDeactivatedLocally(writeResult.deactivatedTemplateIds)
     templates.value = templates.value.map(template =>
-      template.id === id ? updated : template,
+      template.id === id ? writeResult.template : template,
     )
-    return updated
+    return {
+      template: writeResult.template,
+      deactivatedTemplateIds: writeResult.deactivatedTemplateIds,
+    }
   }
 
   async function setRouteTemplateActive(
     id: string,
     active: boolean,
-  ): Promise<RouteTemplateListItem> {
+  ): Promise<RouteTemplateWriteOutcome> {
     const result = await apolloClient.mutate<SetRouteTemplateActiveMutation>({
       mutation: SET_ROUTE_TEMPLATE_ACTIVE_MUTATION,
       variables: { id, active },
     })
 
-    if (!result.data?.setRouteTemplateActive) {
+    const writeResult = result.data?.setRouteTemplateActive
+    if (!writeResult?.template) {
       throw new Error(translate('errors.routeTemplate.statusUpdateFailed'))
     }
 
+    markDeactivatedLocally(writeResult.deactivatedTemplateIds)
     templates.value = templates.value.map(template =>
       template.id === id
-        ? { ...template, ...result.data!.setRouteTemplateActive }
+        ? { ...template, ...writeResult.template }
         : template,
     )
 
-    return templates.value.find(template => template.id === id)!
+    return {
+      template: templates.value.find(template => template.id === id)!,
+      deactivatedTemplateIds: writeResult.deactivatedTemplateIds,
+    }
   }
 
   function findApothekerProfile(

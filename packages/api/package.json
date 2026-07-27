@@ -23,6 +23,8 @@
     "bootstrap:database:demo": "nest build && node dist/bootstrap-cli.js",
     "bootstrap:database:demo:cli": "node dist/bootstrap-cli.js",
     "diagnose:voice-reports:azure": "ts-node --transpile-only scripts/diagnose-voice-reports-azure.ts",
+    "diagnose:route-template-assignments": "ts-node --transpile-only scripts/diagnose-route-template-assignments.ts",
+    "repair:route-template-assignments": "ts-node --transpile-only scripts/repair-route-template-assignments.ts",
     "test:voice-reports:azure-storage": "ts-node --transpile-only scripts/test-voice-reports-azure-storage.ts",
     "test:voice-reports:azure-speech": "ts-node --transpile-only scripts/test-voice-reports-azure-speech.ts",
     "test:voice-reports:azure": "ts-node --transpile-only scripts/test-voice-reports-azure.ts"

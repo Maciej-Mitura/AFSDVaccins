@@ -3,6 +3,7 @@ import { TypeOrmModule } from '@nestjs/typeorm'
 
 import { ProfileCoreModule } from '../profile/profile-core.module'
 import { RouteTemplate } from './route-template.entity'
+import { RouteTemplatePersistenceService } from './route-template-persistence.service'
 import { RouteTemplatesService } from './route-templates.service'
 
 const isSchemaGeneration =
@@ -27,9 +28,13 @@ const persistenceImports = isSchemaGeneration
   ? []
   : [TypeOrmModule.forFeature([RouteTemplate])]
 
+const persistenceProviders = isSchemaGeneration
+  ? []
+  : [RouteTemplatePersistenceService]
+
 @Module({
   imports: [ProfileCoreModule, ...persistenceImports],
-  providers: [routeTemplatesServiceProvider],
+  providers: [routeTemplatesServiceProvider, ...persistenceProviders],
   exports: [RouteTemplatesService, ...persistenceImports],
 })
 export class RouteTemplatesCoreModule {}

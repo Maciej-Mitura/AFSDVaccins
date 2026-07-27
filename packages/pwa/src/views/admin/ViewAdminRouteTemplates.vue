@@ -234,11 +234,17 @@ async function onSubmit(event: FormSubmitEvent<TemplateForm>) {
     }
 
     if (editingTemplate.value) {
-      await updateRouteTemplate(editingTemplate.value.id, payload)
-      successMessage.value = t('success.routes.template.updated')
+      const outcome = await updateRouteTemplate(editingTemplate.value.id, payload)
+      successMessage.value =
+        outcome.deactivatedTemplateIds.length > 0
+          ? t('success.routes.template.updatedWithDeactivation')
+          : t('success.routes.template.updated')
     } else {
-      await createRouteTemplate(payload)
-      successMessage.value = t('success.routes.template.created')
+      const outcome = await createRouteTemplate(payload)
+      successMessage.value =
+        outcome.deactivatedTemplateIds.length > 0
+          ? t('success.routes.template.createdWithDeactivation')
+          : t('success.routes.template.created')
     }
 
     closeForm()
@@ -255,10 +261,15 @@ async function toggleActive(template: RouteTemplateListItem) {
   formError.value = null
 
   try {
-    await setRouteTemplateActive(template.id, !template.active)
-    successMessage.value = template.active
-      ? t('success.routes.template.deactivated')
-      : t('success.routes.template.activated')
+    const outcome = await setRouteTemplateActive(template.id, !template.active)
+    if (!template.active) {
+      successMessage.value =
+        outcome.deactivatedTemplateIds.length > 0
+          ? t('success.routes.template.activatedWithDeactivation')
+          : t('success.routes.template.activated')
+    } else {
+      successMessage.value = t('success.routes.template.deactivated')
+    }
     await reloadTemplates()
   } catch (error: unknown) {
     formError.value = mapGraphQLError(error)

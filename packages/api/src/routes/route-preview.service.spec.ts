@@ -13,10 +13,7 @@ import { ApothekerProfileService } from '../profile/apotheker/apotheker-profile.
 import { BezorgerProfile } from '../profile/bezorger/bezorger-profile.entity'
 import { BezorgerProfileService } from '../profile/bezorger/bezorger-profile.service'
 import { BezorgerProfileNotFoundException } from '../profile/exceptions/profile.exceptions'
-import {
-  MultipleActiveRouteTemplatesException,
-  RouteTemplateNotAssignedException,
-} from '../route-templates/exceptions/route-template.exceptions'
+import { RouteTemplateNotAssignedException } from '../route-templates/exceptions/route-template.exceptions'
 import { RouteTemplate } from '../route-templates/route-template.entity'
 import { RouteTemplatesService } from '../route-templates/route-templates.service'
 import { SettingsService } from '../settings/settings.service'
@@ -462,8 +459,10 @@ describe('RoutePreviewService', () => {
         ],
       )
 
-      await expect(service.computeTomorrowPreview(bezorger)).rejects.toBeInstanceOf(
-        MultipleActiveRouteTemplatesException,
+      await expect(service.computeTomorrowPreview(bezorger)).rejects.toMatchObject(
+        {
+          response: { error: 'ROUTE_TEMPLATE_MULTIPLE_ACTIVE_FOR_COURIER' },
+        },
       )
     })
 

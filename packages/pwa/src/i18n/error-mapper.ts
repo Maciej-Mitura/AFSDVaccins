@@ -18,6 +18,11 @@ const GRAPHQL_ERROR_KEYS: Record<string, string> = {
   INSUFFICIENT_STOCK: 'errors.stock.insufficient',
   INVALID_ORDER_STATUS_TRANSITION: 'errors.order.invalidStatusTransition',
   ORDER_CANNOT_BE_CANCELLED: 'errors.order.cancelNotAllowed',
+  ROUTE_TEMPLATE_NOT_ASSIGNED: 'errors.routeTemplate.notAssigned',
+  ROUTE_TEMPLATE_MULTIPLE_ACTIVE_FOR_COURIER:
+    'errors.routeTemplate.multipleActiveForCourier',
+  MULTIPLE_ACTIVE_ROUTE_TEMPLATES:
+    'errors.routeTemplate.multipleActiveForCourier',
 }
 
 function logTechnicalError(scope: string, error: unknown): void {

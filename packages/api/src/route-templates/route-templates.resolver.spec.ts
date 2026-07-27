@@ -32,8 +32,11 @@ const ROUTE_TEMPLATES_QUERY = `
 const CREATE_ROUTE_TEMPLATE_MUTATION = `
   mutation CreateRouteTemplate($input: CreateRouteTemplateInput!) {
     createRouteTemplate(input: $input) {
-      id
-      name
+      deactivatedTemplateIds
+      template {
+        id
+        name
+      }
     }
   }
 `
@@ -41,8 +44,11 @@ const CREATE_ROUTE_TEMPLATE_MUTATION = `
 const SET_ROUTE_TEMPLATE_ACTIVE_MUTATION = `
   mutation SetRouteTemplateActive($id: ID!, $active: Boolean!) {
     setRouteTemplateActive(id: $id, active: $active) {
-      id
-      active
+      deactivatedTemplateIds
+      template {
+        id
+        active
+      }
     }
   }
 `
@@ -235,8 +241,11 @@ describe('RouteTemplatesResolver (GraphQL)', () => {
       },
     ])
     routeTemplatesServiceMock.setRouteTemplateActive.mockResolvedValue({
-      id: '507f1f77bcf86cd799439011',
-      active: false,
+      template: {
+        id: '507f1f77bcf86cd799439011',
+        active: false,
+      },
+      deactivatedTemplateIds: [],
     })
 
     const listResponse = await request(server)
@@ -270,12 +279,17 @@ describe('RouteTemplatesResolver (GraphQL)', () => {
       })
 
     const mutateBody = mutateResponse.body as {
-      data?: { setRouteTemplateActive: { active: boolean } }
+      data?: {
+        setRouteTemplateActive: {
+          template: { active: boolean }
+          deactivatedTemplateIds: string[]
+        }
+      }
       errors?: Array<{ message: string }>
     }
 
     expect(mutateBody.errors).toBeUndefined()
-    expect(mutateBody.data?.setRouteTemplateActive.active).toBe(false)
+    expect(mutateBody.data?.setRouteTemplateActive.template.active).toBe(false)
     expect(routeTemplatesServiceMock.setRouteTemplateActive).toHaveBeenCalled()
   })
 })
