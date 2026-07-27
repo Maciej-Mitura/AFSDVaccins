@@ -166,14 +166,18 @@ const router = createRouter({
         {
           path: 'route-templates',
           name: 'admin-route-templates',
-          component: () =>
-            import('@/views/admin/ViewAdminRouteTemplates.vue'),
+          component: () => import('@/views/admin/ViewAdminRouteTemplates.vue'),
         },
         {
           path: 'route-planning',
           name: 'admin-route-planning',
+          component: () => import('@/views/admin/ViewAdminRoutePlanning.vue'),
+        },
+        {
+          path: 'analytics/couriers',
+          name: 'admin-courier-analytics',
           component: () =>
-            import('@/views/admin/ViewAdminRoutePlanning.vue'),
+            import('@/views/admin/ViewAdminCourierAnalytics.vue'),
         },
       ],
     },

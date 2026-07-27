@@ -15,7 +15,8 @@ analytics:
 
 Out of scope (later phases):
 
-- Full ECharts admin dashboard UI (Phase 32B)
+- Full ECharts admin dashboard UI (Phase 32B — see
+  `docs/phase-32b-courier-analytics-dashboard.md`)
 - Courier-facing analytics
 - Live / realtime analytics subscriptions
 - Date-range filters (7/30/90-day or custom)

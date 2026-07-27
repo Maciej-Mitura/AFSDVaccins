@@ -33,6 +33,10 @@ const adminNavLinks = computed<AppShellLink[]>(() => [
   { label: t('navigation.admin.orders'), to: '/admin/orders' },
   { label: t('navigation.admin.routePlanning'), to: '/admin/route-planning' },
   { label: t('navigation.admin.routeTemplates'), to: '/admin/route-templates' },
+  {
+    label: t('navigation.admin.courierAnalytics'),
+    to: '/admin/analytics/couriers',
+  },
   { label: t('navigation.admin.vaccines'), to: '/admin/vaccines' },
   { label: t('navigation.admin.stock'), to: '/admin/stock' },
   { label: t('navigation.admin.notifications'), to: '/admin/notifications' },

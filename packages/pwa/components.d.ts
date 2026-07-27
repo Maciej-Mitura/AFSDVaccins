@@ -12,6 +12,7 @@ export {}
 declare module 'vue' {
   export interface GlobalComponents {
     CommonAppShell: typeof import('./src/components/common/CommonAppShell.vue')['default']
+    CommonEcharts: typeof import('./src/components/feature/admin/analytics/CommonEcharts.vue')['default']
     CommonEmptyState: typeof import('./src/components/common/CommonEmptyState.vue')['default']
     CommonErrorState: typeof import('./src/components/common/CommonErrorState.vue')['default']
     CommonLanguageSelector: typeof import('./src/components/common/CommonLanguageSelector.vue')['default']
@@ -31,6 +32,9 @@ declare module 'vue' {
     FeatureBezorgerDeliveryQrPreviewModal: typeof import('./src/components/feature/bezorger/FeatureBezorgerDeliveryQrPreviewModal.vue')['default']
     FeatureBezorgerDeliveryQrWorkflow: typeof import('./src/components/feature/bezorger/FeatureBezorgerDeliveryQrWorkflow.vue')['default']
     FeatureBezorgerLayout: typeof import('./src/components/feature/bezorger/FeatureBezorgerLayout.vue')['default']
+    FeatureCourierAnalyticsDetail: typeof import('./src/components/feature/admin/analytics/FeatureCourierAnalyticsDetail.vue')['default']
+    FeatureCourierAnalyticsKpi: typeof import('./src/components/feature/admin/analytics/FeatureCourierAnalyticsKpi.vue')['default']
+    FeatureCourierAnalyticsLeaderboard: typeof import('./src/components/feature/admin/analytics/FeatureCourierAnalyticsLeaderboard.vue')['default']
     FeatureDeliveryStopQrModal: typeof import('./src/components/feature/delivery-qr/FeatureDeliveryStopQrModal.vue')['default']
     FeatureNotificationCentre: typeof import('./src/components/feature/notifications/FeatureNotificationCentre.vue')['default']
     FeatureProfileLayout: typeof import('./src/components/feature/profile/FeatureProfileLayout.vue')['default']
