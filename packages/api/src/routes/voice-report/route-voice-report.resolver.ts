@@ -20,7 +20,7 @@ import {
   RouteVoiceReportGql,
   RouteVoiceReportUpdateGql,
 } from './route-voice-report.type'
-import type { RouteVoiceReportCreatedEventPayload } from './route-voice-report-events.service'
+import type { RouteVoiceReportUpdateEventPayload } from './route-voice-report-events.service'
 
 @Resolver(() => RouteVoiceReportGql)
 export class RouteVoiceReportResolver {
@@ -45,12 +45,12 @@ export class RouteVoiceReportResolver {
 
   @Subscription(() => RouteVoiceReportUpdateGql, {
     description:
-      'Redacted voice-report creation events. ADMIN (any route) or assigned BEZORGER only.',
-    resolve: (payload: RouteVoiceReportCreatedEventPayload) =>
+      'Redacted voice-report create/transcription events. ADMIN (any route) or assigned BEZORGER only. Payload never includes transcript text.',
+    resolve: (payload: RouteVoiceReportUpdateEventPayload) =>
       payload.routeVoiceReportUpdates,
     filter: async function (
       this: RouteVoiceReportResolver,
-      payload: RouteVoiceReportCreatedEventPayload,
+      payload: RouteVoiceReportUpdateEventPayload,
       _variables: unknown,
       context: GraphqlRequestContext,
     ): Promise<boolean> {
@@ -62,9 +62,9 @@ export class RouteVoiceReportResolver {
   })
   @UseGuards(AuthorizationGuard, RolesGuard)
   @Roles(UserRole.ADMIN, UserRole.BEZORGER)
-  routeVoiceReportUpdates(): AsyncIterator<RouteVoiceReportCreatedEventPayload> {
+  routeVoiceReportUpdates(): AsyncIterator<RouteVoiceReportUpdateEventPayload> {
     return this.pubSub.asyncIterableIterator(
       ROUTE_VOICE_REPORT_CREATED_EVENT,
-    ) as AsyncIterator<RouteVoiceReportCreatedEventPayload>
+    ) as AsyncIterator<RouteVoiceReportUpdateEventPayload>
   }
 }

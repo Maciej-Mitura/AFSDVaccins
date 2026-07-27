@@ -31,8 +31,12 @@ import {
 import { RouteVoiceReportAudioRequiredException } from './route-voice-report.exceptions'
 import { RouteVoiceReportMulterExceptionFilter } from './route-voice-report-multer.filter'
 import { RouteVoiceReportService } from './route-voice-report.service'
-import type { RouteVoiceReportUploadResponseDto } from './route-voice-report.type'
+import type {
+  RouteVoiceReportUploadResponseDto,
+  RouteVoiceTranscriptionRetryResponseDto,
+} from './route-voice-report.type'
 import { RouteVoiceReportUploadThrottle } from './route-voice-report-throttle.decorator'
+import { RouteVoiceReportTranscriptionRunner } from './route-voice-report-transcription.runner'
 
 type UploadedAudioFile = {
   buffer: Buffer
@@ -43,17 +47,22 @@ type UploadedAudioFile = {
 }
 
 /**
- * Authenticated route voice-report upload + Range audio streaming (Phase 34A).
+ * Authenticated route voice-report upload + Range audio streaming (Phase 34A)
+ * and ADMIN transcription retry (Phase 34B).
  *
  * POST /delivery-routes/:routeId/voice-reports
  * GET  /delivery-routes/:routeId/voice-reports/:reportId/audio
+ * POST /delivery-routes/:routeId/voice-reports/:reportId/retry-transcription
  *
  * Never redirects to Azure. Never exposes blob names or SAS URLs.
  */
 @Controller('delivery-routes')
 @UseFilters(RouteVoiceReportMulterExceptionFilter)
 export class RouteVoiceReportController {
-  constructor(private readonly voiceReportService: RouteVoiceReportService) {}
+  constructor(
+    private readonly voiceReportService: RouteVoiceReportService,
+    private readonly transcriptionRunner: RouteVoiceReportTranscriptionRunner,
+  ) {}
 
   @Post(':routeId/voice-reports')
   @HttpCode(201)
@@ -175,5 +184,22 @@ export class RouteVoiceReportController {
       }
       throw error
     }
+  }
+
+  @Post(':routeId/voice-reports/:reportId/retry-transcription')
+  @HttpCode(202)
+  @UseGuards(AuthorizationGuard, RolesGuard, StrictIdentityThrottlerGuard)
+  @RouteVoiceReportUploadThrottle()
+  @Roles(UserRole.ADMIN)
+  async retryVoiceReportTranscription(
+    @Param('routeId') routeId: string,
+    @Param('reportId') reportId: string,
+    @CurrentUser() user: User,
+  ): Promise<RouteVoiceTranscriptionRetryResponseDto> {
+    return this.transcriptionRunner.retryTranscriptionForAdmin(
+      user,
+      routeId,
+      reportId,
+    )
   }
 }

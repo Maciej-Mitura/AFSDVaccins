@@ -40,7 +40,9 @@ import { RoutesCoreModule } from './routes-core.module'
 import { RoutesResolver } from './routes.resolver'
 import { RoutesService } from './routes.service'
 import { AzureRouteVoiceReportStorageProvider } from './voice-report/azure-route-voice-report-storage.provider'
+import { AzureRouteVoiceTranscriptionProvider } from './voice-report/azure-route-voice-transcription.provider'
 import { FakeRouteVoiceReportStorageProvider } from './voice-report/fake-route-voice-report-storage.provider'
+import { FakeRouteVoiceTranscriptionProvider } from './voice-report/fake-route-voice-transcription.provider'
 import { RouteVoiceReportAuditEvent } from './voice-report/route-voice-report-audit.entity'
 import { RouteVoiceReportAuditService } from './voice-report/route-voice-report-audit.service'
 import { RouteVoiceReportController } from './voice-report/route-voice-report.controller'
@@ -49,8 +51,13 @@ import { RouteVoiceReportEventsService } from './voice-report/route-voice-report
 import { RouteVoiceReportResolver } from './voice-report/route-voice-report.resolver'
 import { RouteVoiceReportService } from './voice-report/route-voice-report.service'
 import { ROUTE_VOICE_REPORT_STORAGE_PROVIDER } from './voice-report/route-voice-report-storage.provider'
+import { RouteVoiceReportTranscriptionRunner } from './voice-report/route-voice-report-transcription.runner'
+import { ROUTE_VOICE_TRANSCRIPTION_PROVIDER } from './voice-report/route-voice-transcription.provider'
 import { resolveVaccineImageProviderMode } from '../vaccine/image/vaccine-image-provider.selection'
-import { ROUTE_VOICE_REPORT_DEFAULT_CONTAINER_NAME } from './voice-report/route-voice-report.constants'
+import {
+  ROUTE_VOICE_REPORT_DEFAULT_CONTAINER_NAME,
+} from './voice-report/route-voice-report.constants'
+import { ROUTE_VOICE_TRANSCRIPTION_TIMEOUT_MS_DEFAULT } from './voice-report/route-voice-transcription.constants'
 
 const isSchemaGeneration =
   process.argv.includes('--generate-schema-only') ||
@@ -276,6 +283,36 @@ const routeVoiceReportStorageProvider = {
   },
 }
 
+const routeVoiceTranscriptionProvider = {
+  provide: ROUTE_VOICE_TRANSCRIPTION_PROVIDER,
+  inject: [ConfigService],
+  useFactory: (configService: ConfigService<EnvConfig, true>) => {
+    if (isSchemaGeneration) {
+      return new FakeRouteVoiceTranscriptionProvider()
+    }
+
+    const mode =
+      configService.get('ROUTE_VOICE_TRANSCRIPTION_PROVIDER', {
+        infer: true,
+      }) ?? 'fake'
+
+    if (mode === 'fake') {
+      return new FakeRouteVoiceTranscriptionProvider()
+    }
+
+    return AzureRouteVoiceTranscriptionProvider.fromConfig({
+      endpoint: configService.getOrThrow('AZURE_SPEECH_ENDPOINT', {
+        infer: true,
+      }),
+      key: configService.getOrThrow('AZURE_SPEECH_KEY', { infer: true }),
+      timeoutMs:
+        configService.get('ROUTE_VOICE_TRANSCRIPTION_TIMEOUT_MS', {
+          infer: true,
+        }) ?? ROUTE_VOICE_TRANSCRIPTION_TIMEOUT_MS_DEFAULT,
+    })
+  },
+}
+
 const routeVoiceReportServiceProvider = isSchemaGeneration
   ? {
       provide: RouteVoiceReportService,
@@ -289,11 +326,32 @@ const routeVoiceReportServiceProvider = isSchemaGeneration
     }
   : RouteVoiceReportService
 
+const routeVoiceReportTranscriptionRunnerProvider = isSchemaGeneration
+  ? {
+      provide: RouteVoiceReportTranscriptionRunner,
+      useValue: {
+        onModuleInit: () => Promise.resolve(),
+        recoverStaleAndPendingWork: () => Promise.resolve(0),
+        enqueueLegacyAvailableReports: () => Promise.resolve(0),
+        schedule: () => undefined,
+        retryTranscriptionForAdmin: () =>
+          Promise.resolve({
+            reportId: '0',
+            transcriptionStatus: 'PENDING',
+          }),
+      },
+    }
+  : RouteVoiceReportTranscriptionRunner
+
 const routeVoiceReportAuditServiceProvider = isSchemaGeneration
   ? {
       provide: RouteVoiceReportAuditService,
       useValue: {
         recordCreated: () => Promise.resolve({ inserted: false }),
+        recordTranscriptionCompleted: () =>
+          Promise.resolve({ inserted: false }),
+        recordTranscriptionFailed: () => Promise.resolve({ inserted: false }),
+        recordTranscriptionRetried: () => Promise.resolve({ inserted: false }),
         countByReportId: () => Promise.resolve(0),
       },
     }
@@ -304,6 +362,7 @@ const routeVoiceReportEventsServiceProvider = isSchemaGeneration
       provide: RouteVoiceReportEventsService,
       useValue: {
         publishCreated: () => Promise.resolve(),
+        publishTranscriptionUpdate: () => Promise.resolve(),
       },
     }
   : RouteVoiceReportEventsService
@@ -370,7 +429,9 @@ const voiceReportPersistence = isSchemaGeneration
     deliveryManifestServiceProvider,
     deliveryManifestAuditServiceProvider,
     routeVoiceReportStorageProvider,
+    routeVoiceTranscriptionProvider,
     routeVoiceReportServiceProvider,
+    routeVoiceReportTranscriptionRunnerProvider,
     routeVoiceReportAuditServiceProvider,
     routeVoiceReportEventsServiceProvider,
     DeliveryStopQrImageService,
@@ -390,6 +451,7 @@ const voiceReportPersistence = isSchemaGeneration
     RoutePreviewService,
     DeliveryRouteProgressLocationService,
     RouteVoiceReportService,
+    RouteVoiceReportTranscriptionRunner,
   ],
 })
 export class RoutesModule {}

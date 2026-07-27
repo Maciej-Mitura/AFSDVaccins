@@ -17,9 +17,17 @@ const PRODUCTION_AZURE_VISION = {
   AZURE_VISION_KEY: 'example-vision-key',
 } as const
 
+/** Placeholder Azure Speech env for production validation cases (not real secrets). */
+const PRODUCTION_AZURE_SPEECH = {
+  ROUTE_VOICE_TRANSCRIPTION_PROVIDER: 'azure' as const,
+  AZURE_SPEECH_ENDPOINT: 'https://example.cognitiveservices.azure.com',
+  AZURE_SPEECH_KEY: 'example-speech-key',
+} as const
+
 const PRODUCTION_AZURE = {
   ...PRODUCTION_AZURE_STORAGE,
   ...PRODUCTION_AZURE_VISION,
+  ...PRODUCTION_AZURE_SPEECH,
 } as const
 
 /** Phase 26A placeholder signing secret (not a real secret). */
@@ -322,6 +330,46 @@ describe('envValidationSchema', () => {
       AZURE_VISION_TIMEOUT_MS: 60_000,
     })
     expect(tooHigh.error).toBeDefined()
+  })
+
+  it('requires Azure Speech variables when transcription provider is azure', () => {
+    const fakeMode = envValidationSchema.validate({
+      ...BASE_DEV,
+      ROUTE_VOICE_TRANSCRIPTION_PROVIDER: 'fake',
+    })
+    expect(fakeMode.error).toBeUndefined()
+
+    const azureMissing = envValidationSchema.validate({
+      ...BASE_DEV,
+      ROUTE_VOICE_TRANSCRIPTION_PROVIDER: 'azure',
+    })
+    expect(azureMissing.error).toBeDefined()
+    expect(azureMissing.error?.message).toMatch(
+      /AZURE_SPEECH_ENDPOINT|AZURE_SPEECH_KEY/,
+    )
+
+    const productionMissingSpeech = envValidationSchema.validate({
+      NODE_ENV: 'production',
+      PORT: 3000,
+      URL_FRONTEND: 'https://example.web.app',
+      DB_HOST: 'mongodb://localhost:27017',
+      DB_NAME: 'vaccin-delivery',
+      TRUST_PROXY: '1',
+      ...PRODUCTION_AZURE_STORAGE,
+      ...PRODUCTION_AZURE_VISION,
+      ...DELIVERY_QR_SIGNING,
+      ...WEB_PUSH_VAPID,
+    })
+    expect(productionMissingSpeech.error).toBeDefined()
+    expect(productionMissingSpeech.error?.message).toMatch(
+      /AZURE_SPEECH_ENDPOINT|AZURE_SPEECH_KEY/,
+    )
+
+    const azureComplete = envValidationSchema.validate({
+      ...BASE_DEV,
+      ...PRODUCTION_AZURE_SPEECH,
+    })
+    expect(azureComplete.error).toBeUndefined()
   })
 
   it('rejects invalid Azure read URL TTL values', () => {

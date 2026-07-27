@@ -145,11 +145,15 @@ describe('route-voice-report-audio.validation', () => {
     expect(parseSelectedLocale('nl-NL')).toBe('nl-NL')
     expect(parseSelectedLocale('en-GB')).toBe('en-GB')
     expect(parseSelectedLocale('pl-PL')).toBe('pl-PL')
+    expect(parseSelectedLocale('AUTO')).toBe('AUTO')
     expect(parseSelectedLocale(undefined)).toBeNull()
   })
 
   it('rejects invalid locale', () => {
     expect(() => parseSelectedLocale('!!!')).toThrow(
+      RouteVoiceReportLocaleInvalidException,
+    )
+    expect(() => parseSelectedLocale('en-US')).toThrow(
       RouteVoiceReportLocaleInvalidException,
     )
   })

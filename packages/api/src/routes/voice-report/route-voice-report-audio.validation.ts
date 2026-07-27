@@ -175,8 +175,13 @@ export function parseSelectedLocale(raw: unknown): string | null {
   if (trimmed.length > ROUTE_VOICE_REPORT_MAX_SELECTED_LOCALE_LENGTH) {
     throw new RouteVoiceReportLocaleInvalidException()
   }
-  // BCP-47-ish: en, en-GB, nl-NL, pl-PL
-  if (!/^[A-Za-z]{2,3}(-[A-Za-z0-9]{2,8})*$/.test(trimmed)) {
+  // Phase 34B: en-GB | nl-NL | pl-PL | AUTO (null → AUTO at transcription init).
+  if (
+    trimmed !== 'en-GB' &&
+    trimmed !== 'nl-NL' &&
+    trimmed !== 'pl-PL' &&
+    trimmed !== 'AUTO'
+  ) {
     throw new RouteVoiceReportLocaleInvalidException()
   }
   return trimmed

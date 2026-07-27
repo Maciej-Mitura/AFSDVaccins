@@ -33,6 +33,12 @@ import {
 import { RouteVoiceReport } from './route-voice-report.entity'
 import { RouteVoiceReportEventsService } from './route-voice-report-events.service'
 import {
+  createPendingTranscription,
+  mapSelectedLocaleToRequested,
+  resolveEffectiveDurationSeconds,
+} from './route-voice-report-transcription.embed'
+import { RouteVoiceReportTranscriptionRunner } from './route-voice-report-transcription.runner'
+import {
   RouteVoiceReportCreationFailedException,
   RouteVoiceReportForbiddenException,
   RouteVoiceReportIdempotencyConflictException,
@@ -54,6 +60,7 @@ import type {
   RouteVoiceReportGql,
   RouteVoiceReportUploadResponseDto,
 } from './route-voice-report.type'
+import { RouteVoiceTranscriptionStatus } from './route-voice-transcription-status.enum'
 
 export type ParsedByteRange =
   | { kind: 'full' }
@@ -95,6 +102,7 @@ export class RouteVoiceReportService {
     private readonly bezorgerProfileService: BezorgerProfileService,
     private readonly auditService: RouteVoiceReportAuditService,
     private readonly eventsService: RouteVoiceReportEventsService,
+    private readonly transcriptionRunner: RouteVoiceReportTranscriptionRunner,
   ) {}
 
   async uploadForCourier(
@@ -234,6 +242,7 @@ export class RouteVoiceReportService {
     }
 
     try {
+      const requestedLocale = mapSelectedLocaleToRequested(selectedLocale)
       await this.reportRepository.updateOne(
         {
           _id: reportObjectId,
@@ -244,6 +253,7 @@ export class RouteVoiceReportService {
             status: RouteVoiceReportStatus.AVAILABLE,
             uploadedAt: now,
             updatedAt: new Date(),
+            transcription: createPendingTranscription(requestedLocale),
           },
         },
       )
@@ -280,9 +290,13 @@ export class RouteVoiceReportService {
         routeId: routeIdStr,
         reportId,
         status: RouteVoiceReportStatus.AVAILABLE,
+        transcriptionStatus:
+          finalised.transcription?.status ??
+          RouteVoiceTranscriptionStatus.PENDING,
       })
     }
 
+    this.transcriptionRunner.schedule(finalised.id)
     return this.toUploadResponse(finalised)
   }
 
@@ -317,7 +331,7 @@ export class RouteVoiceReportService {
         }
         return a.id.localeCompare(b.id)
       })
-      .map(report => this.toGql(report, displayName))
+      .map(report => this.toGql(report, displayName, actor.role))
   }
 
   async streamAudioForActor(
@@ -564,6 +578,11 @@ export class RouteVoiceReportService {
           status: RouteVoiceReportStatus.AVAILABLE,
           uploadedAt: now,
           updatedAt: now,
+          transcription:
+            existing.transcription ??
+            createPendingTranscription(
+              mapSelectedLocaleToRequested(existing.selectedLocale),
+            ),
         },
       },
     )
@@ -595,9 +614,13 @@ export class RouteVoiceReportService {
         routeId: finalised.routeId,
         reportId: finalised.id,
         status: RouteVoiceReportStatus.AVAILABLE,
+        transcriptionStatus:
+          finalised.transcription?.status ??
+          RouteVoiceTranscriptionStatus.PENDING,
       })
     }
 
+    this.transcriptionRunner.schedule(finalised.id)
     return this.toUploadResponse(finalised)
   }
 
@@ -656,6 +679,7 @@ export class RouteVoiceReportService {
           browserFormatLabel: input.browserFormatLabel,
           clientUploadId: input.clientUploadId,
           idempotencyFingerprint: input.idempotencyFingerprint,
+          transcription: null,
           createdAt: input.now,
           updatedAt: input.now,
         })
@@ -815,6 +839,7 @@ export class RouteVoiceReportService {
   private toUploadResponse(
     report: RouteVoiceReport,
   ): RouteVoiceReportUploadResponseDto {
+    const tx = report.transcription
     return {
       id: report.id,
       routeId: report.routeId,
@@ -827,13 +852,26 @@ export class RouteVoiceReportService {
       uploadedAt: report.uploadedAt.toISOString(),
       selectedLocale: report.selectedLocale,
       canPlayAudio: report.status === RouteVoiceReportStatus.AVAILABLE,
+      transcriptionStatus: tx?.status ?? null,
+      requestedLocale: tx?.requestedLocale ?? null,
+      effectiveDurationSeconds: resolveEffectiveDurationSeconds({
+        clientDurationSeconds: report.durationSeconds,
+        transcriptionAudioDurationSeconds: tx?.audioDurationSeconds,
+      }),
     }
   }
 
   private toGql(
     report: RouteVoiceReport,
     recordedByDisplayName: string,
+    actorRole: UserRole,
   ): RouteVoiceReportGql {
+    const tx = report.transcription
+    const canRetry =
+      actorRole === UserRole.ADMIN &&
+      report.status === RouteVoiceReportStatus.AVAILABLE &&
+      tx?.status === RouteVoiceTranscriptionStatus.FAILED
+
     return {
       id: report.id,
       routeId: report.routeId,
@@ -846,6 +884,19 @@ export class RouteVoiceReportService {
       uploadedAt: report.uploadedAt,
       recordedByDisplayName,
       canPlayAudio: true,
+      transcriptionStatus: tx?.status ?? null,
+      requestedLocale: tx?.requestedLocale ?? null,
+      detectedLocale: tx?.detectedLocale ?? null,
+      transcript: tx?.text ?? null,
+      confidence: tx?.confidence ?? null,
+      transcriptionStartedAt: tx?.startedAt ?? null,
+      transcriptionCompletedAt: tx?.completedAt ?? null,
+      transcriptionFailureCode: tx?.failureCode ?? null,
+      effectiveDurationSeconds: resolveEffectiveDurationSeconds({
+        clientDurationSeconds: report.durationSeconds,
+        transcriptionAudioDurationSeconds: tx?.audioDurationSeconds,
+      }),
+      canRetryTranscription: canRetry,
     }
   }
 }

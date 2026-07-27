@@ -232,6 +232,83 @@ export const envValidationSchema = Joi.object({
     .max(30_000)
     .default(10_000),
 
+  // ---- Phase 34B Azure Speech fast transcription (backend-only) ----
+  /**
+   * When false, uploads still succeed but transcription is not scheduled.
+   * Default true; local/tests typically use the fake provider.
+   */
+  ROUTE_VOICE_TRANSCRIPTION_ENABLED: Joi.boolean().default(true),
+  /**
+   * Transcription backend: `fake` (local/tests) or `azure` (production target).
+   * Fake is rejected when NODE_ENV=production.
+   */
+  ROUTE_VOICE_TRANSCRIPTION_PROVIDER: Joi.when('NODE_ENV', {
+    is: 'production',
+    then: Joi.string().valid('azure').default('azure'),
+    otherwise: Joi.string().valid('fake', 'azure').default('fake'),
+  }),
+  /**
+   * Azure AI Speech resource endpoint (HTTPS only), e.g.
+   * https://<resource>.cognitiveservices.azure.com
+   * Required when ROUTE_VOICE_TRANSCRIPTION_PROVIDER=azure.
+   */
+  AZURE_SPEECH_ENDPOINT: Joi.when('ROUTE_VOICE_TRANSCRIPTION_PROVIDER', {
+    is: 'azure',
+    then: Joi.string()
+      .uri({ scheme: ['https'] })
+      .required(),
+    otherwise: Joi.when('NODE_ENV', {
+      is: 'production',
+      then: Joi.string()
+        .uri({ scheme: ['https'] })
+        .required(),
+      otherwise: Joi.string().allow('').optional(),
+    }),
+  }),
+  /**
+   * Azure AI Speech subscription key. Never log. Never expose to PWA.
+   * Required when provider is azure / production.
+   */
+  AZURE_SPEECH_KEY: Joi.when('ROUTE_VOICE_TRANSCRIPTION_PROVIDER', {
+    is: 'azure',
+    then: Joi.string().min(1).required(),
+    otherwise: Joi.when('NODE_ENV', {
+      is: 'production',
+      then: Joi.string().min(1).required(),
+      otherwise: Joi.string().allow('').optional(),
+    }),
+  }),
+  /** Fast-transcription HTTP timeout (ms); bounded 5000–180000; default 60000. */
+  ROUTE_VOICE_TRANSCRIPTION_TIMEOUT_MS: Joi.number()
+    .integer()
+    .min(5_000)
+    .max(180_000)
+    .default(60_000),
+  /** In-process concurrent transcription jobs per API instance (1–2). */
+  ROUTE_VOICE_TRANSCRIPTION_CONCURRENCY: Joi.number()
+    .integer()
+    .min(1)
+    .max(2)
+    .default(1),
+  /** Automatic transient attempts before FAILED (1–5; default 3). */
+  ROUTE_VOICE_TRANSCRIPTION_MAX_ATTEMPTS: Joi.number()
+    .integer()
+    .min(1)
+    .max(5)
+    .default(3),
+  /** Processing lease TTL in seconds (120–900; default 600). */
+  ROUTE_VOICE_TRANSCRIPTION_LEASE_SECONDS: Joi.number()
+    .integer()
+    .min(120)
+    .max(900)
+    .default(600),
+  /** Startup recovery batch size (1–100; default 25). */
+  ROUTE_VOICE_TRANSCRIPTION_RECOVERY_BATCH_SIZE: Joi.number()
+    .integer()
+    .min(1)
+    .max(100)
+    .default(25),
+
   // ---- Phase 26A delivery QR signing (backend-only; never log) ----
   /**
    * HMAC-SHA-256 signing secret for delivery-stop QR tokens.
@@ -343,6 +420,15 @@ export type EnvConfig = {
   AZURE_VISION_ENDPOINT?: string
   AZURE_VISION_KEY?: string
   AZURE_VISION_TIMEOUT_MS: number
+  ROUTE_VOICE_TRANSCRIPTION_ENABLED: boolean
+  ROUTE_VOICE_TRANSCRIPTION_PROVIDER: 'fake' | 'azure'
+  AZURE_SPEECH_ENDPOINT?: string
+  AZURE_SPEECH_KEY?: string
+  ROUTE_VOICE_TRANSCRIPTION_TIMEOUT_MS: number
+  ROUTE_VOICE_TRANSCRIPTION_CONCURRENCY: number
+  ROUTE_VOICE_TRANSCRIPTION_MAX_ATTEMPTS: number
+  ROUTE_VOICE_TRANSCRIPTION_LEASE_SECONDS: number
+  ROUTE_VOICE_TRANSCRIPTION_RECOVERY_BATCH_SIZE: number
   DELIVERY_QR_SIGNING_SECRET?: string
   PUSH_PROVIDER: 'fake' | 'webpush'
   WEB_PUSH_VAPID_PUBLIC_KEY?: string

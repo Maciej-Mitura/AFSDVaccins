@@ -201,3 +201,50 @@ export class RouteVoiceReportClientUploadIdInvalidException extends BadRequestEx
     })
   }
 }
+
+/** Phase 34B transcription errors — stable codes; never Azure raw messages. */
+
+export class RouteVoiceTranscriptionForbiddenException extends ForbiddenException {
+  constructor() {
+    super({
+      message: 'Je mag transcriptie voor dit spraakrapport niet opnieuw starten.',
+      error: 'ROUTE_VOICE_TRANSCRIPTION_FORBIDDEN',
+    })
+  }
+}
+
+export class RouteVoiceTranscriptionNotFoundException extends NotFoundException {
+  constructor() {
+    super({
+      message: 'Spraakrapport voor transcriptie niet gevonden.',
+      error: 'ROUTE_VOICE_TRANSCRIPTION_NOT_FOUND',
+    })
+  }
+}
+
+export class RouteVoiceTranscriptionAlreadyCompletedException extends ConflictException {
+  constructor() {
+    super({
+      message: 'Transcriptie is al voltooid.',
+      error: 'ROUTE_VOICE_TRANSCRIPTION_ALREADY_COMPLETED',
+    })
+  }
+}
+
+export class RouteVoiceTranscriptionAlreadyProcessingException extends ConflictException {
+  constructor() {
+    super({
+      message: 'Transcriptie is al bezig.',
+      error: 'ROUTE_VOICE_TRANSCRIPTION_ALREADY_PROCESSING',
+    })
+  }
+}
+
+export class RouteVoiceTranscriptionRetryNotAllowedException extends BadRequestException {
+  constructor() {
+    super({
+      message: 'Transcriptie opnieuw starten is niet toegestaan voor deze status.',
+      error: 'ROUTE_VOICE_TRANSCRIPTION_RETRY_NOT_ALLOWED',
+    })
+  }
+}

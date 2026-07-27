@@ -48,6 +48,16 @@ describe('RouteVoiceReport GraphQL surface', () => {
       'uploadedAt',
       'recordedByDisplayName',
       'canPlayAudio',
+      'transcriptionStatus',
+      'requestedLocale',
+      'detectedLocale',
+      'transcript',
+      'confidence',
+      'transcriptionStartedAt',
+      'transcriptionCompletedAt',
+      'transcriptionFailureCode',
+      'effectiveDurationSeconds',
+      'canRetryTranscription',
     ]) {
       expect(gqlFieldNames.has(name)).toBe(true)
     }
@@ -69,16 +79,33 @@ describe('RouteVoiceReport GraphQL surface', () => {
       'azureUrl',
       'sasToken',
       'connectionString',
+      'processingLeaseId',
+      'providerRequestId',
+      'failureMessageSafe',
+      'attemptCount',
     ]) {
       expect(gqlFieldNames.has(name)).toBe(false)
     }
   })
 
   it('keeps subscription update payload free of storage fields', () => {
-    for (const name of ['routeId', 'reportId', 'status', 'eventType']) {
+    for (const name of [
+      'routeId',
+      'reportId',
+      'status',
+      'transcriptionStatus',
+      'eventType',
+    ]) {
       expect(updateFieldNames.has(name)).toBe(true)
     }
-    for (const name of ['blobName', 'containerName', 'sha256', 'recordedByUserId']) {
+    for (const name of [
+      'blobName',
+      'containerName',
+      'sha256',
+      'recordedByUserId',
+      'transcript',
+      'providerRequestId',
+    ]) {
       expect(updateFieldNames.has(name)).toBe(false)
     }
   })

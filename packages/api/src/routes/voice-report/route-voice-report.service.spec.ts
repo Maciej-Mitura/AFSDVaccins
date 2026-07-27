@@ -312,6 +312,7 @@ describe('RouteVoiceReportService', () => {
       }),
     }
 
+    const schedule = jest.fn()
     const service = new RouteVoiceReportService(
       deliveryRouteRepository as never,
       reportRepository as never,
@@ -319,6 +320,7 @@ describe('RouteVoiceReportService', () => {
       bezorgerProfileService as never,
       { recordCreated: auditRecordCreated } as never,
       { publishCreated } as never,
+      { schedule } as never,
     )
 
     return {
@@ -329,6 +331,7 @@ describe('RouteVoiceReportService', () => {
       reportRepository,
       auditRecordCreated,
       publishCreated,
+      schedule,
       bezorgerProfileService,
     }
   }

@@ -82,6 +82,9 @@ describe('production readiness (offline)', () => {
     assert.match(example, /WEB_PUSH_VAPID_PUBLIC_KEY=/)
     assert.match(example, /WEB_PUSH_VAPID_PRIVATE_KEY=/)
     assert.match(example, /WEB_PUSH_SUBJECT=/)
+    assert.match(example, /AZURE_SPEECH_ENDPOINT=/)
+    assert.match(example, /AZURE_SPEECH_KEY=/)
+    assert.match(example, /ROUTE_VOICE_TRANSCRIPTION_PROVIDER=/)
     assertNoSecretPatterns(example, 'api .env.example')
   })
 
