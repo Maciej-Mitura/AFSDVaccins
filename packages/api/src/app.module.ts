@@ -9,6 +9,7 @@ import {
   buildTypeOrmMongoOptions,
   safeMongoScheme,
 } from './config/mongo-connection'
+import { AnalyticsModule } from './analytics/analytics.module'
 import { AuthenticationModule } from './authentication/authentication.module'
 import { GraphqlWsContextExtra } from './authentication/firebase.types'
 import {
@@ -163,6 +164,7 @@ const databaseImports = isSchemaGeneration
     OrderModule,
     RouteTemplatesModule,
     RoutesModule,
+    AnalyticsModule,
   ],
 })
 export class AppModule {}

@@ -17,6 +17,9 @@ export const CacheKeys = {
   settingsCurrent: () => 'settings:current',
   vaccinesActive: () => 'vaccines:active',
   vaccinesAll: () => 'vaccines:all',
+  /** Phase 32A — all-time ADMIN courier performance analytics (short TTL). */
+  courierPerformanceAnalyticsAllTime: () =>
+    'analytics:courier-performance:all-time',
 } as const
 
 export type CacheKey = ReturnType<(typeof CacheKeys)[keyof typeof CacheKeys]>
