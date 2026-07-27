@@ -29,6 +29,14 @@ export const FORBIDDEN_ROUTE_CACHE_FIELD_NAMES = [
   'sasUrl',
   'blobSas',
   'connectionString',
+  // Phase 34A — voice reports must never enter IndexedDB route snapshots.
+  'voiceReport',
+  'voiceReports',
+  'routeVoiceReport',
+  'routeVoiceReports',
+  'blobName',
+  'audioBytes',
+  'sha256',
 ] as const
 
 type UnknownRecord = Record<string, unknown>

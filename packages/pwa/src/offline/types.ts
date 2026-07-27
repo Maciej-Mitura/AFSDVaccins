@@ -36,6 +36,8 @@ export enum ForbiddenPendingActionType {
   QrConfirmed = 'QR_CONFIRMED',
   OrderDelivered = 'ORDER_DELIVERED',
   RouteCompleted = 'ROUTE_COMPLETED',
+  /** Phase 34A — offline voice-report upload is forbidden. */
+  RouteVoiceReportUploaded = 'ROUTE_VOICE_REPORT_UPLOADED',
 }
 
 export enum PendingActionState {

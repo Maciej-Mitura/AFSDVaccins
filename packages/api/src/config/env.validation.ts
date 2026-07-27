@@ -180,6 +180,16 @@ export const envValidationSchema = Joi.object({
     .min(60)
     .max(3600)
     .default(900),
+  /**
+   * Private blob container for route voice-report audio (Phase 34A).
+   * Non-secret; defaults to route-voice-reports. Reuses AZURE_STORAGE_CONNECTION_STRING.
+   * Container must already exist with anonymous access disabled.
+   */
+  AZURE_STORAGE_ROUTE_VOICE_REPORTS_CONTAINER: Joi.string()
+    .min(1)
+    .max(63)
+    .pattern(/^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?$/)
+    .default('route-voice-reports'),
 
   /**
    * Azure AI Vision Image Analysis 4.0 endpoint (HTTPS only).
@@ -329,6 +339,7 @@ export type EnvConfig = {
   AZURE_STORAGE_CONNECTION_STRING?: string
   AZURE_STORAGE_CONTAINER_NAME?: string
   AZURE_STORAGE_READ_URL_TTL_SECONDS: number
+  AZURE_STORAGE_ROUTE_VOICE_REPORTS_CONTAINER: string
   AZURE_VISION_ENDPOINT?: string
   AZURE_VISION_KEY?: string
   AZURE_VISION_TIMEOUT_MS: number

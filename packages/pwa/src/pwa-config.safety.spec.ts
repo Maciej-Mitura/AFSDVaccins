@@ -100,6 +100,15 @@ describe('PWA safety and configuration', () => {
     expect(swSource).not.toContain('CacheFirst')
   })
 
+  it('route voice-report upload and audio endpoints are not service-worker cached', () => {
+    expect(swSource).not.toMatch(/voice-reports/i)
+    expect(swSource).not.toContain('delivery-routes')
+    expect(viteConfig).not.toMatch(/voice-reports|voiceReport/i)
+    expect(swSource).not.toContain('CacheFirst')
+    expect(swSource).not.toContain('NetworkFirst')
+    expect(swSource).not.toContain('StaleWhileRevalidate')
+  })
+
   it('route and stop manifest PDF endpoints are not service-worker cached', () => {
     expect(swSource).not.toMatch(/manifest\.pdf/i)
     expect(swSource).not.toContain('delivery-routes')

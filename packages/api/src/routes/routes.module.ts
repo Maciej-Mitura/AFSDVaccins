@@ -1,8 +1,10 @@
 import { Module } from '@nestjs/common'
+import { ConfigModule, ConfigService } from '@nestjs/config'
 import { TypeOrmModule } from '@nestjs/typeorm'
 
 import { AuthenticationModule } from '../authentication/authentication.module'
 import { PubSubModule } from '../common/pubsub/pubsub.module'
+import { EnvConfig } from '../config/env.validation'
 import { BusinessNotificationModule } from '../notifications/business-notification.module'
 import { CLOCK, SystemClock } from '../order/clock.provider'
 import { UserModule } from '../user/user.module'
@@ -37,6 +39,18 @@ import { RoutePreviewService } from './route-preview.service'
 import { RoutesCoreModule } from './routes-core.module'
 import { RoutesResolver } from './routes.resolver'
 import { RoutesService } from './routes.service'
+import { AzureRouteVoiceReportStorageProvider } from './voice-report/azure-route-voice-report-storage.provider'
+import { FakeRouteVoiceReportStorageProvider } from './voice-report/fake-route-voice-report-storage.provider'
+import { RouteVoiceReportAuditEvent } from './voice-report/route-voice-report-audit.entity'
+import { RouteVoiceReportAuditService } from './voice-report/route-voice-report-audit.service'
+import { RouteVoiceReportController } from './voice-report/route-voice-report.controller'
+import { RouteVoiceReport } from './voice-report/route-voice-report.entity'
+import { RouteVoiceReportEventsService } from './voice-report/route-voice-report-events.service'
+import { RouteVoiceReportResolver } from './voice-report/route-voice-report.resolver'
+import { RouteVoiceReportService } from './voice-report/route-voice-report.service'
+import { ROUTE_VOICE_REPORT_STORAGE_PROVIDER } from './voice-report/route-voice-report-storage.provider'
+import { resolveVaccineImageProviderMode } from '../vaccine/image/vaccine-image-provider.selection'
+import { ROUTE_VOICE_REPORT_DEFAULT_CONTAINER_NAME } from './voice-report/route-voice-report.constants'
 
 const isSchemaGeneration =
   process.argv.includes('--generate-schema-only') ||
@@ -228,6 +242,72 @@ const deliveryManifestAuditServiceProvider = isSchemaGeneration
     }
   : DeliveryManifestAuditService
 
+const routeVoiceReportStorageProvider = {
+  provide: ROUTE_VOICE_REPORT_STORAGE_PROVIDER,
+  inject: [ConfigService],
+  useFactory: (configService: ConfigService<EnvConfig, true>) => {
+    if (isSchemaGeneration) {
+      return new FakeRouteVoiceReportStorageProvider()
+    }
+
+    const nodeEnv = configService.get('NODE_ENV', { infer: true })
+    // Reuse vaccine-image storage mode: fake locally / azure in production.
+    const mode = resolveVaccineImageProviderMode(
+      configService.get('VACCINE_IMAGE_STORAGE_PROVIDER', { infer: true }),
+      nodeEnv,
+    )
+
+    const containerName =
+      configService.get('AZURE_STORAGE_ROUTE_VOICE_REPORTS_CONTAINER', {
+        infer: true,
+      }) ?? ROUTE_VOICE_REPORT_DEFAULT_CONTAINER_NAME
+
+    if (mode === 'fake') {
+      return new FakeRouteVoiceReportStorageProvider(containerName)
+    }
+
+    return AzureRouteVoiceReportStorageProvider.fromConfig({
+      connectionString: configService.getOrThrow(
+        'AZURE_STORAGE_CONNECTION_STRING',
+        { infer: true },
+      ),
+      containerName,
+    })
+  },
+}
+
+const routeVoiceReportServiceProvider = isSchemaGeneration
+  ? {
+      provide: RouteVoiceReportService,
+      useValue: {
+        uploadForCourier: () => Promise.resolve(null),
+        listForActor: () => Promise.resolve([]),
+        streamAudioForActor: () => Promise.resolve(null),
+        recoverStaleUploadingReservations: () => Promise.resolve(0),
+        filterVoiceReportUpdateForSubscriber: () => Promise.resolve(false),
+      },
+    }
+  : RouteVoiceReportService
+
+const routeVoiceReportAuditServiceProvider = isSchemaGeneration
+  ? {
+      provide: RouteVoiceReportAuditService,
+      useValue: {
+        recordCreated: () => Promise.resolve({ inserted: false }),
+        countByReportId: () => Promise.resolve(0),
+      },
+    }
+  : RouteVoiceReportAuditService
+
+const routeVoiceReportEventsServiceProvider = isSchemaGeneration
+  ? {
+      provide: RouteVoiceReportEventsService,
+      useValue: {
+        publishCreated: () => Promise.resolve(),
+      },
+    }
+  : RouteVoiceReportEventsService
+
 const confirmAuditPersistence = isSchemaGeneration
   ? []
   : [TypeOrmModule.forFeature([DeliveryQrConfirmAuditEvent])]
@@ -244,8 +324,13 @@ const manifestAuditPersistence = isSchemaGeneration
   ? []
   : [TypeOrmModule.forFeature([DeliveryManifestAuditEvent])]
 
+const voiceReportPersistence = isSchemaGeneration
+  ? []
+  : [TypeOrmModule.forFeature([RouteVoiceReport, RouteVoiceReportAuditEvent])]
+
 @Module({
   imports: [
+    ConfigModule,
     AuthenticationModule,
     UserModule,
     PubSubModule,
@@ -255,6 +340,7 @@ const manifestAuditPersistence = isSchemaGeneration
     ...arrivalAuditPersistence,
     ...locationAuditPersistence,
     ...manifestAuditPersistence,
+    ...voiceReportPersistence,
   ],
   controllers: isSchemaGeneration
     ? []
@@ -264,6 +350,7 @@ const manifestAuditPersistence = isSchemaGeneration
         DeliveryStopQrController,
         DeliveryStopArrivalController,
         DeliveryManifestController,
+        RouteVoiceReportController,
       ],
   providers: [
     routePreviewServiceProvider,
@@ -282,11 +369,16 @@ const manifestAuditPersistence = isSchemaGeneration
     deliveryManifestPdfServiceProvider,
     deliveryManifestServiceProvider,
     deliveryManifestAuditServiceProvider,
+    routeVoiceReportStorageProvider,
+    routeVoiceReportServiceProvider,
+    routeVoiceReportAuditServiceProvider,
+    routeVoiceReportEventsServiceProvider,
     DeliveryStopQrImageService,
     RoutesResolver,
     DeliveryStopQrFieldsResolver,
     DeliveryRouteLocationFieldsResolver,
     DeliveryStopQrResolver,
+    RouteVoiceReportResolver,
     {
       provide: CLOCK,
       useClass: SystemClock,
@@ -297,6 +389,7 @@ const manifestAuditPersistence = isSchemaGeneration
     RoutesService,
     RoutePreviewService,
     DeliveryRouteProgressLocationService,
+    RouteVoiceReportService,
   ],
 })
 export class RoutesModule {}
