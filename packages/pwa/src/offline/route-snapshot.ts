@@ -37,6 +37,11 @@ export const FORBIDDEN_ROUTE_CACHE_FIELD_NAMES = [
   'blobName',
   'audioBytes',
   'sha256',
+  // Phase 34C — transcripts and audio URLs must never enter offline storage.
+  'transcript',
+  'transcription',
+  'previewBlob',
+  'audioObjectUrl',
 ] as const
 
 type UnknownRecord = Record<string, unknown>

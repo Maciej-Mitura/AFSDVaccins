@@ -7,6 +7,7 @@ import CommonErrorState from '@/components/common/CommonErrorState.vue'
 import CommonLoadingSkeleton from '@/components/common/CommonLoadingSkeleton.vue'
 import FeatureBezorgerDeliveryQrWorkflow from '@/components/feature/bezorger/FeatureBezorgerDeliveryQrWorkflow.vue'
 import FeatureRouteLocationStatusCard from '@/components/feature/routes/FeatureRouteLocationStatusCard.vue'
+import FeatureRouteVoiceRecorder from '@/components/feature/voice-report/FeatureRouteVoiceRecorder.vue'
 import { toRouteLocationStatusCardProps } from '@/components/feature/routes/route-location-status'
 import { useCourierStopArrival } from '@/composables/useCourierStopArrival'
 import { RouteStatus, useDeliveryRoutes } from '@/composables/useDeliveryRoutes'
@@ -523,6 +524,16 @@ watch([ownerUserId, ownerBezorgerProfileId, isOnline], () => {
           {{ t('common.cancel') }}
         </UButton>
       </div>
+
+      <FeatureRouteVoiceRecorder
+        :route-id="myTodayRoute.id"
+        :route-status="myTodayRoute.status"
+        :route-source="todayRouteSource"
+        :allow-recording="myTodayRoute.status === RouteStatus.InProgress"
+        :show-courier-name="false"
+        :can-retry-transcription="false"
+        title-key="routeVoiceReports.title"
+      />
 
       <CommonErrorState
         v-if="statusError"

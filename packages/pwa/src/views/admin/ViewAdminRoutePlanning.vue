@@ -7,6 +7,7 @@ import CommonErrorState from '@/components/common/CommonErrorState.vue'
 import CommonLoadingSkeleton from '@/components/common/CommonLoadingSkeleton.vue'
 import FeatureDeliveryStopQrModal from '@/components/feature/delivery-qr/FeatureDeliveryStopQrModal.vue'
 import FeatureRouteLocationStatusCard from '@/components/feature/routes/FeatureRouteLocationStatusCard.vue'
+import FeatureRouteVoiceRecorder from '@/components/feature/voice-report/FeatureRouteVoiceRecorder.vue'
 import { toRouteLocationStatusCardProps } from '@/components/feature/routes/route-location-status'
 import {
   RouteStatus,
@@ -514,6 +515,16 @@ onMounted(() => {
                 viewerRole: 'ADMIN',
               })
             "
+          />
+
+          <FeatureRouteVoiceRecorder
+            :route-id="route.id"
+            :route-status="route.status"
+            route-source="SERVER"
+            :allow-recording="false"
+            :show-courier-name="true"
+            :can-retry-transcription="true"
+            title-key="routeVoiceReports.adminTitle"
           />
 
           <div
