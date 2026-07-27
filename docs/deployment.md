@@ -168,6 +168,28 @@ FIREBASE_SERVICE_ACCOUNT_JSON=<raw JSON or base64 JSON>
 
 Optional: throttle/cache/GraphQL/body-limit overrides from `packages/api/.env.example`.
 
+### Azure Blob + Speech (route voice reports — Phase 34D)
+
+Set on the **API** Railway service only (never PWA / never `VITE_`):
+
+```text
+VACCINE_IMAGE_STORAGE_PROVIDER=azure
+AZURE_STORAGE_CONNECTION_STRING=<storage-connection-string>
+AZURE_STORAGE_CONTAINER_NAME=vaccine-images
+AZURE_STORAGE_ROUTE_VOICE_REPORTS_CONTAINER=route-voice-reports
+ROUTE_VOICE_TRANSCRIPTION_PROVIDER=azure
+ROUTE_VOICE_TRANSCRIPTION_ENABLED=true
+AZURE_SPEECH_ENDPOINT=https://<resource-name>.cognitiveservices.azure.com
+AZURE_SPEECH_KEY=<subscription-key>
+```
+
+Pre-create the private voice-report container in Azure Portal (anonymous access
+disabled). Changing these variables requires a Railway redeploy/restart.
+
+Local acceptance (does not deploy): see
+`docs/phase-34d-real-azure-readiness.md` and
+`npm run diagnose:voice-reports:azure` / `npm run test:voice-reports:azure`.
+
 Do **not** set `ALLOW_DATABASE_BOOTSTRAP` / `CONFIRM_DATABASE_BOOTSTRAP` on the long-running API service.
 
 ### E. Deploy API and verify `/health` (empty DB is OK)

@@ -370,6 +370,105 @@ describe('envValidationSchema', () => {
       ...PRODUCTION_AZURE_SPEECH,
     })
     expect(azureComplete.error).toBeUndefined()
+    expect(
+      (azureComplete.value as { AZURE_SPEECH_ENDPOINT: string })
+        .AZURE_SPEECH_ENDPOINT,
+    ).toBe('https://example.cognitiveservices.azure.com')
+  })
+
+  it('rejects fake transcription and disabled transcription in production', () => {
+    const fake = envValidationSchema.validate({
+      ...BASE_PRODUCTION,
+      ROUTE_VOICE_TRANSCRIPTION_PROVIDER: 'fake',
+    })
+    expect(fake.error).toBeDefined()
+
+    const disabled = envValidationSchema.validate({
+      ...BASE_PRODUCTION,
+      ROUTE_VOICE_TRANSCRIPTION_ENABLED: false,
+    })
+    expect(disabled.error).toBeDefined()
+  })
+
+  it('rejects fake storage in production and accepts development fake mode', () => {
+    const fakeStorage = envValidationSchema.validate({
+      ...BASE_PRODUCTION,
+      VACCINE_IMAGE_STORAGE_PROVIDER: 'fake',
+    })
+    expect(fakeStorage.error).toBeDefined()
+
+    const developmentFake = envValidationSchema.validate({
+      ...BASE_DEV,
+      VACCINE_IMAGE_STORAGE_PROVIDER: 'fake',
+      ROUTE_VOICE_TRANSCRIPTION_PROVIDER: 'fake',
+    })
+    expect(developmentFake.error).toBeUndefined()
+  })
+
+  it('normalises trailing slash Speech endpoints and rejects query/path/HTTP', () => {
+    const trailing = envValidationSchema.validate({
+      ...BASE_DEV,
+      ROUTE_VOICE_TRANSCRIPTION_PROVIDER: 'azure',
+      AZURE_SPEECH_ENDPOINT: 'https://example.cognitiveservices.azure.com/',
+      AZURE_SPEECH_KEY: 'example-speech-key',
+    })
+    expect(trailing.error).toBeUndefined()
+    expect(
+      (trailing.value as { AZURE_SPEECH_ENDPOINT: string }).AZURE_SPEECH_ENDPOINT,
+    ).toBe('https://example.cognitiveservices.azure.com')
+
+    const withQuery = envValidationSchema.validate({
+      ...BASE_DEV,
+      ROUTE_VOICE_TRANSCRIPTION_PROVIDER: 'azure',
+      AZURE_SPEECH_ENDPOINT:
+        'https://example.cognitiveservices.azure.com?api-version=1',
+      AZURE_SPEECH_KEY: 'example-speech-key',
+    })
+    expect(withQuery.error).toBeDefined()
+
+    const withPath = envValidationSchema.validate({
+      ...BASE_DEV,
+      ROUTE_VOICE_TRANSCRIPTION_PROVIDER: 'azure',
+      AZURE_SPEECH_ENDPOINT:
+        'https://example.cognitiveservices.azure.com/speechtotext',
+      AZURE_SPEECH_KEY: 'example-speech-key',
+    })
+    expect(withPath.error).toBeDefined()
+
+    const http = envValidationSchema.validate({
+      ...BASE_DEV,
+      ROUTE_VOICE_TRANSCRIPTION_PROVIDER: 'azure',
+      AZURE_SPEECH_ENDPOINT: 'http://example.cognitiveservices.azure.com',
+      AZURE_SPEECH_KEY: 'example-speech-key',
+    })
+    expect(http.error).toBeDefined()
+  })
+
+  it('rejects lease shorter than transcription timeout plus safety margin', () => {
+    const unsafe = envValidationSchema.validate({
+      ...BASE_DEV,
+      ROUTE_VOICE_TRANSCRIPTION_TIMEOUT_MS: 180_000,
+      ROUTE_VOICE_TRANSCRIPTION_LEASE_SECONDS: 120,
+    })
+    expect(unsafe.error).toBeDefined()
+    expect(unsafe.error?.message).toMatch(/LEASE_SECONDS|safety margin/i)
+
+    const safe = envValidationSchema.validate({
+      ...BASE_DEV,
+      ROUTE_VOICE_TRANSCRIPTION_TIMEOUT_MS: 60_000,
+      ROUTE_VOICE_TRANSCRIPTION_LEASE_SECONDS: 600,
+    })
+    expect(safe.error).toBeUndefined()
+  })
+
+  it('validates development real Azure mode when credentials are present', () => {
+    const result = envValidationSchema.validate({
+      ...BASE_DEV,
+      VACCINE_IMAGE_STORAGE_PROVIDER: 'azure',
+      ...PRODUCTION_AZURE_STORAGE,
+      ...PRODUCTION_AZURE_SPEECH,
+    })
+    expect(result.error).toBeUndefined()
   })
 
   it('rejects invalid Azure read URL TTL values', () => {

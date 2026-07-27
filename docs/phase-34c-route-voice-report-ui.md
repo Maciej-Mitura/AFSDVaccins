@@ -15,13 +15,14 @@ PWA courier and admin UI for **route-scoped operational voice reports**:
 
 Out of scope:
 
-- LLM summarisation / classification (Phase 34D+)
+- LLM summarisation / classification (later phase)
 - Transcript editing
 - Offline recording or queued uploads
 - Push notifications containing report content
 - Changes to Phase 34A storage architecture
 - Changes to Phase 34B transcription formulas / state semantics
 - Deploy
+- Real Azure portal provisioning (see Phase 34D)
 
 ## Architecture
 

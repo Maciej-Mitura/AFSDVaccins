@@ -62,6 +62,17 @@ describe('production Docker safety', () => {
     assert.match(compose, /read_only:\s*true/)
   })
 
+  it('compose forwards Azure voice-report storage and Speech placeholders', () => {
+    const compose = read(composePath)
+    assert.match(compose, /AZURE_STORAGE_ROUTE_VOICE_REPORTS_CONTAINER/)
+    assert.match(compose, /ROUTE_VOICE_TRANSCRIPTION_PROVIDER/)
+    assert.match(compose, /AZURE_SPEECH_ENDPOINT/)
+    assert.match(compose, /AZURE_SPEECH_KEY/)
+    assert.match(compose, /ROUTE_VOICE_TRANSCRIPTION_ENABLED/)
+    assert.doesNotMatch(compose, /AccountKey=[A-Za-z0-9+/=]{16,}/)
+    assert.doesNotMatch(compose, /VITE_AZURE_SPEECH/)
+  })
+
   it('env example never enables Playwright bypass or commits secrets', () => {
     const example = read(envExamplePath)
     assert.doesNotMatch(example, /VITE_E2E_AUTH_BYPASS\s*=\s*true/)

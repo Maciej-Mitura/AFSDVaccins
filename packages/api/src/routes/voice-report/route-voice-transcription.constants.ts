@@ -29,9 +29,19 @@ export const ROUTE_VOICE_TRANSCRIPTION_LEASE_SECONDS_DEFAULT = 600
 export const ROUTE_VOICE_TRANSCRIPTION_LEASE_SECONDS_MIN = 120
 export const ROUTE_VOICE_TRANSCRIPTION_LEASE_SECONDS_MAX = 900
 
+/**
+ * Lease must outlive provider timeout by at least this margin so expired leases
+ * cannot reclaim a still-running Azure Speech request.
+ */
+export const ROUTE_VOICE_TRANSCRIPTION_LEASE_TIMEOUT_SAFETY_MARGIN_MS = 60_000
+
 export const ROUTE_VOICE_TRANSCRIPTION_RECOVERY_BATCH_DEFAULT = 25
 export const ROUTE_VOICE_TRANSCRIPTION_RECOVERY_BATCH_MIN = 1
 export const ROUTE_VOICE_TRANSCRIPTION_RECOVERY_BATCH_MAX = 100
+
+/** Acceptance-probe prefix only (never a production route/report blob path). */
+export const ROUTE_VOICE_ACCEPTANCE_PROBE_BLOB_PREFIX =
+  '_acceptance-tests/voice-reports/' as const
 
 /** Transient retry base delay (ms); exponential with attempt index. */
 export const ROUTE_VOICE_TRANSCRIPTION_RETRY_BASE_DELAY_MS = 2_000

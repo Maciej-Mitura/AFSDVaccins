@@ -223,11 +223,45 @@ export class AzureRouteVoiceReportStorageProvider
       return
     }
     try {
-      await this.containerClient.getProperties()
+      const props = await this.containerClient.getProperties()
+      // Private containers omit blobPublicAccess; any public level is forbidden.
+      if (props.blobPublicAccess) {
+        throw new RouteVoiceReportStorageFailedException()
+      }
       this.containerAccessVerified = true
     } catch (error) {
       mapRouteVoiceReportAzureStorageError(error)
     }
+  }
+
+  /**
+   * Explicit private-access verification for diagnostics/acceptance.
+   * Does not create the container.
+   */
+  async verifyPrivateContainer(): Promise<{
+    containerName: string
+    exists: true
+    privateAccess: true
+  }> {
+    try {
+      const props = await this.containerClient.getProperties()
+      if (props.blobPublicAccess) {
+        throw new RouteVoiceReportStorageFailedException()
+      }
+      this.containerAccessVerified = true
+      return {
+        containerName: this.containerName,
+        exists: true,
+        privateAccess: true,
+      }
+    } catch (error) {
+      mapRouteVoiceReportAzureStorageError(error)
+    }
+  }
+
+  /** Expose container client for acceptance probes only (same private container). */
+  getAcceptanceContainerClient(): ContainerClient {
+    return this.containerClient
   }
 }
 

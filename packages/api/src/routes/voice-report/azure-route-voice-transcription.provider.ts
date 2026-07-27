@@ -110,12 +110,15 @@ export class AzureRouteVoiceTranscriptionProvider
       })
     }
 
-    const url = `${this.endpoint}${AZURE_SPEECH_FAST_TRANSCRIBE_PATH}?api-version=${AZURE_SPEECH_FAST_TRANSCRIBE_API_VERSION}`
+    const url = buildAzureSpeechFastTranscribeUrl(this.endpoint)
     const form = new FormData()
+    const mimeType = input.mimeType || 'application/octet-stream'
     const blob = new Blob([new Uint8Array(input.audioBytes)], {
-      type: input.mimeType || 'application/octet-stream',
+      type: mimeType,
     })
-    form.append('audio', blob, input.fileNameHint || 'audio.bin')
+    const fileName =
+      input.fileNameHint?.trim() || azureSpeechFileNameHintForMime(mimeType)
+    form.append('audio', blob, fileName)
     form.append(
       'definition',
       JSON.stringify({
@@ -202,6 +205,11 @@ function isRouteVoiceTranscriptionProviderError(
   return error instanceof RouteVoiceTranscriptionProviderError
 }
 
+/**
+ * Normalise AZURE_SPEECH_ENDPOINT to the Azure resource origin only.
+ * Accepts one optional trailing slash; rejects query strings, fragments, and
+ * request-path injection (including duplicated /speechtotext).
+ */
 export function assertHttpsSpeechEndpoint(endpoint: string): string {
   if (typeof endpoint !== 'string' || endpoint.trim().length === 0) {
     throw new RouteVoiceTranscriptionProviderError({
@@ -210,9 +218,10 @@ export function assertHttpsSpeechEndpoint(endpoint: string): string {
       message: 'AZURE_SPEECH_ENDPOINT is required',
     })
   }
+  const trimmed = endpoint.trim()
   let parsed: URL
   try {
-    parsed = new URL(endpoint.trim())
+    parsed = new URL(trimmed)
   } catch {
     throw new RouteVoiceTranscriptionProviderError({
       kind: 'not_configured',
@@ -227,7 +236,65 @@ export function assertHttpsSpeechEndpoint(endpoint: string): string {
       message: 'AZURE_SPEECH_ENDPOINT must use HTTPS',
     })
   }
-  return endpoint.trim().replace(/\/+$/, '')
+  if (parsed.username || parsed.password) {
+    throw new RouteVoiceTranscriptionProviderError({
+      kind: 'not_configured',
+      transient: false,
+      message: 'AZURE_SPEECH_ENDPOINT must not include credentials',
+    })
+  }
+  if (parsed.search.length > 0 || parsed.hash.length > 0) {
+    throw new RouteVoiceTranscriptionProviderError({
+      kind: 'not_configured',
+      transient: false,
+      message: 'AZURE_SPEECH_ENDPOINT must not include a query string or fragment',
+    })
+  }
+  const pathname = parsed.pathname.replace(/\/+$/, '') || '/'
+  if (pathname !== '/') {
+    throw new RouteVoiceTranscriptionProviderError({
+      kind: 'not_configured',
+      transient: false,
+      message:
+        'AZURE_SPEECH_ENDPOINT must be the resource origin only (no request path)',
+    })
+  }
+  // Origin only; path + api-version are appended by the provider constant.
+  return `https://${parsed.host}`
+}
+
+/** Build the exact fast-transcription URL (api-version centralised). */
+export function buildAzureSpeechFastTranscribeUrl(endpoint: string): string {
+  const normalised = assertHttpsSpeechEndpoint(endpoint)
+  return `${normalised}${AZURE_SPEECH_FAST_TRANSCRIBE_PATH}?api-version=${AZURE_SPEECH_FAST_TRANSCRIBE_API_VERSION}`
+}
+
+/** Safe host for diagnostics — never returns credentials or full URL with key. */
+export function safeAzureSpeechEndpointHost(endpoint: string): string | null {
+  try {
+    return new URL(assertHttpsSpeechEndpoint(endpoint)).host
+  } catch {
+    return null
+  }
+}
+
+/** Bounded filename hint for multipart (format-based; never user filename). */
+export function azureSpeechFileNameHintForMime(mimeType: string): string {
+  const base = mimeType.split(';')[0]?.trim().toLowerCase() ?? ''
+  if (base === 'audio/webm') {
+    return 'audio.webm'
+  }
+  if (base === 'audio/ogg') {
+    return 'audio.ogg'
+  }
+  if (
+    base === 'audio/mp4' ||
+    base === 'audio/x-m4a' ||
+    base === 'audio/aac'
+  ) {
+    return 'audio.m4a'
+  }
+  return 'audio.bin'
 }
 
 export function assertNonEmptySpeechKey(key: string): string {

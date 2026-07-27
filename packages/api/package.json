@@ -21,7 +21,11 @@
     "seed:database:all": "nest build && node dist/cli.js",
     "seed:database:cli": "node dist/cli.js",
     "bootstrap:database:demo": "nest build && node dist/bootstrap-cli.js",
-    "bootstrap:database:demo:cli": "node dist/bootstrap-cli.js"
+    "bootstrap:database:demo:cli": "node dist/bootstrap-cli.js",
+    "diagnose:voice-reports:azure": "ts-node --transpile-only scripts/diagnose-voice-reports-azure.ts",
+    "test:voice-reports:azure-storage": "ts-node --transpile-only scripts/test-voice-reports-azure-storage.ts",
+    "test:voice-reports:azure-speech": "ts-node --transpile-only scripts/test-voice-reports-azure-speech.ts",
+    "test:voice-reports:azure": "ts-node --transpile-only scripts/test-voice-reports-azure.ts"
   },
   "dependencies": {
     "@apollo/server": "^4.12.2",

@@ -85,7 +85,47 @@ describe('production readiness (offline)', () => {
     assert.match(example, /AZURE_SPEECH_ENDPOINT=/)
     assert.match(example, /AZURE_SPEECH_KEY=/)
     assert.match(example, /ROUTE_VOICE_TRANSCRIPTION_PROVIDER=/)
+    assert.match(example, /AZURE_STORAGE_ROUTE_VOICE_REPORTS_CONTAINER=/)
+    assert.match(example, /ROUTE_VOICE_TRANSCRIPTION_ENABLED=/)
+    assert.match(example, /diagnose:voice-reports:azure/)
+    assert.doesNotMatch(example, /VITE_AZURE_SPEECH/)
     assertNoSecretPatterns(example, 'api .env.example')
+  })
+
+  it('production compose and prod env example forward Phase 34D Azure voice vars', () => {
+    const compose = read('infrastructure/docker-compose-production.yml')
+    assert.match(compose, /VACCINE_IMAGE_STORAGE_PROVIDER/)
+    assert.match(compose, /AZURE_STORAGE_ROUTE_VOICE_REPORTS_CONTAINER/)
+    assert.match(compose, /ROUTE_VOICE_TRANSCRIPTION_PROVIDER/)
+    assert.match(compose, /AZURE_SPEECH_ENDPOINT/)
+    assert.match(compose, /AZURE_SPEECH_KEY/)
+    assert.match(compose, /ROUTE_VOICE_TRANSCRIPTION_ENABLED/)
+    assert.doesNotMatch(compose, /VITE_AZURE_SPEECH/)
+
+    const prodExample = read('infrastructure/.env.prod.example')
+    assert.match(prodExample, /AZURE_STORAGE_ROUTE_VOICE_REPORTS_CONTAINER/)
+    assert.match(prodExample, /AZURE_SPEECH_ENDPOINT/)
+    assert.match(prodExample, /ROUTE_VOICE_TRANSCRIPTION_PROVIDER=azure/)
+    assert.match(prodExample, /Railway/)
+    assertNoSecretPatterns(prodExample, 'infrastructure .env.prod.example')
+  })
+
+  it('Phase 34D readiness documentation exists', () => {
+    const doc = read('docs/phase-34d-real-azure-readiness.md')
+    assert.match(doc, /2025-10-15/)
+    assert.match(doc, /diagnose:voice-reports:azure/)
+    assert.match(doc, /test:voice-reports:azure/)
+    assert.match(doc, /Ocp-Apim-Subscription-Key/)
+    assert.match(doc, /_acceptance-tests\/voice-reports/)
+    const index = read('docs/phase-34-index.md')
+    assert.match(index, /phase-34d-real-azure-readiness/)
+  })
+
+  it('deployment runbook documents Azure voice Railway checklist', () => {
+    const runbook = read('docs/deployment.md')
+    assert.match(runbook, /AZURE_SPEECH_ENDPOINT/)
+    assert.match(runbook, /AZURE_STORAGE_ROUTE_VOICE_REPORTS_CONTAINER/)
+    assert.match(runbook, /phase-34d-real-azure-readiness/)
   })
 
   it('PWA env example keeps public placeholders only', () => {

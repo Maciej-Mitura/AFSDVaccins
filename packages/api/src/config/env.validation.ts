@@ -6,6 +6,9 @@ import {
   isValidBodyLimitSyntax,
 } from './body-limit'
 import { parseTrustProxy } from './trust-proxy'
+import {
+  ROUTE_VOICE_TRANSCRIPTION_LEASE_TIMEOUT_SAFETY_MARGIN_MS,
+} from '../routes/voice-report/route-voice-transcription.constants'
 
 export const DATABASE_BOOTSTRAP_CONFIRMATION_PHRASE =
   'BOOTSTRAP_PUBLIC_DEMO_DATABASE'
@@ -235,9 +238,17 @@ export const envValidationSchema = Joi.object({
   // ---- Phase 34B Azure Speech fast transcription (backend-only) ----
   /**
    * When false, uploads still succeed but transcription is not scheduled.
-   * Default true; local/tests typically use the fake provider.
+   * Default true; production requires true for full voice-report functionality.
    */
-  ROUTE_VOICE_TRANSCRIPTION_ENABLED: Joi.boolean().default(true),
+  ROUTE_VOICE_TRANSCRIPTION_ENABLED: Joi.when('NODE_ENV', {
+    is: 'production',
+    then: Joi.boolean()
+      .truthy('true')
+      .falsy('false')
+      .valid(true)
+      .default(true),
+    otherwise: Joi.boolean().truthy('true').falsy('false').default(true),
+  }),
   /**
    * Transcription backend: `fake` (local/tests) or `azure` (production target).
    * Fake is rejected when NODE_ENV=production.
@@ -248,21 +259,58 @@ export const envValidationSchema = Joi.object({
     otherwise: Joi.string().valid('fake', 'azure').default('fake'),
   }),
   /**
-   * Azure AI Speech resource endpoint (HTTPS only), e.g.
+   * Azure AI Speech resource endpoint (HTTPS origin only), e.g.
    * https://<resource>.cognitiveservices.azure.com
+   * No query string, fragment, credentials, or request path.
    * Required when ROUTE_VOICE_TRANSCRIPTION_PROVIDER=azure.
    */
   AZURE_SPEECH_ENDPOINT: Joi.when('ROUTE_VOICE_TRANSCRIPTION_PROVIDER', {
     is: 'azure',
     then: Joi.string()
-      .uri({ scheme: ['https'] })
-      .required(),
+      .required()
+      .custom((value: string, helpers) => {
+        const normalised = normaliseAzureSpeechEndpointForConfig(value)
+        if (!normalised) {
+          return helpers.error('any.invalid')
+        }
+        return normalised
+      })
+      .messages({
+        'any.invalid':
+          'AZURE_SPEECH_ENDPOINT must be an HTTPS resource origin without query, fragment, credentials, or request path',
+      }),
     otherwise: Joi.when('NODE_ENV', {
       is: 'production',
       then: Joi.string()
-        .uri({ scheme: ['https'] })
-        .required(),
-      otherwise: Joi.string().allow('').optional(),
+        .required()
+        .custom((value: string, helpers) => {
+          const normalised = normaliseAzureSpeechEndpointForConfig(value)
+          if (!normalised) {
+            return helpers.error('any.invalid')
+          }
+          return normalised
+        })
+        .messages({
+          'any.invalid':
+            'AZURE_SPEECH_ENDPOINT must be an HTTPS resource origin without query, fragment, credentials, or request path',
+        }),
+      otherwise: Joi.string()
+        .allow('')
+        .optional()
+        .custom((value: string, helpers) => {
+          if (value === undefined || value === null || value === '') {
+            return value
+          }
+          const normalised = normaliseAzureSpeechEndpointForConfig(value)
+          if (!normalised) {
+            return helpers.error('any.invalid')
+          }
+          return normalised
+        })
+        .messages({
+          'any.invalid':
+            'AZURE_SPEECH_ENDPOINT must be an HTTPS resource origin without query, fragment, credentials, or request path',
+        }),
     }),
   }),
   /**
@@ -377,7 +425,54 @@ export const envValidationSchema = Joi.object({
       otherwise: Joi.string().allow('').optional(),
     }),
   }),
+}).custom((value: Record<string, unknown>, helpers) => {
+  const timeoutMs = value.ROUTE_VOICE_TRANSCRIPTION_TIMEOUT_MS
+  const leaseSeconds = value.ROUTE_VOICE_TRANSCRIPTION_LEASE_SECONDS
+  if (
+    typeof timeoutMs === 'number' &&
+    typeof leaseSeconds === 'number' &&
+    leaseSeconds * 1000 <
+      timeoutMs + ROUTE_VOICE_TRANSCRIPTION_LEASE_TIMEOUT_SAFETY_MARGIN_MS
+  ) {
+    return helpers.message({
+      custom:
+        'ROUTE_VOICE_TRANSCRIPTION_LEASE_SECONDS must exceed ROUTE_VOICE_TRANSCRIPTION_TIMEOUT_MS plus a 60s safety margin',
+    })
+  }
+  return value
 })
+
+/**
+ * Config-layer Speech endpoint normalisation (mirrors provider rules; no throw).
+ * Returns normalised HTTPS origin or null when invalid.
+ */
+export function normaliseAzureSpeechEndpointForConfig(
+  endpoint: string,
+): string | null {
+  if (typeof endpoint !== 'string' || endpoint.trim().length === 0) {
+    return null
+  }
+  let parsed: URL
+  try {
+    parsed = new URL(endpoint.trim())
+  } catch {
+    return null
+  }
+  if (parsed.protocol !== 'https:') {
+    return null
+  }
+  if (parsed.username || parsed.password) {
+    return null
+  }
+  if (parsed.search.length > 0 || parsed.hash.length > 0) {
+    return null
+  }
+  const pathname = parsed.pathname.replace(/\/+$/, '') || '/'
+  if (pathname !== '/') {
+    return null
+  }
+  return `https://${parsed.host}`
+}
 
 export type EnvConfig = {
   NODE_ENV: 'development' | 'test' | 'production'

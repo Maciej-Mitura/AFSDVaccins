@@ -45,7 +45,11 @@
     "test:e2e:pwa:report": "playwright show-report",
     "prepush:check": "npm run typecheck:api && npm run typecheck:pwa && npm run test:api && npm run test:pwa",
     "seed:database:all": "npm run seed:database:all --workspace=@vaccin-delivery/api",
-    "test:docker:safety": "node --test infrastructure/docker-production.safety.test.mjs"
+    "test:docker:safety": "node --test infrastructure/docker-production.safety.test.mjs",
+    "diagnose:voice-reports:azure": "npm run diagnose:voice-reports:azure --workspace=@vaccin-delivery/api",
+    "test:voice-reports:azure-storage": "npm run test:voice-reports:azure-storage --workspace=@vaccin-delivery/api",
+    "test:voice-reports:azure-speech": "npm run test:voice-reports:azure-speech --workspace=@vaccin-delivery/api",
+    "test:voice-reports:azure": "npm run test:voice-reports:azure --workspace=@vaccin-delivery/api"
   },
   "lint-staged": {
     "*.{json,md,yml,yaml}": "prettier --write",

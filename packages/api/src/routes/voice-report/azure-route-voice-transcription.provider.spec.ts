@@ -1,10 +1,15 @@
 import {
+  assertHttpsSpeechEndpoint,
+  azureSpeechFileNameHintForMime,
+  buildAzureSpeechFastTranscribeUrl,
+  AzureRouteVoiceTranscriptionProvider,
+} from './azure-route-voice-transcription.provider'
+import {
   buildAzureSpeechLocales,
   mapAzureFastTranscriptionBody,
   normaliseTranscriptText,
 } from './azure-route-voice-transcription.mapper'
 import { RouteVoiceTranscriptionProviderError } from './azure-route-voice-transcription.errors'
-import { AzureRouteVoiceTranscriptionProvider } from './azure-route-voice-transcription.provider'
 import { RouteVoiceTranscriptionLocale } from './route-voice-transcription-locale.enum'
 import {
   AZURE_SPEECH_FAST_TRANSCRIBE_API_VERSION,
@@ -34,7 +39,48 @@ describe('Azure Speech fast transcription adapter', () => {
     ])
   })
 
-  it('maps a valid provider result to a provider-neutral result', () => {
+  it('normalises trailing slash and builds exact 2025-10-15 URL', () => {
+    expect(
+      assertHttpsSpeechEndpoint(
+        'https://example.cognitiveservices.azure.com/',
+      ),
+    ).toBe('https://example.cognitiveservices.azure.com')
+    expect(
+      buildAzureSpeechFastTranscribeUrl(
+        'https://example.cognitiveservices.azure.com/',
+      ),
+    ).toBe(
+      `https://example.cognitiveservices.azure.com/speechtotext/transcriptions:transcribe?api-version=${AZURE_SPEECH_FAST_TRANSCRIBE_API_VERSION}`,
+    )
+  })
+
+  it('rejects Speech endpoints with query, path injection, or HTTP', () => {
+    expect(() =>
+      assertHttpsSpeechEndpoint(
+        'https://example.cognitiveservices.azure.com?api-version=1',
+      ),
+    ).toThrow(/query string|fragment/i)
+    expect(() =>
+      assertHttpsSpeechEndpoint(
+        'https://example.cognitiveservices.azure.com/speechtotext',
+      ),
+    ).toThrow(/origin only|request path/i)
+    expect(() =>
+      assertHttpsSpeechEndpoint(
+        'http://example.cognitiveservices.azure.com',
+      ),
+    ).toThrow(/HTTPS/i)
+  })
+
+  it('maps MIME types to safe filename hints', () => {
+    expect(azureSpeechFileNameHintForMime('audio/webm')).toBe('audio.webm')
+    expect(azureSpeechFileNameHintForMime('audio/ogg;codecs=opus')).toBe(
+      'audio.ogg',
+    )
+    expect(azureSpeechFileNameHintForMime('audio/mp4')).toBe('audio.m4a')
+  })
+
+  it('maps a successful manual locale fixture', () => {
     const mapped = mapAzureFastTranscriptionBody(
       {
         durationMilliseconds: 12500,
@@ -51,6 +97,21 @@ describe('Azure Speech fast transcription adapter', () => {
     expect(mapped.confidence).toBeCloseTo(0.85)
     expect(mapped.audioDurationSeconds).toBe(12.5)
     expect(mapped.providerRequestId).toBe('req-1')
+  })
+
+  it('maps a successful AUTO detection fixture', () => {
+    const mapped = mapAzureFastTranscriptionBody(
+      {
+        durationMilliseconds: 2100,
+        combinedPhrases: [{ text: 'Good morning' }],
+        phrases: [
+          { text: 'Good morning', locale: 'en-GB', confidence: 0.91 },
+        ],
+      },
+      'auto-req',
+    )
+    expect(mapped.detectedLocale).toBe('en-GB')
+    expect(mapped.text).toBe('Good morning')
   })
 
   it('keeps missing confidence null and rejects invalid confidence', () => {
@@ -91,6 +152,15 @@ describe('Azure Speech fast transcription adapter', () => {
         'no_speech',
       )
     }
+  })
+
+  it('rejects malformed success bodies', () => {
+    expect(() => mapAzureFastTranscriptionBody(null, null)).toThrow(
+      /invalid transcription body/i,
+    )
+    expect(() => mapAzureFastTranscriptionBody('nope', null)).toThrow(
+      /invalid transcription body/i,
+    )
   })
 
   it('rejects oversized transcript', () => {
@@ -143,18 +213,58 @@ describe('Azure Speech fast transcription adapter', () => {
       correlationId: 'corr-1',
     })
 
-    expect(capturedUrl).toContain(
-      `api-version=${AZURE_SPEECH_FAST_TRANSCRIBE_API_VERSION}`,
+    expect(capturedUrl).toBe(
+      `https://example.cognitiveservices.azure.com/speechtotext/transcriptions:transcribe?api-version=${AZURE_SPEECH_FAST_TRANSCRIBE_API_VERSION}`,
     )
-    expect(capturedUrl).toContain('/speechtotext/transcriptions:transcribe')
     const headers = new Headers(capturedHeaders)
     expect(headers.get('Ocp-Apim-Subscription-Key')).toBe(
       'super-secret-speech-key',
     )
+    expect(headers.get('Content-Type')).toBeNull()
     const definition = capturedBody?.get('definition')
     expect(definition).toBe(JSON.stringify({ locales: ['en-GB'] }))
+    expect(capturedBody?.get('audio')).toBeTruthy()
     expect(result.text).toBe('ok')
     expect(result.providerRequestId).toBe('azure-req-9')
+  })
+
+  it('maps WebM / Ogg / M4A filename and MIME in multipart', async () => {
+    const cases = [
+      { mime: 'audio/webm', hint: 'audio.webm' },
+      { mime: 'audio/ogg', hint: 'audio.ogg' },
+      { mime: 'audio/mp4', hint: 'audio.m4a' },
+    ] as const
+
+    for (const item of cases) {
+      let capturedBody: FormData | undefined
+      const provider = AzureRouteVoiceTranscriptionProvider.fromParts({
+        endpoint: 'https://example.cognitiveservices.azure.com',
+        key: 'key',
+        fetchImpl: (_url, init) => {
+          capturedBody = init.body as FormData
+          return Promise.resolve(
+            new Response(
+              JSON.stringify({
+                combinedPhrases: [{ text: 'ok' }],
+                phrases: [{ text: 'ok', locale: 'en-GB' }],
+              }),
+              { status: 200 },
+            ),
+          )
+        },
+      })
+      await provider.transcribe({
+        audioBytes,
+        mimeType: item.mime,
+        requestedLocale: RouteVoiceTranscriptionLocale.EN_GB,
+        fileNameHint: item.hint,
+        correlationId: 'c',
+      })
+      const audio = capturedBody?.get('audio')
+      expect(audio).toBeTruthy()
+      expect((audio as File).name).toBe(item.hint)
+      expect((audio as File).type).toBe(item.mime)
+    }
   })
 
   it('AUTO definition includes exactly three locales', async () => {
@@ -190,7 +300,7 @@ describe('Azure Speech fast transcription adapter', () => {
     })
   })
 
-  it('maps timeout / 429 / 5xx / 4xx invalid-audio to stable errors', async () => {
+  it('maps timeout / 429 / 5xx / structured Azure audio error', async () => {
     const timeoutProvider = AzureRouteVoiceTranscriptionProvider.fromParts({
       endpoint: 'https://example.cognitiveservices.azure.com',
       key: 'key',
