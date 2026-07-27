@@ -418,7 +418,7 @@ describe('ViewApothekerCreateOrder daily limit UX', () => {
     addLine(vm, 'flu', 10)
     await nextTick()
 
-    expect(wrapper.find('[data-testid="order-line-flu"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="order-line"]').exists()).toBe(true)
     expect(vm.canSubmit).toBe(true)
     expect(
       wrapper.find('[data-testid="place-order"]').attributes('disabled'),
@@ -490,7 +490,7 @@ describe('ViewApothekerCreateOrder daily limit UX', () => {
     addLine(vm, 'flu', 5)
     await nextTick()
 
-    expect(wrapper.find('[data-testid="order-line-flu"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="order-line"]').exists()).toBe(true)
 
     await vm.submitOrder()
     await flushPromises()
@@ -504,10 +504,10 @@ describe('ViewApothekerCreateOrder daily limit UX', () => {
     expect(wrapper.find('[data-testid="create-order-form-error"]').text()).toBe(
       translate('errors.order.dailyLimitExceededPrecise', { remaining: 3 }),
     )
-    expect(wrapper.find('[data-testid="order-line-flu"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="order-line"]').exists()).toBe(true)
     expect(vm.highlightedVaccineId).toBe('flu')
     expect(vm.lines[0]?.quantity).toBe(5)
-    expect(wrapper.find('[data-testid="order-line-flu"]').text()).toContain(
+    expect(wrapper.find('[data-testid="order-line"]').text()).toContain(
       translate('apotheker.orders.create.remainingToday', { remaining: 3 }),
     )
     wrapper.unmount()

@@ -622,7 +622,7 @@ defineExpose({
               ? 'border-error ring-2 ring-error/40'
               : 'border-default'
           "
-          :data-testid="`order-line-${line.vaccineId}`"
+          data-testid="order-line"
           :data-highlighted="
             highlightedVaccineId === line.vaccineId ? 'true' : undefined
           "

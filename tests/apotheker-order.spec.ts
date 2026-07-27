@@ -19,9 +19,15 @@ test.describe('APOTHEKER journey', () => {
     // Prefer vaccine placeholder text — shell language USelect is also a combobox.
     await page.getByText('Selecteer vaccin').click()
     await page.getByRole('option', { name: 'Playwright Flu' }).click()
-    await page.getByLabel('Aantal').fill('2')
+    await page.getByTestId('add-quantity-input').fill('2')
     await page.getByRole('button', { name: 'Regel toevoegen' }).click()
-    await expect(page.getByText('2 dosissen')).toBeVisible()
+
+    const orderLine = page.getByTestId('order-line')
+    await expect(orderLine).toBeVisible()
+    await expect(orderLine.getByText('Playwright Flu')).toBeVisible()
+    await expect(orderLine.getByRole('spinbutton', { name: 'Aantal' })).toHaveValue(
+      '2',
+    )
 
     await page.getByTestId('place-order').click()
 
