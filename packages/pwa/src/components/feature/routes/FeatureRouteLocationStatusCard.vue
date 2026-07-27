@@ -106,7 +106,7 @@ const liveRegionMessage = computed(() => {
     </div>
 
     <h3
-      class="text-base font-semibold break-words"
+      class="text-base font-semibold wrap-break-word"
       data-testid="route-location-heading"
     >
       {{ heading }}
@@ -132,7 +132,7 @@ const liveRegionMessage = computed(() => {
     <template v-else-if="viewerRole === 'APOTHEKER'">
       <p
         v-if="hasLocation && city"
-        class="mt-2 break-words"
+        class="mt-2 wrap-break-word"
         data-testid="route-location-pharmacist-city"
       >
         {{ t('routes.location.courierLastLocation', { city }) }}
@@ -162,7 +162,7 @@ const liveRegionMessage = computed(() => {
               {{ t('routes.location.lastRecordedCity') }}
             </dt>
             <dd
-              class="break-words font-medium"
+              class="wrap-break-word font-medium"
               data-testid="route-location-city"
             >
               {{ city }}
@@ -187,7 +187,7 @@ const liveRegionMessage = computed(() => {
           >
             <dt class="sr-only">{{ t('routes.location.source.arrival') }}</dt>
             <dd
-              class="text-muted break-words"
+              class="text-muted wrap-break-word"
               data-testid="route-location-source"
             >
               {{ sourceText }}
@@ -233,7 +233,7 @@ const liveRegionMessage = computed(() => {
 
         <p
           v-if="hasNextStop && nextStopSequence != null && nextStopName"
-          class="mt-1 break-words"
+          class="mt-1 wrap-break-word"
           data-testid="route-location-next-stop"
         >
           {{

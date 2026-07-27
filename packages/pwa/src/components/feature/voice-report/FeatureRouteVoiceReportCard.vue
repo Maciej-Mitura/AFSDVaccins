@@ -255,7 +255,7 @@ watch(
           <template v-if="confidenceLabel"> · {{ confidenceLabel }} </template>
         </p>
         <p
-          class="whitespace-pre-wrap break-words text-sm"
+          class="whitespace-pre-wrap wrap-break-word text-sm"
           data-testid="route-voice-transcript-text"
         >
           {{ report.transcript ?? '' }}

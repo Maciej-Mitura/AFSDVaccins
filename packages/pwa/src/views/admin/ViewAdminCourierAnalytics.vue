@@ -428,7 +428,7 @@ async function onExportCsv(): Promise<void> {
             :min-height="320"
           />
           <div class="mt-3 overflow-x-auto">
-            <table class="w-full min-w-[28rem] text-left text-xs">
+            <table class="w-full min-w-md text-left text-xs">
               <caption class="sr-only">
                 {{
                   t('admin.courierAnalytics.charts.monthlyActivity.title')
@@ -564,7 +564,7 @@ async function onExportCsv(): Promise<void> {
             </div>
           </template>
           <div class="overflow-x-auto">
-            <table class="w-full min-w-[64rem] text-left text-sm">
+            <table class="w-full min-w-5xl text-left text-sm">
               <caption class="sr-only">
                 {{
                   t('admin.courierAnalytics.detailTable.caption')

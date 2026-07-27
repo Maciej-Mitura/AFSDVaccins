@@ -1,6 +1,6 @@
 <template>
   <div class="overflow-x-auto" data-testid="courier-analytics-leaderboard">
-    <table class="w-full min-w-[40rem] text-left text-sm">
+    <table class="w-full min-w-160 text-left text-sm">
       <caption class="sr-only">
         {{
           t('admin.courierAnalytics.leaderboard.caption')
