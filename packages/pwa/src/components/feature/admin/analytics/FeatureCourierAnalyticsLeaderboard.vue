@@ -10,16 +10,10 @@
         <tr
           class="border-b border-default text-xs uppercase tracking-wide text-toned"
         >
-          <th
-            scope="col"
-            class="sticky left-0 bg-elevated py-2 pr-3 font-medium"
-          >
+          <th scope="col" class="sticky left-0 bg-muted py-2 pr-3 font-medium">
             {{ t('admin.courierAnalytics.column.rank') }}
           </th>
-          <th
-            scope="col"
-            class="sticky left-10 bg-elevated py-2 pr-3 font-medium"
-          >
+          <th scope="col" class="sticky left-10 bg-muted py-2 pr-3 font-medium">
             {{ t('admin.courierAnalytics.column.courier') }}
           </th>
           <th scope="col" class="py-2 pr-3 font-medium">

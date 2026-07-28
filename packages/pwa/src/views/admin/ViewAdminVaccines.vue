@@ -8,6 +8,8 @@ import * as z from 'zod'
 import CommonEmptyState from '@/components/common/CommonEmptyState.vue'
 import CommonErrorState from '@/components/common/CommonErrorState.vue'
 import CommonLoadingSkeleton from '@/components/common/CommonLoadingSkeleton.vue'
+import CommonPageHeader from '@/components/common/CommonPageHeader.vue'
+import CommonPageSection from '@/components/common/CommonPageSection.vue'
 import VaccineImageAdminPanel from '@/components/vaccines/VaccineImageAdminPanel.vue'
 import VaccineImageThumbnail from '@/components/vaccines/VaccineImageThumbnail.vue'
 import { useVaccines, type VaccineListItem } from '@/composables/useVaccines'
@@ -176,13 +178,19 @@ async function refreshSignedUrls(): Promise<void> {
 </script>
 
 <template>
-  <div class="space-y-6">
-    <div class="flex flex-wrap items-center justify-between gap-3">
-      <h2 class="text-lg font-semibold">{{ t('vaccines.title') }}</h2>
-      <UButton size="sm" :disabled="!isOnline" @click="openCreateForm">
-        {{ t('vaccines.create') }}
-      </UButton>
-    </div>
+  <div class="space-y-8">
+    <CommonPageHeader :title="t('vaccines.title')">
+      <template #actions>
+        <UButton
+          size="sm"
+          color="primary"
+          :disabled="!isOnline"
+          @click="openCreateForm"
+        >
+          {{ t('vaccines.create') }}
+        </UButton>
+      </template>
+    </CommonPageHeader>
 
     <UAlert
       v-if="formError && !showForm"
@@ -212,10 +220,12 @@ async function refreshSignedUrls(): Promise<void> {
       :description="t('vaccines.empty.description')"
     />
 
-    <div v-else class="space-y-4">
-      <UCard v-for="vaccine in vaccines" :key="vaccine.id">
-        <div
-          class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between"
+    <CommonPageSection v-else>
+      <ul class="divide-y divide-default" role="list">
+        <li
+          v-for="vaccine in vaccines"
+          :key="vaccine.id"
+          class="flex flex-col gap-4 py-4 sm:flex-row sm:items-start sm:justify-between"
         >
           <div class="flex min-w-0 flex-1 gap-3">
             <VaccineImageThumbnail
@@ -224,9 +234,11 @@ async function refreshSignedUrls(): Promise<void> {
               show-review-indicator
               :on-url-expired="refreshSignedUrls"
             />
-            <div class="min-w-0 space-y-2 text-sm">
+            <div class="min-w-0 space-y-1.5 text-sm">
               <div class="flex flex-wrap items-center gap-2">
-                <h3 class="font-semibold">{{ vaccine.name }}</h3>
+                <h3 class="font-semibold text-highlighted">
+                  {{ vaccine.name }}
+                </h3>
                 <UBadge
                   :color="vaccine.active ? 'success' : 'neutral'"
                   variant="subtle"
@@ -234,30 +246,48 @@ async function refreshSignedUrls(): Promise<void> {
                   {{ activeInactiveLabel(vaccine.active) }}
                 </UBadge>
               </div>
-              <p>{{ vaccine.description || t('common.noDescription') }}</p>
-              <p>
-                <span class="font-medium"
+              <p class="text-toned">
+                {{ vaccine.description || t('common.noDescription') }}
+              </p>
+              <p class="text-toned">
+                <span class="font-medium text-highlighted"
                   >{{ t('vaccines.manufacturer') }}:</span
                 >
                 {{ vaccine.manufacturer }}
               </p>
-              <p>
-                <span class="font-medium">{{ t('vaccines.stock') }}:</span>
-                {{ vaccine.stockQuantity }}
-                <span class="text-muted">{{
-                  t('vaccines.stock.manageHint')
-                }}</span>
-              </p>
-              <p>
-                <span class="font-medium"
-                  >{{ t('vaccines.stockWarningThreshold') }}:</span
-                >
-                {{ vaccine.stockWarningThreshold }}
-              </p>
+              <div class="flex flex-wrap gap-x-6 gap-y-2 pt-1">
+                <div class="min-w-0">
+                  <p
+                    class="text-xs font-medium uppercase tracking-wide text-toned"
+                  >
+                    {{ t('vaccines.stock') }}
+                  </p>
+                  <p
+                    class="mt-0.5 text-2xl font-semibold tabular-nums text-highlighted"
+                  >
+                    {{ vaccine.stockQuantity }}
+                  </p>
+                  <p class="text-xs text-muted">
+                    {{ t('vaccines.stock.manageHint') }}
+                  </p>
+                </div>
+                <div class="min-w-0">
+                  <p
+                    class="text-xs font-medium uppercase tracking-wide text-toned"
+                  >
+                    {{ t('vaccines.stockWarningThreshold') }}
+                  </p>
+                  <p
+                    class="mt-0.5 text-2xl font-semibold tabular-nums text-highlighted"
+                  >
+                    {{ vaccine.stockWarningThreshold }}
+                  </p>
+                </div>
+              </div>
             </div>
           </div>
 
-          <div class="flex flex-wrap gap-2">
+          <div class="flex shrink-0 flex-wrap gap-2">
             <UButton size="sm" variant="outline" @click="openEditForm(vaccine)">
               {{ t('common.edit') }}
             </UButton>
@@ -271,9 +301,9 @@ async function refreshSignedUrls(): Promise<void> {
               {{ vaccine.active ? t('admin.deactivate') : t('admin.activate') }}
             </UButton>
           </div>
-        </div>
-      </UCard>
-    </div>
+        </li>
+      </ul>
+    </CommonPageSection>
 
     <UModal v-model:open="showForm" :title="formTitle">
       <template #body>
@@ -339,7 +369,12 @@ async function refreshSignedUrls(): Promise<void> {
           />
 
           <div class="flex gap-2">
-            <UButton type="submit" :loading="saving" :disabled="!isOnline">
+            <UButton
+              type="submit"
+              color="primary"
+              :loading="saving"
+              :disabled="!isOnline"
+            >
               {{ t('common.save') }}
             </UButton>
             <UButton color="neutral" variant="ghost" @click="closeForm">

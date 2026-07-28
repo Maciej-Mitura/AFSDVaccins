@@ -13,7 +13,7 @@
 
     <div
       v-if="loading"
-      class="flex items-center justify-center rounded-lg border border-default bg-elevated"
+      class="flex items-center justify-center rounded-md bg-muted"
       :style="{ minHeight: `${minHeight}px` }"
       aria-busy="true"
     >
@@ -24,7 +24,7 @@
       v-else-if="empty"
       :title="emptyTitle"
       :description="emptyDescription"
-      class="rounded-lg border border-default bg-elevated"
+      class="rounded-md bg-muted"
       :style="{ minHeight: `${minHeight}px` }"
     />
 

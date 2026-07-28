@@ -395,6 +395,7 @@
     "bezorger.route.tomorrow.template": "Template: {name}",
     "bezorger.route.tomorrow.title": "Tomorrow route preview",
     "common.add": "Add",
+    "common.actions": "Actions",
     "common.back": "Back",
     "common.back.login": "Back to sign in",
     "common.cancel": "Cancel",

@@ -6,6 +6,8 @@ import { useI18n } from 'vue-i18n'
 import CommonEmptyState from '@/components/common/CommonEmptyState.vue'
 import CommonErrorState from '@/components/common/CommonErrorState.vue'
 import CommonLoadingSkeleton from '@/components/common/CommonLoadingSkeleton.vue'
+import CommonPageHeader from '@/components/common/CommonPageHeader.vue'
+import CommonPageSection from '@/components/common/CommonPageSection.vue'
 import { useStock } from '@/composables/useStock'
 import { useVaccines } from '@/composables/useVaccines'
 import { formatDateTime } from '@/i18n'
@@ -40,18 +42,17 @@ function performerName(entry: (typeof history.value)[number]): string {
 </script>
 
 <template>
-  <div class="space-y-6">
-    <div class="flex flex-wrap items-center justify-between gap-3">
-      <div>
-        <h2 class="text-lg font-semibold">
-          {{ t('admin.stock.history.title') }}
-        </h2>
-        <p v-if="vaccine" class="text-sm text-muted">{{ vaccine.name }}</p>
-      </div>
-      <UButton size="sm" variant="outline" @click="goBackToStock">
-        {{ t('admin.stock.backToStock') }}
-      </UButton>
-    </div>
+  <div class="space-y-8">
+    <CommonPageHeader
+      :title="t('admin.stock.history.title')"
+      :subtitle="vaccine?.name"
+    >
+      <template #actions>
+        <UButton size="sm" variant="outline" @click="goBackToStock">
+          {{ t('admin.stock.backToStock') }}
+        </UButton>
+      </template>
+    </CommonPageHeader>
 
     <CommonLoadingSkeleton v-if="loading && history.length === 0" />
 
@@ -67,24 +68,30 @@ function performerName(entry: (typeof history.value)[number]): string {
       :description="t('admin.stock.history.empty.description')"
     />
 
-    <div v-else class="space-y-4">
-      <UCard v-for="entry in history" :key="entry.id">
-        <div class="space-y-2 text-sm">
+    <CommonPageSection v-else>
+      <ul class="divide-y divide-default" role="list">
+        <li
+          v-for="entry in history"
+          :key="entry.id"
+          class="space-y-1.5 py-4 text-sm"
+        >
           <div class="flex flex-wrap items-center gap-2">
-            <h3 class="font-semibold">{{ entry.type }}</h3>
-            <UBadge variant="subtle"
-              >{{ entry.quantityDelta > 0 ? '+' : ''
-              }}{{ entry.quantityDelta }}</UBadge
+            <h3 class="font-semibold text-highlighted">{{ entry.type }}</h3>
+            <UBadge
+              :color="entry.quantityDelta > 0 ? 'success' : 'neutral'"
+              variant="subtle"
             >
+              {{ entry.quantityDelta > 0 ? '+' : '' }}{{ entry.quantityDelta }}
+            </UBadge>
           </div>
-          <p>
-            <span class="font-medium"
+          <p class="text-toned">
+            <span class="font-medium text-highlighted"
               >{{ t('admin.stock.history.date') }}:</span
             >
             {{ formatDateTime(entry.createdAt) }}
           </p>
-          <p>
-            <span class="font-medium"
+          <p class="text-toned">
+            <span class="font-medium text-highlighted"
               >{{ t('admin.stock.history.beforeAfter') }}:</span
             >
             {{
@@ -94,26 +101,26 @@ function performerName(entry: (typeof history.value)[number]): string {
               })
             }}
           </p>
-          <p>
-            <span class="font-medium"
+          <p class="text-toned">
+            <span class="font-medium text-highlighted"
               >{{ t('admin.stock.history.reason') }}:</span
             >
             {{ entry.reason }}
           </p>
-          <p>
-            <span class="font-medium"
+          <p class="text-toned">
+            <span class="font-medium text-highlighted"
               >{{ t('admin.stock.history.performedBy') }}:</span
             >
             {{ performerName(entry) }}
           </p>
-          <p v-if="entry.relatedOrderId">
-            <span class="font-medium"
+          <p v-if="entry.relatedOrderId" class="text-toned">
+            <span class="font-medium text-highlighted"
               >{{ t('admin.stock.history.relatedOrder') }}:</span
             >
             {{ entry.relatedOrderId }}
           </p>
-        </div>
-      </UCard>
-    </div>
+        </li>
+      </ul>
+    </CommonPageSection>
   </div>
 </template>

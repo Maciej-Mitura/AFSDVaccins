@@ -10,6 +10,8 @@ import * as z from 'zod'
 import CommonEmptyState from '@/components/common/CommonEmptyState.vue'
 import CommonErrorState from '@/components/common/CommonErrorState.vue'
 import CommonLoadingSkeleton from '@/components/common/CommonLoadingSkeleton.vue'
+import CommonPageHeader from '@/components/common/CommonPageHeader.vue'
+import CommonPageSection from '@/components/common/CommonPageSection.vue'
 import { useStock, type StockOverviewItem } from '@/composables/useStock'
 import { useOnlineStatus } from '@/composables/useOnlineStatus'
 import { activeInactiveLabel } from '@/i18n'
@@ -119,6 +121,10 @@ const formTitle = computed(() =>
     : t('admin.stock.adjustTitle'),
 )
 
+const lowStockVaccines = computed(() =>
+  overview.value.filter(vaccine => isLowStock(vaccine)),
+)
+
 void loadStockOverview(true)
 
 function isLowStock(vaccine: StockOverviewItem): boolean {
@@ -218,10 +224,8 @@ function openHistory(vaccineId: string): void {
 </script>
 
 <template>
-  <div class="space-y-6">
-    <div class="flex flex-wrap items-center justify-between gap-3">
-      <h2 class="text-lg font-semibold">{{ t('admin.stock.title') }}</h2>
-    </div>
+  <div class="space-y-8">
+    <CommonPageHeader :title="t('admin.stock.title')" />
 
     <UAlert
       v-if="successMessage"
@@ -251,59 +255,109 @@ function openHistory(vaccineId: string): void {
       :description="t('admin.stock.empty.description')"
     />
 
-    <div v-else class="space-y-4">
-      <UCard v-for="vaccine in overview" :key="vaccine.id">
-        <div
-          class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between"
-        >
-          <div class="space-y-2 text-sm">
-            <div class="flex flex-wrap items-center gap-2">
-              <h3 class="font-semibold">{{ vaccine.name }}</h3>
-              <UBadge
-                v-if="isLowStock(vaccine)"
-                color="warning"
-                variant="subtle"
-              >
-                {{ t('admin.stock.lowStock') }}
-              </UBadge>
-              <UBadge
-                :color="vaccine.active ? 'success' : 'neutral'"
-                variant="subtle"
-              >
-                {{ activeInactiveLabel(vaccine.active) }}
-              </UBadge>
-            </div>
-            <p>
-              <span class="font-medium">{{ t('admin.stock.current') }}:</span>
-              {{ vaccine.stockQuantity }}
-            </p>
-            <p>
-              <span class="font-medium"
-                >{{ t('admin.stock.warningThreshold') }}:</span
-              >
-              {{ vaccine.stockWarningThreshold }}
-            </p>
-          </div>
+    <template v-else>
+      <CommonPageSection
+        v-if="lowStockVaccines.length > 0"
+        :title="t('admin.stock.lowStock')"
+        variant="inset"
+      >
+        <ul class="divide-y divide-default" role="list">
+          <li
+            v-for="vaccine in lowStockVaccines"
+            :key="`low-${vaccine.id}`"
+            class="flex flex-wrap items-center gap-x-3 gap-y-1 py-2.5 text-sm"
+          >
+            <UIcon
+              name="i-lucide-triangle-alert"
+              class="size-4 shrink-0 text-warning"
+              aria-hidden="true"
+            />
+            <span class="font-medium text-highlighted">{{ vaccine.name }}</span>
+            <span class="text-toned">
+              {{ vaccine.stockQuantity }} / {{ vaccine.stockWarningThreshold }}
+            </span>
+            <UBadge color="warning" variant="subtle">
+              {{ t('admin.stock.lowStock') }}
+            </UBadge>
+          </li>
+        </ul>
+      </CommonPageSection>
 
-          <div class="flex flex-wrap gap-2">
-            <UButton
-              size="sm"
-              :disabled="!isOnline"
-              @click="openAdjustForm(vaccine)"
-            >
-              {{ t('admin.stock.adjust') }}
-            </UButton>
-            <UButton
-              size="sm"
-              variant="outline"
-              @click="openHistory(vaccine.id)"
-            >
-              {{ t('admin.stock.history') }}
-            </UButton>
-          </div>
-        </div>
-      </UCard>
-    </div>
+      <CommonPageSection>
+        <ul class="divide-y divide-default" role="list">
+          <li
+            v-for="vaccine in overview"
+            :key="vaccine.id"
+            class="flex flex-col gap-4 py-4 sm:flex-row sm:items-start sm:justify-between"
+          >
+            <div class="min-w-0 space-y-2">
+              <div class="flex flex-wrap items-center gap-2">
+                <h3 class="font-semibold text-highlighted">
+                  {{ vaccine.name }}
+                </h3>
+                <UBadge
+                  v-if="isLowStock(vaccine)"
+                  color="warning"
+                  variant="subtle"
+                >
+                  {{ t('admin.stock.lowStock') }}
+                </UBadge>
+                <UBadge
+                  :color="vaccine.active ? 'success' : 'neutral'"
+                  variant="subtle"
+                >
+                  {{ activeInactiveLabel(vaccine.active) }}
+                </UBadge>
+              </div>
+              <div class="flex flex-wrap gap-x-6 gap-y-2">
+                <div class="min-w-0">
+                  <p
+                    class="text-xs font-medium uppercase tracking-wide text-toned"
+                  >
+                    {{ t('admin.stock.current') }}
+                  </p>
+                  <p
+                    class="mt-0.5 text-2xl font-semibold tabular-nums text-highlighted"
+                  >
+                    {{ vaccine.stockQuantity }}
+                  </p>
+                </div>
+                <div class="min-w-0">
+                  <p
+                    class="text-xs font-medium uppercase tracking-wide text-toned"
+                  >
+                    {{ t('admin.stock.warningThreshold') }}
+                  </p>
+                  <p
+                    class="mt-0.5 text-2xl font-semibold tabular-nums text-highlighted"
+                  >
+                    {{ vaccine.stockWarningThreshold }}
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <div class="flex shrink-0 flex-wrap gap-2">
+              <UButton
+                size="sm"
+                color="primary"
+                :disabled="!isOnline"
+                @click="openAdjustForm(vaccine)"
+              >
+                {{ t('admin.stock.adjust') }}
+              </UButton>
+              <UButton
+                size="sm"
+                variant="outline"
+                @click="openHistory(vaccine.id)"
+              >
+                {{ t('admin.stock.history') }}
+              </UButton>
+            </div>
+          </li>
+        </ul>
+      </CommonPageSection>
+    </template>
 
     <UModal v-model:open="showForm" :title="formTitle">
       <template #body>
@@ -342,7 +396,12 @@ function openHistory(vaccineId: string): void {
           />
 
           <div class="flex gap-2">
-            <UButton type="submit" :loading="adjusting" :disabled="!isOnline">
+            <UButton
+              type="submit"
+              color="primary"
+              :loading="adjusting"
+              :disabled="!isOnline"
+            >
               {{ t('common.save') }}
             </UButton>
             <UButton color="neutral" variant="ghost" @click="closeForm">

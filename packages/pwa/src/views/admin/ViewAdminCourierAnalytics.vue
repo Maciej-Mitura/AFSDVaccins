@@ -5,6 +5,8 @@ import { useI18n } from 'vue-i18n'
 import CommonEmptyState from '@/components/common/CommonEmptyState.vue'
 import CommonErrorState from '@/components/common/CommonErrorState.vue'
 import CommonLoadingSkeleton from '@/components/common/CommonLoadingSkeleton.vue'
+import CommonPageHeader from '@/components/common/CommonPageHeader.vue'
+import CommonPageSection from '@/components/common/CommonPageSection.vue'
 import CommonEcharts from '@/components/feature/admin/analytics/CommonEcharts.vue'
 import FeatureCourierAnalyticsDetail from '@/components/feature/admin/analytics/FeatureCourierAnalyticsDetail.vue'
 import FeatureCourierAnalyticsKpi from '@/components/feature/admin/analytics/FeatureCourierAnalyticsKpi.vue'
@@ -60,6 +62,13 @@ const {
 } = useCourierPerformanceAnalytics()
 
 const dataQualityOpen = ref(false)
+
+const generatedAtMeta = computed(() => {
+  if (!generatedAtLabel.value) {
+    return undefined
+  }
+  return `${t('admin.courierAnalytics.calculated')}: ${generatedAtLabel.value}`
+})
 
 onMounted(() => {
   void load()
@@ -161,27 +170,13 @@ async function onExportCsv(): Promise<void> {
 </script>
 
 <template>
-  <div class="space-y-6" data-testid="courier-analytics-page">
-    <header
-      class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between"
+  <div class="space-y-8" data-testid="courier-analytics-page">
+    <CommonPageHeader
+      :title="t('admin.courierAnalytics.title')"
+      :subtitle="t('admin.courierAnalytics.subtitle')"
+      :meta="generatedAtMeta"
     >
-      <div class="min-w-0">
-        <h1 class="text-xl font-semibold tracking-tight text-highlighted">
-          {{ t('admin.courierAnalytics.title') }}
-        </h1>
-        <p class="mt-1 text-sm text-toned">
-          {{ t('admin.courierAnalytics.subtitle') }}
-        </p>
-        <p
-          v-if="generatedAtLabel"
-          class="mt-1 text-xs text-muted"
-          aria-live="polite"
-        >
-          {{ t('admin.courierAnalytics.calculated') }}:
-          {{ generatedAtLabel }}
-        </p>
-      </div>
-      <div class="flex flex-wrap gap-2">
+      <template #actions>
         <UButton
           color="neutral"
           variant="outline"
@@ -205,8 +200,8 @@ async function onExportCsv(): Promise<void> {
         >
           {{ t('admin.courierAnalytics.exportCsv') }}
         </UButton>
-      </div>
-    </header>
+      </template>
+    </CommonPageHeader>
 
     <div
       v-if="exportSuccessMessage || exportErrorMessage"
@@ -237,17 +232,11 @@ async function onExportCsv(): Promise<void> {
     </div>
 
     <div v-if="loading" class="space-y-6" aria-busy="true">
-      <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-        <UCard v-for="n in 6" :key="n" :ui="{ body: 'p-4' }">
-          <CommonLoadingSkeleton />
-        </UCard>
+      <div class="grid gap-x-6 gap-y-3 sm:grid-cols-2 lg:grid-cols-3">
+        <CommonLoadingSkeleton v-for="n in 6" :key="n" />
       </div>
-      <UCard>
-        <CommonLoadingSkeleton />
-      </UCard>
-      <UCard>
-        <CommonLoadingSkeleton />
-      </UCard>
+      <CommonLoadingSkeleton />
+      <CommonLoadingSkeleton />
     </div>
 
     <div v-else-if="errorMessage" class="space-y-3" role="alert">
@@ -273,25 +262,26 @@ async function onExportCsv(): Promise<void> {
         icon="i-lucide-info"
         :title="t('admin.courierAnalytics.noData.title')"
         :description="t('admin.courierAnalytics.noData.description')"
+        data-testid="courier-analytics-no-data"
       />
 
-      <section v-if="hasData" aria-labelledby="kpi-heading" class="space-y-3">
-        <h2 id="kpi-heading" class="sr-only">
-          {{ t('admin.courierAnalytics.section.summary') }}
-        </h2>
+      <CommonPageSection
+        v-if="hasData"
+        :title="t('admin.courierAnalytics.section.summary')"
+      >
         <FeatureCourierAnalyticsKpi :cards="kpiCards" />
-      </section>
+      </CommonPageSection>
 
-      <UCard v-if="showDataQuality">
+      <CommonPageSection v-if="showDataQuality" variant="inset">
         <button
           type="button"
-          class="flex w-full items-center justify-between text-left"
+          class="flex w-full items-center justify-between text-left outline-none focus-visible:rounded-sm focus-visible:ring-2 focus-visible:ring-primary"
           :aria-expanded="dataQualityOpen"
           data-testid="courier-analytics-data-quality-toggle"
           @click="dataQualityOpen = !dataQualityOpen"
         >
           <div>
-            <h2 class="text-sm font-semibold">
+            <h2 class="text-sm font-semibold text-highlighted">
               {{ t('admin.courierAnalytics.dataQuality.title') }}
             </h2>
             <p class="mt-0.5 text-xs text-muted">
@@ -303,6 +293,7 @@ async function onExportCsv(): Promise<void> {
               dataQualityOpen ? 'i-lucide-chevron-up' : 'i-lucide-chevron-down'
             "
             class="size-4 text-muted"
+            aria-hidden="true"
           />
         </button>
         <div
@@ -350,39 +341,33 @@ async function onExportCsv(): Promise<void> {
             {{ t('admin.courierAnalytics.dataQuality.exclusionNote') }}
           </p>
         </div>
-      </UCard>
+      </CommonPageSection>
 
       <template v-if="hasData">
-        <UCard>
-          <template #header>
-            <div>
-              <h2 class="text-lg font-semibold">
-                {{ t('admin.courierAnalytics.leaderboard.title') }}
-              </h2>
-              <p class="mt-0.5 text-sm text-muted">
-                {{ t('admin.courierAnalytics.leaderboard.subtitle') }}
-              </p>
-            </div>
-          </template>
+        <CommonPageSection
+          :title="t('admin.courierAnalytics.leaderboard.title')"
+          :description="t('admin.courierAnalytics.leaderboard.subtitle')"
+        >
           <FeatureCourierAnalyticsLeaderboard
             :rankings="rankings"
             :selected-id="selectedCourierProfileId"
             @select="onSelectCourier"
           />
-        </UCard>
+        </CommonPageSection>
 
         <FeatureCourierAnalyticsDetail
           :courier="selectedCourier"
           @close="clearSelection"
         />
 
-        <UCard>
+        <CommonPageSection
+          :title="t('admin.courierAnalytics.charts.scoreComparison.title')"
+          :description="
+            t('admin.courierAnalytics.charts.scoreComparison.subtitle')
+          "
+        >
           <CommonEcharts
             :option="scoreOption"
-            :title="t('admin.courierAnalytics.charts.scoreComparison.title')"
-            :subtitle="
-              t('admin.courierAnalytics.charts.scoreComparison.subtitle')
-            "
             :caption="
               insufficientExcludedFromScoreChart > 0
                 ? t(
@@ -401,13 +386,14 @@ async function onExportCsv(): Promise<void> {
             :min-height="Math.max(280, scoreComparison.length * 36)"
             @chart-click="onChartSelect"
           />
-        </UCard>
+        </CommonPageSection>
 
-        <UCard>
+        <CommonPageSection
+          :title="t('admin.courierAnalytics.charts.components.title')"
+          :description="t('admin.courierAnalytics.charts.components.subtitle')"
+        >
           <CommonEcharts
             :option="componentOption"
-            :title="t('admin.courierAnalytics.charts.components.title')"
-            :subtitle="t('admin.courierAnalytics.charts.components.subtitle')"
             :caption="t('admin.courierAnalytics.charts.components.caption')"
             :empty="!componentOption"
             :empty-title="t('admin.courierAnalytics.charts.empty.title')"
@@ -417,15 +403,16 @@ async function onExportCsv(): Promise<void> {
             :min-height="Math.max(300, componentMatrix.length * 48)"
             @chart-click="onChartSelect"
           />
-        </UCard>
+        </CommonPageSection>
 
-        <UCard>
+        <CommonPageSection
+          :title="t('admin.courierAnalytics.charts.monthlyActivity.title')"
+          :description="
+            t('admin.courierAnalytics.charts.monthlyActivity.subtitle')
+          "
+        >
           <CommonEcharts
             :option="monthlyOption"
-            :title="t('admin.courierAnalytics.charts.monthlyActivity.title')"
-            :subtitle="
-              t('admin.courierAnalytics.charts.monthlyActivity.subtitle')
-            "
             :caption="
               t('admin.courierAnalytics.charts.monthlyActivity.caption')
             "
@@ -444,49 +431,43 @@ async function onExportCsv(): Promise<void> {
                 }}
               </caption>
               <thead>
-                <tr class="border-b border-default text-muted">
-                  <th class="py-1 pr-2">
+                <tr class="border-b border-default bg-muted text-muted">
+                  <th class="px-2 py-1.5 font-medium">
                     {{ t('admin.courierAnalytics.column.month') }}
                   </th>
-                  <th class="py-1 pr-2">
+                  <th class="px-2 py-1.5 font-medium">
                     {{ t('admin.courierAnalytics.series.deliveredStops') }}
                   </th>
-                  <th class="py-1 pr-2">
+                  <th class="px-2 py-1.5 font-medium">
                     {{ t('admin.courierAnalytics.series.completedRoutes') }}
                   </th>
-                  <th class="py-1">
+                  <th class="px-2 py-1.5 font-medium">
                     {{ t('admin.courierAnalytics.series.deliveredOrders') }}
                   </th>
                 </tr>
               </thead>
-              <tbody>
-                <tr
-                  v-for="row in monthlyActivity"
-                  :key="row.month"
-                  class="border-b border-default"
-                >
-                  <td class="py-1 pr-2 tabular-nums">{{ row.month }}</td>
-                  <td class="py-1 pr-2 tabular-nums">
+              <tbody class="divide-y divide-default">
+                <tr v-for="row in monthlyActivity" :key="row.month">
+                  <td class="px-2 py-1.5 tabular-nums">{{ row.month }}</td>
+                  <td class="px-2 py-1.5 tabular-nums">
                     {{ row.deliveredStops }}
                   </td>
-                  <td class="py-1 pr-2 tabular-nums">
+                  <td class="px-2 py-1.5 tabular-nums">
                     {{ row.completedRoutes }}
                   </td>
-                  <td class="py-1 tabular-nums">{{ row.deliveredOrders }}</td>
+                  <td class="px-2 py-1.5 tabular-nums">
+                    {{ row.deliveredOrders }}
+                  </td>
                 </tr>
               </tbody>
             </table>
           </div>
-        </UCard>
+        </CommonPageSection>
 
-        <section
-          aria-labelledby="distributions-heading"
-          class="grid gap-4 md:grid-cols-2 lg:grid-cols-3"
+        <CommonPageSection
+          :title="t('admin.courierAnalytics.section.distributions')"
         >
-          <h2 id="distributions-heading" class="sr-only">
-            {{ t('admin.courierAnalytics.section.distributions') }}
-          </h2>
-          <UCard>
+          <div class="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
             <CommonEcharts
               :option="routeDonutOption"
               :title="t('admin.courierAnalytics.charts.routeStatus.title')"
@@ -500,8 +481,6 @@ async function onExportCsv(): Promise<void> {
               "
               :min-height="260"
             />
-          </UCard>
-          <UCard>
             <CommonEcharts
               :option="timelinessDonutOption"
               :title="t('admin.courierAnalytics.charts.timeliness.title')"
@@ -513,8 +492,6 @@ async function onExportCsv(): Promise<void> {
               "
               :min-height="260"
             />
-          </UCard>
-          <UCard>
             <CommonEcharts
               :option="proofDonutOption"
               :title="t('admin.courierAnalytics.charts.proof.title')"
@@ -526,14 +503,15 @@ async function onExportCsv(): Promise<void> {
               "
               :min-height="260"
             />
-          </UCard>
-        </section>
+          </div>
+        </CommonPageSection>
 
-        <UCard>
+        <CommonPageSection
+          :title="t('admin.courierAnalytics.charts.handling.title')"
+          :description="t('admin.courierAnalytics.charts.handling.subtitle')"
+        >
           <CommonEcharts
             :option="handlingOption"
-            :title="t('admin.courierAnalytics.charts.handling.title')"
-            :subtitle="t('admin.courierAnalytics.charts.handling.subtitle')"
             :caption="t('admin.courierAnalytics.handling.contextNote')"
             :empty="!handlingOption"
             :empty-title="
@@ -545,32 +523,24 @@ async function onExportCsv(): Promise<void> {
             :min-height="Math.max(260, handlingDurations.length * 36)"
             @chart-click="onChartSelect"
           />
-        </UCard>
+        </CommonPageSection>
 
-        <UCard>
-          <template #header>
-            <div
-              class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between"
+        <CommonPageSection
+          :title="t('admin.courierAnalytics.detailTable.title')"
+          :description="t('admin.courierAnalytics.detailTable.subtitle')"
+        >
+          <template #actions>
+            <UButton
+              color="neutral"
+              variant="outline"
+              size="sm"
+              :loading="exporting"
+              :disabled="exporting"
+              data-testid="courier-analytics-export-detail"
+              @click="onExportCsv"
             >
-              <div>
-                <h2 class="text-lg font-semibold">
-                  {{ t('admin.courierAnalytics.detailTable.title') }}
-                </h2>
-                <p class="mt-0.5 text-sm text-muted">
-                  {{ t('admin.courierAnalytics.detailTable.subtitle') }}
-                </p>
-              </div>
-              <UButton
-                color="neutral"
-                variant="outline"
-                size="sm"
-                :loading="exporting"
-                :disabled="exporting"
-                @click="onExportCsv"
-              >
-                {{ t('admin.courierAnalytics.exportCsv') }}
-              </UButton>
-            </div>
+              {{ t('admin.courierAnalytics.exportCsv') }}
+            </UButton>
           </template>
           <div class="overflow-x-auto">
             <table class="w-full min-w-5xl text-left text-sm">
@@ -581,68 +551,68 @@ async function onExportCsv(): Promise<void> {
               </caption>
               <thead>
                 <tr
-                  class="border-b border-default text-xs uppercase tracking-wide text-muted"
+                  class="border-b border-default bg-muted text-xs uppercase tracking-wide text-muted"
                 >
-                  <th class="sticky left-0 bg-elevated py-2 pr-2">
+                  <th class="sticky left-0 bg-muted px-2 py-2">
                     {{ t('admin.courierAnalytics.column.rank') }}
                   </th>
-                  <th class="sticky left-10 bg-elevated py-2 pr-2">
+                  <th class="sticky left-10 bg-muted px-2 py-2">
                     {{ t('admin.courierAnalytics.column.courier') }}
                   </th>
-                  <th class="py-2 pr-2">
+                  <th class="px-2 py-2">
                     {{ t('admin.courierAnalytics.reliabilityScore') }}
                   </th>
-                  <th class="py-2 pr-2">
+                  <th class="px-2 py-2">
                     {{ t('admin.courierAnalytics.component.routeCompletion') }}
                   </th>
-                  <th class="py-2 pr-2">
+                  <th class="px-2 py-2">
                     {{
                       t('admin.courierAnalytics.component.deliveryCompletion')
                     }}
                   </th>
-                  <th class="py-2 pr-2">
+                  <th class="px-2 py-2">
                     {{ t('admin.courierAnalytics.component.onTime') }}
                   </th>
-                  <th class="py-2 pr-2">
+                  <th class="px-2 py-2">
                     {{ t('admin.courierAnalytics.component.qrConfirmation') }}
                   </th>
-                  <th class="py-2 pr-2">
+                  <th class="px-2 py-2">
                     {{ t('admin.courierAnalytics.component.consistency') }}
                   </th>
-                  <th class="py-2 pr-2">
+                  <th class="px-2 py-2">
                     {{ t('admin.courierAnalytics.column.assignedRoutes') }}
                   </th>
-                  <th class="py-2 pr-2">
+                  <th class="px-2 py-2">
                     {{ t('admin.courierAnalytics.column.completedRoutes') }}
                   </th>
-                  <th class="py-2 pr-2">
+                  <th class="px-2 py-2">
                     {{ t('admin.courierAnalytics.column.overdueRoutes') }}
                   </th>
-                  <th class="py-2 pr-2">
+                  <th class="px-2 py-2">
                     {{ t('admin.courierAnalytics.column.deliveredStops') }}
                   </th>
-                  <th class="py-2 pr-2">
+                  <th class="px-2 py-2">
                     {{ t('admin.courierAnalytics.detail.lateStops') }}
                   </th>
-                  <th class="py-2 pr-2">
+                  <th class="px-2 py-2">
                     {{ t('admin.courierAnalytics.detail.qrConfirmedStops') }}
                   </th>
-                  <th class="py-2">
+                  <th class="px-2 py-2">
                     {{ t('admin.courierAnalytics.averageHandlingDuration') }}
                   </th>
                 </tr>
               </thead>
-              <tbody>
+              <tbody class="divide-y divide-default">
                 <tr
                   v-for="row in rankings"
                   :key="row.courierProfileId"
-                  class="cursor-pointer border-b border-default hover:bg-elevated/80"
+                  class="cursor-pointer hover:bg-muted/60"
                   @click="onSelectCourier(row.courierProfileId)"
                 >
-                  <td class="sticky left-0 bg-inherit py-2 pr-2 tabular-nums">
+                  <td class="sticky left-0 bg-default px-2 py-2 tabular-nums">
                     {{ row.rank }}
                   </td>
-                  <td class="sticky left-10 bg-inherit py-2 pr-2 font-medium">
+                  <td class="sticky left-10 bg-default px-2 py-2 font-medium">
                     {{ row.displayName }}
                     <span
                       v-if="isInsufficient(row.dataCompleteness)"
@@ -651,45 +621,45 @@ async function onExportCsv(): Promise<void> {
                       ({{ t('admin.courierAnalytics.insufficientData') }})
                     </span>
                   </td>
-                  <td class="py-2 pr-2 tabular-nums">
+                  <td class="px-2 py-2 tabular-nums">
                     {{ formatScore(row.totalScore) }}
                   </td>
-                  <td class="py-2 pr-2 tabular-nums">
+                  <td class="px-2 py-2 tabular-nums">
                     {{ formatScore(row.componentScores.routeCompletion) }}
                   </td>
-                  <td class="py-2 pr-2 tabular-nums">
+                  <td class="px-2 py-2 tabular-nums">
                     {{ formatScore(row.componentScores.deliveryCompletion) }}
                   </td>
-                  <td class="py-2 pr-2 tabular-nums">
+                  <td class="px-2 py-2 tabular-nums">
                     {{ formatScore(row.componentScores.onTime) }}
                   </td>
-                  <td class="py-2 pr-2 tabular-nums">
+                  <td class="px-2 py-2 tabular-nums">
                     {{ formatScore(row.componentScores.qrConfirmation) }}
                   </td>
-                  <td class="py-2 pr-2 tabular-nums">
+                  <td class="px-2 py-2 tabular-nums">
                     {{
                       formatScore(row.componentScores.operationalConsistency)
                     }}
                   </td>
-                  <td class="py-2 pr-2 tabular-nums">
+                  <td class="px-2 py-2 tabular-nums">
                     {{ row.rawMetrics.totalAssignedRoutes }}
                   </td>
-                  <td class="py-2 pr-2 tabular-nums">
+                  <td class="px-2 py-2 tabular-nums">
                     {{ row.rawMetrics.completedRoutes }}
                   </td>
-                  <td class="py-2 pr-2 tabular-nums">
+                  <td class="px-2 py-2 tabular-nums">
                     {{ row.rawMetrics.incompleteRoutes }}
                   </td>
-                  <td class="py-2 pr-2 tabular-nums">
+                  <td class="px-2 py-2 tabular-nums">
                     {{ row.rawMetrics.deliveredStops }}
                   </td>
-                  <td class="py-2 pr-2 tabular-nums">
+                  <td class="px-2 py-2 tabular-nums">
                     {{ row.rawMetrics.lateDeliveredStops }}
                   </td>
-                  <td class="py-2 pr-2 tabular-nums">
+                  <td class="px-2 py-2 tabular-nums">
                     {{ row.rawMetrics.qrConfirmedStops }}
                   </td>
-                  <td class="py-2 tabular-nums">
+                  <td class="px-2 py-2 tabular-nums">
                     {{
                       formatHandlingDuration(
                         row.rawMetrics.averageHandlingDurationSeconds,
@@ -706,7 +676,7 @@ async function onExportCsv(): Promise<void> {
               </tbody>
             </table>
           </div>
-        </UCard>
+        </CommonPageSection>
       </template>
     </template>
 

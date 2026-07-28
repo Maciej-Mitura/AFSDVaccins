@@ -3,6 +3,8 @@ import { computed, onMounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 
 import CommonEmptyState from '@/components/common/CommonEmptyState.vue'
+import CommonPageHeader from '@/components/common/CommonPageHeader.vue'
+import CommonPageSection from '@/components/common/CommonPageSection.vue'
 import CommonErrorState from '@/components/common/CommonErrorState.vue'
 import CommonLoadingSkeleton from '@/components/common/CommonLoadingSkeleton.vue'
 import FeatureDeliveryStopQrModal from '@/components/feature/delivery-qr/FeatureDeliveryStopQrModal.vue'
@@ -345,22 +347,20 @@ onMounted(() => {
 </script>
 
 <template>
-  <div class="space-y-6">
-    <div>
-      <h1 class="text-2xl font-semibold">{{ t('routes.planning.title') }}</h1>
-      <p class="mt-1 text-sm text-muted">
-        {{ t('routes.planning.description') }}
-      </p>
-    </div>
+  <div class="space-y-8" data-testid="admin-route-planning-page">
+    <CommonPageHeader
+      :title="t('routes.planning.title')"
+      :subtitle="t('routes.planning.description')"
+    />
 
-    <UCard>
-      <template #header>
-        <h2 class="text-lg font-semibold">{{ t('routes.generate.title') }}</h2>
-      </template>
-
+    <CommonPageSection :title="t('routes.generate.title')" variant="inset">
       <div class="grid gap-4 md:grid-cols-2">
         <UFormField :label="t('orders.deliveryDate')">
-          <UInput v-model="deliveryDate" type="date" />
+          <UInput
+            v-model="deliveryDate"
+            type="date"
+            data-testid="admin-route-planning-date"
+          />
         </UFormField>
 
         <UFormField :label="t('routes.template.active')">
@@ -369,15 +369,19 @@ onMounted(() => {
             :items="templateOptions"
             :placeholder="t('routes.template.placeholder')"
             :loading="templatesLoading"
+            data-testid="admin-route-planning-template"
           />
         </UFormField>
       </div>
 
       <div
         v-if="selectedCourier"
-        class="mt-4 rounded-md bg-elevated/50 px-3 py-2 text-sm"
+        class="mt-4 rounded-md bg-default px-3 py-2 text-sm"
+        data-testid="admin-route-planning-courier"
       >
-        <span class="font-medium">{{ t('routes.courier') }}:</span>
+        <span class="font-medium text-highlighted"
+          >{{ t('routes.courier') }}:</span
+        >
         {{ selectedCourier.displayName }}
         <span v-if="selectedCourier.vehicleLabel" class="text-muted">
           ({{ selectedCourier.vehicleLabel }})
@@ -410,6 +414,7 @@ onMounted(() => {
 
       <div class="mt-4 flex flex-wrap gap-2">
         <UButton
+          color="primary"
           :loading="generating"
           :disabled="
             !isOnline ||
@@ -417,6 +422,7 @@ onMounted(() => {
             generating ||
             !canGenerateSelected
           "
+          data-testid="admin-route-planning-generate"
           @click="onGenerate"
         >
           {{
@@ -449,15 +455,11 @@ onMounted(() => {
         :title="t('routes.generate.failed')"
         :description="generateError"
       />
-    </UCard>
+    </CommonPageSection>
 
-    <UCard>
-      <template #header>
-        <h2 class="text-lg font-semibold">
-          {{ t('routes.generatedList.title', { date: deliveryDate }) }}
-        </h2>
-      </template>
-
+    <CommonPageSection
+      :title="t('routes.generatedList.title', { date: deliveryDate })"
+    >
       <CommonLoadingSkeleton v-if="loading" />
       <CommonErrorState
         v-else-if="errorMessage"
@@ -470,42 +472,97 @@ onMounted(() => {
         :description="t('routes.planning.empty.description')"
       />
 
-      <div v-else class="space-y-6">
-        <div
+      <ul v-else class="divide-y divide-default" role="list">
+        <li
           v-for="route in routesForDate"
           :key="route.id"
-          class="space-y-3 border-b border-default pb-6 last:border-0 last:pb-0"
+          class="space-y-4 py-5 first:pt-0"
+          :data-testid="`admin-route-item-${route.id}`"
         >
-          <div class="flex flex-wrap items-baseline justify-between gap-2">
-            <div>
-              <p class="font-medium">
+          <div
+            class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between"
+          >
+            <div class="min-w-0 space-y-1">
+              <p class="font-semibold text-highlighted">
                 {{
                   findBezorgerProfile(route.bezorgerProfileId)?.displayName ??
                   route.bezorgerProfileId
                 }}
               </p>
-              <p class="text-sm text-muted">
-                {{
-                  t('routes.meta.statusGenerated', {
-                    status: routeStatusLabel(route.status),
-                    date: formatDateTime(route.generatedAt),
-                  })
-                }}
-              </p>
+              <div class="flex flex-wrap items-center gap-2">
+                <UBadge variant="subtle" color="primary">
+                  {{ routeStatusLabel(route.status) }}
+                </UBadge>
+                <span class="text-sm text-muted">
+                  {{ formatDateTime(route.generatedAt) }}
+                </span>
+                <UBadge
+                  v-if="route.skippedApothekerProfileIds.length > 0"
+                  color="neutral"
+                  variant="subtle"
+                >
+                  {{
+                    translatePlural(
+                      'routes.skippedPharmacies',
+                      route.skippedApothekerProfileIds.length,
+                    )
+                  }}
+                </UBadge>
+              </div>
             </div>
-            <UBadge
-              v-if="route.skippedApothekerProfileIds.length > 0"
-              color="neutral"
-              variant="subtle"
+
+            <div
+              v-if="
+                availableAdminActions(route.status).length > 0 ||
+                route.stops.length > 0
+              "
+              class="flex flex-wrap gap-2"
             >
-              {{
-                translatePlural(
-                  'routes.skippedPharmacies',
-                  route.skippedApothekerProfileIds.length,
-                )
-              }}
-            </UBadge>
+              <UButton
+                size="sm"
+                color="neutral"
+                variant="soft"
+                :loading="manifestActingRouteId === route.id && manifestLoading"
+                :disabled="!isOnline || manifestLoading"
+                :aria-label="t('deliveryManifest.downloadRouteAria')"
+                data-testid="admin-download-route-manifest"
+                @click="onDownloadRouteManifest(route)"
+              >
+                {{
+                  manifestActingRouteId === route.id && manifestLoading
+                    ? t('deliveryManifest.generating')
+                    : t('deliveryManifest.downloadRoute')
+                }}
+              </UButton>
+              <UButton
+                v-for="action in availableAdminActions(route.status)"
+                :key="`${route.id}-${action.status}`"
+                size="sm"
+                :color="action.color === 'error' ? 'error' : 'primary'"
+                :variant="action.color === 'error' ? 'outline' : 'solid'"
+                :loading="actingRouteId === route.id && updatingStatus"
+                :disabled="!isOnline || updatingStatus"
+                @click="requestStatusChange(route, action.status, action.label)"
+              >
+                {{ action.label }}
+              </UButton>
+            </div>
           </div>
+
+          <UAlert
+            v-if="manifestFeedbackRouteId === route.id && manifestError"
+            color="error"
+            variant="subtle"
+            :title="manifestError"
+            data-testid="admin-manifest-error"
+          />
+          <UAlert
+            v-else-if="manifestFeedbackRouteId === route.id && manifestSuccess"
+            color="success"
+            variant="subtle"
+            :title="manifestSuccess"
+            data-testid="admin-manifest-success"
+          />
 
           <FeatureRouteLocationStatusCard
             v-bind="
@@ -527,66 +584,23 @@ onMounted(() => {
             title-key="routeVoiceReports.adminTitle"
           />
 
-          <div
-            v-if="
-              availableAdminActions(route.status).length > 0 ||
-              route.stops.length > 0
-            "
-            class="flex flex-wrap gap-2"
-          >
-            <UButton
-              size="sm"
-              color="neutral"
-              variant="soft"
-              :loading="manifestActingRouteId === route.id && manifestLoading"
-              :disabled="!isOnline || manifestLoading"
-              :aria-label="t('deliveryManifest.downloadRouteAria')"
-              data-testid="admin-download-route-manifest"
-              @click="onDownloadRouteManifest(route)"
-            >
-              {{
-                manifestActingRouteId === route.id && manifestLoading
-                  ? t('deliveryManifest.generating')
-                  : t('deliveryManifest.downloadRoute')
-              }}
-            </UButton>
-            <UButton
-              v-for="action in availableAdminActions(route.status)"
-              :key="`${route.id}-${action.status}`"
-              size="sm"
-              :color="action.color === 'error' ? 'error' : 'primary'"
-              :variant="action.color === 'error' ? 'outline' : 'solid'"
-              :loading="actingRouteId === route.id && updatingStatus"
-              :disabled="!isOnline || updatingStatus"
-              @click="requestStatusChange(route, action.status, action.label)"
-            >
-              {{ action.label }}
-            </UButton>
-          </div>
-
-          <UAlert
-            v-if="manifestFeedbackRouteId === route.id && manifestError"
-            class="mt-2"
-            color="error"
-            variant="subtle"
-            :title="manifestError"
-            data-testid="admin-manifest-error"
-          />
-          <UAlert
-            v-else-if="manifestFeedbackRouteId === route.id && manifestSuccess"
-            class="mt-2"
-            color="success"
-            variant="subtle"
-            :title="manifestSuccess"
-            data-testid="admin-manifest-success"
-          />
-
-          <div
+          <details
             v-if="route.statusHistory.length > 0"
-            class="rounded-md bg-elevated/30 px-3 py-2 text-sm"
+            class="group rounded-md bg-muted px-3 py-2 text-sm"
           >
-            <p class="font-medium">{{ t('routes.statusHistory') }}</p>
-            <ul class="mt-1 space-y-1 text-muted">
+            <summary
+              class="cursor-pointer list-none font-medium text-toned outline-none marker:content-none focus-visible:rounded-sm focus-visible:ring-2 focus-visible:ring-primary"
+            >
+              <span class="inline-flex items-center gap-2">
+                <UIcon
+                  name="i-lucide-chevron-right"
+                  class="size-4 transition-transform group-open:rotate-90"
+                  aria-hidden="true"
+                />
+                {{ t('routes.statusHistory') }}
+              </span>
+            </summary>
+            <ul class="mt-2 space-y-1 text-muted">
               <li
                 v-for="(entry, index) in route.statusHistory"
                 :key="`${route.id}-${entry.toStatus}-${index}`"
@@ -594,7 +608,7 @@ onMounted(() => {
                 {{ formatStatusHistoryEntry(entry) }}
               </li>
             </ul>
-          </div>
+          </details>
 
           <CommonEmptyState
             v-if="route.stops.length === 0"
@@ -602,26 +616,30 @@ onMounted(() => {
             :description="t('routes.stop.empty.description')"
           />
 
-          <ul v-else class="space-y-3">
+          <ul
+            v-else
+            class="divide-y divide-default rounded-md bg-muted px-3"
+            role="list"
+          >
             <li
               v-for="stop in route.stops"
               :key="`${route.id}-${stop.sequence}`"
-              class="rounded-md bg-elevated/40 px-3 py-3"
+              class="space-y-2 py-3"
               data-testid="admin-route-stop"
             >
-              <p class="font-medium">
+              <p class="font-medium text-highlighted">
                 {{ stop.sequence }}. {{ stop.pharmacyName }}
               </p>
               <p class="text-sm text-muted">{{ formatAddress(stop) }}</p>
-              <p class="mt-1 text-sm">
+              <p class="text-sm">
                 {{ stopSummary(stop.orderCount, stop.totalQuantity) }}
               </p>
-              <ul class="mt-1 text-sm text-muted">
+              <ul class="text-sm text-muted">
                 <li v-for="line in stop.lines" :key="line.vaccineId">
                   {{ line.vaccineName }}: {{ line.quantity }}
                 </li>
               </ul>
-              <div class="mt-2 flex flex-wrap items-center gap-2">
+              <div class="flex flex-wrap items-center gap-2">
                 <UBadge variant="subtle" data-testid="admin-stop-qr-state">
                   {{ stopQrStateLabel(stop) }}
                 </UBadge>
@@ -646,8 +664,8 @@ onMounted(() => {
               </div>
             </li>
           </ul>
-        </div>
-      </div>
+        </li>
+      </ul>
 
       <FeatureDeliveryStopQrModal
         :open="qrModalOpen"
@@ -670,7 +688,7 @@ onMounted(() => {
         :title="t('routes.status.changeFailed')"
         :description="statusError"
       />
-    </UCard>
+    </CommonPageSection>
 
     <UModal
       :open="confirmAction !== null"

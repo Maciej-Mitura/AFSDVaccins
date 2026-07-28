@@ -95,7 +95,7 @@ describe('courier analytics UI sections', () => {
     __resetAppI18nForTests()
   })
 
-  it('renders KPI card values', () => {
+  it('renders KPI metric strip values without nested cards', () => {
     const wrapper = mount(FeatureCourierAnalyticsKpi, {
       props: {
         cards: [
@@ -112,14 +112,15 @@ describe('courier analytics UI sections', () => {
           },
         ],
       },
-      global: {
-        stubs: { UCard: { template: '<div><slot /></div>' } },
-      },
     })
+    expect(wrapper.find('[data-testid="courier-analytics-kpi"]').exists()).toBe(
+      true,
+    )
     expect(wrapper.text()).toContain('3')
     expect(wrapper.text()).toContain('admin.courierAnalytics.insufficientData')
     expect(wrapper.html()).toMatch(/text-warning/)
     expect(wrapper.html()).toMatch(/text-highlighted/)
+    expect(wrapper.html()).not.toMatch(/UCard/)
   })
 
   it('shows official rank and highlights top three subtly', async () => {
@@ -164,7 +165,6 @@ describe('courier analytics UI sections', () => {
       props: { courier },
       global: {
         stubs: {
-          UCard: { template: '<div><slot /></div>' },
           UButton: {
             template:
               '<button type="button" @click="$emit(\'click\')"><slot /></button>',
@@ -175,6 +175,7 @@ describe('courier analytics UI sections', () => {
     expect(
       wrapper.find('[data-testid="courier-analytics-detail"]').exists(),
     ).toBe(true)
+    expect(wrapper.html()).not.toMatch(/UCard/)
     expect(wrapper.text()).toContain('91.2')
     expect(wrapper.text()).toContain(
       'admin.courierAnalytics.component.routeCompletion',

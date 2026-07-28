@@ -395,6 +395,7 @@
     "bezorger.route.tomorrow.template": "Template: {name}",
     "bezorger.route.tomorrow.title": "Voorbeeldroute voor morgen",
     "common.add": "Toevoegen",
+    "common.actions": "Acties",
     "common.back": "Terug",
     "common.back.login": "Terug naar inloggen",
     "common.cancel": "Annuleren",

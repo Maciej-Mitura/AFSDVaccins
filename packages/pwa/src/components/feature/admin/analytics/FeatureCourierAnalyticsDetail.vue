@@ -1,12 +1,12 @@
 <template>
-  <UCard
+  <div
     v-if="courier"
+    class="rounded-md bg-muted px-4 py-4"
     data-testid="courier-analytics-detail"
-    :ui="{ body: 'p-4 sm:p-5' }"
   >
     <div class="mb-4 flex items-start justify-between gap-3">
       <div>
-        <h2 class="text-lg font-semibold text-highlighted">
+        <h2 class="text-base font-semibold text-highlighted">
           {{ courier.displayName }}
         </h2>
         <p class="mt-1 text-sm text-toned">
@@ -95,20 +95,20 @@
           >
             {{ t('admin.courierAnalytics.detail.routeMetrics') }}
           </h4>
-          <dl class="space-y-1 text-sm">
-            <div class="flex justify-between gap-2">
+          <dl class="divide-y divide-default text-sm">
+            <div class="flex justify-between gap-2 py-1.5">
               <dt>{{ t('admin.courierAnalytics.column.assignedRoutes') }}</dt>
               <dd class="tabular-nums">{{ m.totalAssignedRoutes }}</dd>
             </div>
-            <div class="flex justify-between gap-2">
+            <div class="flex justify-between gap-2 py-1.5">
               <dt>{{ t('admin.courierAnalytics.column.completedRoutes') }}</dt>
               <dd class="tabular-nums">{{ m.completedRoutes }}</dd>
             </div>
-            <div class="flex justify-between gap-2">
+            <div class="flex justify-between gap-2 py-1.5">
               <dt>{{ t('admin.courierAnalytics.column.overdueRoutes') }}</dt>
               <dd class="tabular-nums">{{ m.incompleteRoutes }}</dd>
             </div>
-            <div class="flex justify-between gap-2">
+            <div class="flex justify-between gap-2 py-1.5">
               <dt>
                 {{ t('admin.courierAnalytics.component.routeCompletion') }}
               </dt>
@@ -124,20 +124,20 @@
           >
             {{ t('admin.courierAnalytics.detail.stopMetrics') }}
           </h4>
-          <dl class="space-y-1 text-sm">
-            <div class="flex justify-between gap-2">
+          <dl class="divide-y divide-default text-sm">
+            <div class="flex justify-between gap-2 py-1.5">
               <dt>{{ t('admin.courierAnalytics.column.deliveredStops') }}</dt>
               <dd class="tabular-nums">{{ m.deliveredStops }}</dd>
             </div>
-            <div class="flex justify-between gap-2">
+            <div class="flex justify-between gap-2 py-1.5">
               <dt>{{ t('admin.courierAnalytics.detail.onTimeStops') }}</dt>
               <dd class="tabular-nums">{{ m.onTimeDeliveredStops }}</dd>
             </div>
-            <div class="flex justify-between gap-2">
+            <div class="flex justify-between gap-2 py-1.5">
               <dt>{{ t('admin.courierAnalytics.detail.lateStops') }}</dt>
               <dd class="tabular-nums">{{ m.lateDeliveredStops }}</dd>
             </div>
-            <div class="flex justify-between gap-2">
+            <div class="flex justify-between gap-2 py-1.5">
               <dt>
                 {{ t('admin.courierAnalytics.detail.qrConfirmedStops') }}
               </dt>
@@ -154,14 +154,14 @@
         >
           {{ t('admin.courierAnalytics.component.consistency') }}
         </h3>
-        <dl class="space-y-1 text-sm">
-          <div class="flex justify-between gap-2">
+        <dl class="divide-y divide-default text-sm">
+          <div class="flex justify-between gap-2 py-1.5">
             <dt>
               {{ t('admin.courierAnalytics.consistency.overdueIncomplete') }}
             </dt>
             <dd class="tabular-nums">{{ c.overdueIncompleteRoutes }}</dd>
           </div>
-          <div class="flex justify-between gap-2">
+          <div class="flex justify-between gap-2 py-1.5">
             <dt>
               {{ t('admin.courierAnalytics.consistency.abandonedProcessing') }}
             </dt>
@@ -169,7 +169,7 @@
               {{ c.abandonedProcessingConfirmations }}
             </dd>
           </div>
-          <div class="flex justify-between gap-2">
+          <div class="flex justify-between gap-2 py-1.5">
             <dt>
               {{ t('admin.courierAnalytics.consistency.invalidProofs') }}
             </dt>
@@ -188,8 +188,8 @@
         >
           {{ t('admin.courierAnalytics.handlingTime') }}
         </h3>
-        <dl class="space-y-1 text-sm">
-          <div class="flex justify-between gap-2">
+        <dl class="divide-y divide-default text-sm">
+          <div class="flex justify-between gap-2 py-1.5">
             <dt>
               {{ t('admin.courierAnalytics.averageHandlingDuration') }}
             </dt>
@@ -197,7 +197,7 @@
               {{ formatHandlingDuration(m.averageHandlingDurationSeconds) }}
             </dd>
           </div>
-          <div class="flex justify-between gap-2">
+          <div class="flex justify-between gap-2 py-1.5">
             <dt>
               {{ t('admin.courierAnalytics.medianHandlingDuration') }}
             </dt>
@@ -205,7 +205,7 @@
               {{ formatHandlingDuration(m.medianHandlingDurationSeconds) }}
             </dd>
           </div>
-          <div class="flex justify-between gap-2">
+          <div class="flex justify-between gap-2 py-1.5">
             <dt>{{ t('admin.courierAnalytics.sampleCount') }}</dt>
             <dd class="tabular-nums">{{ m.handlingDurationSampleCount }}</dd>
           </div>
@@ -215,7 +215,7 @@
         </p>
       </section>
     </div>
-  </UCard>
+  </div>
 </template>
 
 <script setup lang="ts">
