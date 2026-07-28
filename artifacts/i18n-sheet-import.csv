@@ -244,7 +244,6 @@ admin.stock.quantityTarget,Nieuwe voorraad (dosissen),New stock (doses),New stoc
 admin.stock.reason,Reden,Reason,Reason,Reason,REVIEW,admin,"Untranslated or loanword clone (es=en, zh=en); human translation recommended"
 admin.stock.title,Voorraadbeheer,Stock management,Stock management,Stock management,REVIEW,admin,"Untranslated or loanword clone (es=en, zh=en); human translation recommended"
 admin.stock.warningThreshold,Waarschuwing drempel,Warning threshold,Warning threshold,Warning threshold,REVIEW,admin,"Untranslated or loanword clone (es=en, zh=en); human translation recommended"
-apotheker.dashboard.roleProof.empty.description,De apotheker proof query gaf geen resultaat terug.,The pharmacist proof query returned no result.,The pharmacist proof query returned no result.,The pharmacist proof query returned no result.,REVIEW,apotheker,"Untranslated or loanword clone (es=en, zh=en); human translation recommended"
 apotheker.dashboard.title,Apotheker dashboard,Pharmacist dashboard,Pharmacist dashboard,Pharmacist dashboard,REVIEW,apotheker,"Untranslated or loanword clone (es=en, zh=en); human translation recommended"
 apotheker.notifications.empty.description,Je hebt nog geen meldingen ontvangen.,You have not received any notifications yet.,You have not received any notifications yet.,You have not received any notifications yet.,REVIEW,apotheker,"Untranslated or loanword clone (es=en, zh=en); human translation recommended"
 apotheker.orders.create.addLine,Regel toevoegen,Add line,Add line,Add line,REVIEW,apotheker,"Untranslated or loanword clone (es=en, zh=en); human translation recommended"
@@ -401,7 +400,6 @@ common.description,Beschrijving,Description,Description,Description,REVIEW,commo
 common.filter,Filteren,Filter,Filter,Filter,REVIEW,common,"Untranslated or loanword clone (es=en, zh=en); human translation recommended"
 common.go.admin,Naar admin,Go to admin,Go to admin,Go to admin,REVIEW,common,"Untranslated or loanword clone (es=en, zh=en); human translation recommended"
 common.go.login,Naar login,Go to login,Go to login,Go to login,REVIEW,common,"Untranslated or loanword clone (es=en, zh=en); human translation recommended"
-common.go.profile,Naar profiel,Go to profile,Go to profile,Go to profile,REVIEW,common,"Untranslated or loanword clone (es=en, zh=en); human translation recommended"
 common.noDescription,Geen beschrijving,No description,No description,No description,REVIEW,common,"Untranslated or loanword clone (es=en, zh=en); human translation recommended"
 common.notFound.description,De gevraagde route bestaat niet in deze ontwikkelversie.,The requested route does not exist in this development version.,The requested route does not exist in this development version.,The requested route does not exist in this development version.,REVIEW,common,"Untranslated or loanword clone (es=en, zh=en); human translation recommended"
 common.notFound.title,Pagina niet gevonden,Page not found,Page not found,Page not found,REVIEW,common,"Untranslated or loanword clone (es=en, zh=en); human translation recommended"
@@ -424,7 +422,6 @@ deliveryStopQr.modal.scanDoesNotComplete,Het scannen van de QR rondt de levering
 deliveryStopQr.modal.showToCourier,Toon deze QR aan de koerier wanneer de levering aankomt.,Show this QR to the courier when the delivery arrives.,Show this QR to the courier when the delivery arrives.,Show this QR to the courier when the delivery arrives.,REVIEW,deliveryStopQr,"Untranslated or loanword clone (es=en, zh=en); human translation recommended"
 deliveryStopQr.modal.stopSequence,Stop {sequence},Stop {sequence},Stop {sequence},Stop {sequence},REVIEW,deliveryStopQr,"Untranslated or loanword clone (nl=en, es=en, zh=en); human translation recommended"
 deliveryStopQr.modal.title,Bezorg-QR,Delivery QR,Delivery QR,Delivery QR,REVIEW,deliveryStopQr,"Untranslated or loanword clone (es=en, zh=en); human translation recommended"
-deliveryStopQr.planned.cardTitle,Geplande levering,Planned delivery,Planned delivery,Planned delivery,REVIEW,deliveryStopQr,"Untranslated or loanword clone (es=en, zh=en); human translation recommended"
 deliveryStopQr.planned.empty.description,"Wanneer een bezorgroute jouw apotheek bevat, verschijnt die hier.","When a delivery route includes your pharmacy, it will appear here.","When a delivery route includes your pharmacy, it will appear here.","When a delivery route includes your pharmacy, it will appear here.",REVIEW,deliveryStopQr,"Untranslated or loanword clone (es=en, zh=en); human translation recommended"
 deliveryStopQr.planned.empty.title,Geen geplande leveringen,No planned deliveries,No planned deliveries,No planned deliveries,REVIEW,deliveryStopQr,"Untranslated or loanword clone (es=en, zh=en); human translation recommended"
 deliveryStopQr.planned.loadFailed,Geplande leveringen konden niet worden geladen,Could not load planned deliveries,Could not load planned deliveries,Could not load planned deliveries,REVIEW,deliveryStopQr,"Untranslated or loanword clone (es=en, zh=en); human translation recommended"
@@ -896,15 +893,18 @@ admin.notifications.empty.title,Geen meldingen,No notifications,No notifications
 admin.notifications.loadFailed,Meldingen laden mislukt,Failed to load notifications,Failed to load notifications,Failed to load notifications,UNUSED,catalog,Not referenced by non-test t()/translate()/literal key harvest
 admin.notifications.markRead,Markeer als gelezen,Mark as read,Mark as read,Mark as read,UNUSED,catalog,Not referenced by non-test t()/translate()/literal key harvest
 admin.notifications.title,Meldingen,Notifications,Notifications,Notifications,UNUSED,catalog,Not referenced by non-test t()/translate()/literal key harvest
+apotheker.dashboard.roleProof.empty.description,De apotheker proof query gaf geen resultaat terug.,The pharmacist proof query returned no result.,The pharmacist proof query returned no result.,The pharmacist proof query returned no result.,UNUSED,catalog,Not referenced by non-test t()/translate()/literal key harvest
 app.shortName,Vaccin,Vaccin,Vaccin,Vaccin,UNUSED,catalog,Not referenced by non-test t()/translate()/literal key harvest
 arrival.arrived,Aangekomen,Arrived,Llegada registrada,已到达,UNUSED,catalog,Not referenced by non-test t()/translate()/literal key harvest
 arrival.routeChangedOffline,Route is gewijzigd terwijl je offline was,Route changed while offline,La ruta cambió mientras estabas sin conexión,离线期间路线已更改,UNUSED,catalog,Not referenced by non-test t()/translate()/literal key harvest
 arrival.stopAlreadyDelivered,Stop is al afgeleverd,Stop already delivered,La parada ya fue entregada,该站点已送达,UNUSED,catalog,Not referenced by non-test t()/translate()/literal key harvest
+common.go.profile,Naar profiel,Go to profile,Go to profile,Go to profile,UNUSED,catalog,Not referenced by non-test t()/translate()/literal key harvest
 common.optional,Optioneel,Optional,Optional,Optional,UNUSED,catalog,Not referenced by non-test t()/translate()/literal key harvest
 common.refresh,Vernieuwen,Refresh,Refresh,Refresh,UNUSED,catalog,Not referenced by non-test t()/translate()/literal key harvest
 deliveryManifest.download,Manifest downloaden,Download manifest,Descargar manifiesto,下载清单,UNUSED,catalog,Not referenced by non-test t()/translate()/literal key harvest
 deliveryManifest.routeTitle,Routemanifest,Route manifest,Manifiesto de ruta,路线清单,UNUSED,catalog,Not referenced by non-test t()/translate()/literal key harvest
 deliveryManifest.stopTitle,Stopmanifest,Stop manifest,Manifiesto de parada,站点清单,UNUSED,catalog,Not referenced by non-test t()/translate()/literal key harvest
+deliveryStopQr.planned.cardTitle,Geplande levering,Planned delivery,Planned delivery,Planned delivery,UNUSED,catalog,Not referenced by non-test t()/translate()/literal key harvest
 errors.order.dailyLimitExceeded,Het dagmaximum van {limit} dosissen per vaccin is overschreden.,The daily maximum of {limit} doses per vaccine has been exceeded.,The daily maximum of {limit} doses per vaccine has been exceeded.,The daily maximum of {limit} doses per vaccine has been exceeded.,UNUSED,catalog,Not referenced by non-test t()/translate()/literal key harvest
 label.email.short,E-mail,Email,Correo electrónico,电子邮件,UNUSED,catalog,Not referenced by non-test t()/translate()/literal key harvest
 label.forgot.login.details,Inloggegevens vergeten?,Forgot login details?,¿Olvidaste tus datos de acceso?,忘记登录信息？,UNUSED,catalog,Not referenced by non-test t()/translate()/literal key harvest

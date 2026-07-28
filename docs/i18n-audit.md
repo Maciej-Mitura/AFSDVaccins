@@ -136,7 +136,7 @@ _No heuristic hits._
 
 ## 6. Untranslated or suspicious values
 
-Key counts: nl=1078, en=1078, es=1078, zh=1078
+Key counts: nl=1098, en=1098, es=1098, zh=1098
 
 | Locale | Values identical to EN (≥6 chars) |
 | ------ | --------------------------------- |
@@ -150,13 +150,13 @@ NL clones excluding allowlist: see CSV `REVIEW` rows with `nl=en`.
 
 ## 7. Stale / unused keys
 
-Count: **69** (heuristic harvest — may include dynamic-only keys).
+Count: **72** (heuristic harvest — may include dynamic-only keys).
 
 Do **not** delete in this phase unless clearly dangerous duplicates. Listed as `UNUSED` in the CSV.
 
 ## 8. Terminology consistency
 
-- Courier-related keys: 245; pharmacist/pharmacy-related keys: 84. Prefer "bezorger"/"apotheker" in Dutch UI and "courier"/"pharmacist" in English.
+- Courier-related keys: 245; pharmacist/pharmacy-related keys: 104. Prefer "bezorger"/"apotheker" in Dutch UI and "courier"/"pharmacist" in English.
 
 Keep: order / delivery / route / stop / doses / history / notifications / voice report / transcription aligned with existing NL product language (`bestelling`, `levering`, `route`, `stop`, `dosissen`, `geschiedenis`, `meldingen`, `spraakrapport`, `transcriptie`).
 
