@@ -29,6 +29,8 @@
     "bootstrap:database:demo": "npm run bootstrap:database:demo --workspace=@vaccin-delivery/api",
     "export:i18n": "npm run export --workspace=@vaccin-delivery/i18n-export",
     "audit:i18n": "npm run audit:i18n --workspace=@vaccin-delivery/pwa",
+    "audit:i18n:check": "npm run audit:i18n:check --workspace=@vaccin-delivery/pwa",
+    "audit:i18n:update": "npm run audit:i18n:update --workspace=@vaccin-delivery/pwa",
     "sync:i18n:keys": "npm exec --workspace=@vaccin-delivery/i18n-export -- tsx src/sync-keys.ts",
     "lint:api": "npm run lint --workspace=@vaccin-delivery/api",
     "lint:pwa": "npm run lint --workspace=@vaccin-delivery/pwa",
