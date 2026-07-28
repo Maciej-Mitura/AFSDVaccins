@@ -172,7 +172,7 @@ See git status after the agent run. Expected deliverables:
 
 ## 10. Generated audit / export files
 
-- CSV: `artifacts\i18n-sheet-import.csv`
+- CSV: `artifacts/i18n-sheet-import.csv`
 - Columns: `key,nl,en,es,zh,status,source,notes`
 - Statuses: `ADD`, `READY_FOR_SHEET`, `UPDATE`, `REVIEW`, `UNUSED`
 

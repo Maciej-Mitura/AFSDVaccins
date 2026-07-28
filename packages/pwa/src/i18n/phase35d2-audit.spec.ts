@@ -64,9 +64,19 @@ describe('phase35d2 i18n audit', () => {
 
     expect(first).toContain('Phase 35D2 i18n audit complete')
     expect(second).toContain('Phase 35D2 i18n audit complete')
+    expect(second).toContain('Unchanged artifacts/i18n-sheet-import.csv')
+    expect(second).toContain('Unchanged docs/i18n-audit.md')
+    expect(second).toContain('Unchanged artifacts/i18n-audit-summary.json')
     expect(csv2).toBe(csv1)
     expect(summary2).toBe(summary1)
     expect(md2).toBe(md1)
+
+    expect(csv1.includes('\r')).toBe(false)
+    expect(summary1.includes('\r')).toBe(false)
+    expect(md1.includes('\r')).toBe(false)
+    expect(md1).toContain('artifacts/i18n-sheet-import.csv')
+    expect(md1).not.toContain('artifacts\\i18n-sheet-import.csv')
+    expect(md1).not.toMatch(/[A-Za-z]:\\/)
 
     expect(csv1.startsWith(`${EXPECTED_HEADER}\n`)).toBe(true)
     const statuses = new Set(
@@ -104,6 +114,11 @@ describe('phase35d2 i18n audit', () => {
     expect(summary.sheetsCapability.dryRun).toBe(true)
     expect(summary.csvStatusCounts.READY_FOR_SHEET).toBeGreaterThan(0)
     expect(summary.csvStatusCounts.REVIEW).toBeGreaterThan(0)
+    expect(Object.keys(summary.csvStatusCounts)).toEqual([
+      'READY_FOR_SHEET',
+      'REVIEW',
+      'UNUSED',
+    ])
     expect(csv1).toContain('arrival.markArrived')
     expect(csv1).toContain('deliveryManifest.downloadRoute')
     expect(summary.missingKeys).not.toContain('arrival.markArrived')
@@ -112,5 +127,8 @@ describe('phase35d2 i18n audit', () => {
     expect(md1).toContain('Phase 35D2')
     expect(md1).toContain('Exact safe commands')
     expect(md1).not.toMatch(/AIza|private_key|BEGIN PRIVATE KEY/)
+    expect(Object.prototype.hasOwnProperty.call(summary, 'generatedAt')).toBe(
+      false,
+    )
   })
 })

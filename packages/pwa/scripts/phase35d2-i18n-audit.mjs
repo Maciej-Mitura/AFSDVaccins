@@ -1,13 +1,14 @@
 #!/usr/bin/env node
 /**
- * Phase 35D2 — deterministic localisation audit + spreadsheet-ready CSV export.
+ * Phase 35D2 / 35D4 — deterministic localisation audit + spreadsheet-ready CSV export.
  *
- * Outputs (repo-relative):
+ * Outputs (repo-relative, POSIX paths, LF newlines):
  *   - docs/i18n-audit.md
  *   - artifacts/i18n-sheet-import.csv
- *   - artifacts/i18n-audit-summary.json (machine-readable; deterministic)
+ *   - artifacts/i18n-audit-summary.json
  *
  * Does NOT call Google Sheets. Does NOT mutate locale JSON.
+ * Writes a file only when normalised content differs (idempotent).
  * Exit 0 on success; exit 1 only on internal failures (parity crash, IO).
  *
  * Usage:
@@ -16,9 +17,11 @@
  */
 import fs from 'node:fs'
 import path from 'node:path'
+import { createRequire } from 'node:module'
 import { fileURLToPath } from 'node:url'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
+const require = createRequire(import.meta.url)
 const PWA_ROOT = path.resolve(__dirname, '..')
 const REPO_ROOT = path.resolve(PWA_ROOT, '../..')
 const SRC_ROOT = path.join(PWA_ROOT, 'src')
@@ -26,8 +29,47 @@ const LOCALES_DIR = path.join(SRC_ROOT, 'locales')
 const ARTIFACTS_DIR = path.join(REPO_ROOT, 'artifacts')
 const DOCS_DIR = path.join(REPO_ROOT, 'docs')
 
+/** Optional Prettier (repo root) — keeps JSON/MD aligned with project formatting. */
+async function formatWithPrettier(source, filepath) {
+  try {
+    const prettier = require(
+      path.join(REPO_ROOT, 'node_modules/prettier/index.cjs'),
+    )
+    const config = (await prettier.resolveConfig(filepath)) ?? {}
+    return await prettier.format(source, {
+      ...config,
+      filepath,
+    })
+  } catch {
+    return source
+  }
+}
+
 const LOCALES = ['nl', 'en', 'es', 'zh']
 const PLACEHOLDER_RE = /\{[^}]+\}/g
+
+/** Tracked artefact paths (repo-relative, POSIX). */
+const CSV_REPO_PATH = 'artifacts/i18n-sheet-import.csv'
+const SUMMARY_REPO_PATH = 'artifacts/i18n-audit-summary.json'
+const MD_REPO_PATH = 'docs/i18n-audit.md'
+
+/** Directories skipped while walking source (never audit generated/ephemeral trees). */
+const SKIP_DIR_NAMES = new Set([
+  'locales',
+  'node_modules',
+  'dist',
+  'coverage',
+  '__snapshots__',
+  '__generated__',
+  'generated',
+  '.git',
+  '.turbo',
+  '.vite',
+  'tmp',
+  'temp',
+  'test-results',
+  'playwright-report',
+])
 
 /** Keys that may legitimately match English in nl (brand / loanwords / short labels). */
 const NL_SAME_AS_EN_ALLOWLIST = new Set([
@@ -77,6 +119,11 @@ const HARDCODED_ALLOWLIST = [
 const ENGLISH_UI_HINT =
   /(?<![A-Za-z])(Loading\.\.\.|Something went wrong|Try again|No results|Click here|Save changes|Sign in|Sign out|Log in|Log out|Unable to |Failed to |Please |Welcome back)(?![A-Za-z])/
 
+/** Normalise any path segment to repo-relative POSIX form. */
+function toPosix(value) {
+  return String(value).replaceAll('\\', '/')
+}
+
 function unwrapCatalog(locale, raw) {
   if (raw && typeof raw === 'object' && raw[locale] && typeof raw[locale] === 'object') {
     return raw[locale]
@@ -100,8 +147,12 @@ function placeholderMultiset(value) {
 }
 
 function walkSourceFiles(dir, out = []) {
-  for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
-    if (['locales', 'node_modules', 'dist', '__snapshots__'].includes(entry.name)) {
+  const entries = fs
+    .readdirSync(dir, { withFileTypes: true })
+    .sort((a, b) => a.name.localeCompare(b.name))
+
+  for (const entry of entries) {
+    if (SKIP_DIR_NAMES.has(entry.name)) {
       continue
     }
     const full = path.join(dir, entry.name)
@@ -111,17 +162,26 @@ function walkSourceFiles(dir, out = []) {
     }
     if (!/\.(vue|ts|tsx|js|mjs)$/.test(entry.name)) continue
     if (entry.name.endsWith('.d.ts')) continue
+    // Exclude vitest/playwright coverage and generated GraphQL artefacts by name.
+    if (/\.(spec|test)\.[jt]sx?$/.test(entry.name)) {
+      // Still collect for key harvest via isTestFile filter later; keep walking.
+    }
     out.push(full)
   }
   return out
 }
 
 function relSrc(file) {
-  return path.relative(SRC_ROOT, file).replaceAll('\\', '/')
+  return toPosix(path.relative(SRC_ROOT, file))
 }
 
 function isTestFile(rel) {
-  return /\.(spec|test)\.[jt]sx?$/.test(rel) || rel.endsWith('test-utils.ts')
+  return (
+    /\.(spec|test)\.[jt]sx?$/.test(rel) ||
+    rel.endsWith('test-utils.ts') ||
+    rel.includes('/__tests__/') ||
+    rel.includes('/__mocks__/')
+  )
 }
 
 function looksLikeI18nKey(key) {
@@ -149,7 +209,7 @@ function collectKeyUsages(files) {
 
   // Also harvest string literals that exactly match catalog keys (status maps, etc.)
   const catalogs = loadCatalogs()
-  const catalogKeys = new Set(Object.keys(catalogs.en))
+  const catalogKeys = new Set(Object.keys(catalogs.en).sort())
   const literalRe = /['"`]([a-z][a-zA-Z0-9]*(?:\.[a-zA-Z0-9_]+)+)['"`]/g
   for (const file of files) {
     const rel = relSrc(file)
@@ -167,7 +227,7 @@ function collectKeyUsages(files) {
 
   for (const [key, sites] of used) {
     if (!catalogKeys.has(key)) {
-      for (const site of sites) {
+      for (const site of [...sites].sort()) {
         if (!isTestFile(site)) {
           missing.push({ key, file: site })
         }
@@ -209,7 +269,7 @@ function buildCsvRows(catalogs, unusedKeys, proposedAdditions) {
       es: add.es || catalogs.es[add.key] || '',
       zh: add.zh || catalogs.zh[add.key] || '',
       status: exists ? 'READY_FOR_SHEET' : 'ADD',
-      source: add.source,
+      source: toPosix(add.source),
       notes: exists
         ? `IMPLEMENTED in runtime catalogs — copy to Sheet then npm run export:i18n. ${add.notes}`
         : add.notes,
@@ -277,13 +337,37 @@ function buildCsvRows(catalogs, unusedKeys, proposedAdditions) {
   return { header, rows }
 }
 
+function normalizeNewlines(text) {
+  return String(text).replaceAll('\r\n', '\n').replaceAll('\r', '\n')
+}
+
+/**
+ * Write UTF-8 LF content only when it differs from the on-disk normalised file.
+ * Returns true when a write occurred.
+ */
+function writeIfChanged(filePath, content) {
+  const next = normalizeNewlines(content)
+  const finalContent = next.endsWith('\n') ? next : `${next}\n`
+
+  if (fs.existsSync(filePath)) {
+    const prev = normalizeNewlines(fs.readFileSync(filePath, 'utf8'))
+    if (prev === finalContent) {
+      return false
+    }
+  }
+
+  fs.mkdirSync(path.dirname(filePath), { recursive: true })
+  fs.writeFileSync(filePath, finalContent, { encoding: 'utf8' })
+  return true
+}
+
 /** Write BOM-less UTF-8 so spreadsheet tools keep Chinese/Spanish characters. */
-function writeCsv(filePath, header, rows) {
+function renderCsv(header, rows) {
   const lines = [
     header.join(','),
     ...rows.map(row => header.map(col => csvEscape(row[col])).join(',')),
   ]
-  fs.writeFileSync(filePath, `${lines.join('\n')}\n`, { encoding: 'utf8' })
+  return `${lines.join('\n')}\n`
 }
 
 function scanHardcodedCandidates(files) {
@@ -292,7 +376,10 @@ function scanHardcodedCandidates(files) {
     const rel = relSrc(file)
     if (isTestFile(rel)) continue
     const inScope = HARDCODED_AUDIT_GLOBS.some(
-      g => rel === g || rel.startsWith(g.replace(/\\/g, '/') + '/') || rel.startsWith(g),
+      g =>
+        rel === g ||
+        rel.startsWith(`${toPosix(g)}/`) ||
+        rel.startsWith(toPosix(g)),
     )
     if (!inScope) continue
 
@@ -328,6 +415,13 @@ function scanHardcodedCandidates(files) {
       })
     })
   }
+
+  findings.sort(
+    (a, b) =>
+      a.file.localeCompare(b.file) ||
+      a.line - b.line ||
+      a.text.localeCompare(b.text),
+  )
   return findings
 }
 
@@ -336,17 +430,23 @@ function terminologyNotes(catalogs) {
   const samples = [
     {
       term: 'courier / bezorger',
-      keys: Object.keys(catalogs.en).filter(
-        k => /courier|bezorger/i.test(k) || /courier|bezorger/i.test(catalogs.en[k]),
-      ),
+      keys: Object.keys(catalogs.en)
+        .filter(
+          k =>
+            /courier|bezorger/i.test(k) ||
+            /courier|bezorger/i.test(catalogs.en[k]),
+        )
+        .sort(),
     },
     {
       term: 'pharmacist / apotheker',
-      keys: Object.keys(catalogs.en).filter(
-        k =>
-          /pharmacist|apotheker|pharmacy/i.test(k) ||
-          /pharmacist|apotheker|pharmacy/i.test(catalogs.en[k]),
-      ),
+      keys: Object.keys(catalogs.en)
+        .filter(
+          k =>
+            /pharmacist|apotheker|pharmacy/i.test(k) ||
+            /pharmacist|apotheker|pharmacy/i.test(catalogs.en[k]),
+        )
+        .sort(),
     },
   ]
 
@@ -381,9 +481,7 @@ function buildMarkdown(report) {
     missingKeys,
     unusedKeys,
     sameAsEn,
-    csvPath,
     hardcoded,
-    sheetsCapability,
     proposedAdditions,
     terminology,
   } = report
@@ -522,7 +620,7 @@ See git status after the agent run. Expected deliverables:
 
 ## 10. Generated audit / export files
 
-- CSV: \`${path.relative(REPO_ROOT, csvPath).replaceAll('\\\\', '/')}\`
+- CSV: \`${CSV_REPO_PATH}\`
 - Columns: \`key,nl,en,es,zh,status,source,notes\`
 - Statuses: \`ADD\`, \`READY_FOR_SHEET\`, \`UPDATE\`, \`REVIEW\`, \`UNUSED\`
 
@@ -593,7 +691,7 @@ function mergeProposedAdditions(missing) {
       en: '',
       es: '',
       zh: '',
-      source: item.file,
+      source: toPosix(item.file),
       notes:
         'Used in code but missing from catalogs — provide translations before Sheet import',
     })
@@ -601,7 +699,27 @@ function mergeProposedAdditions(missing) {
   return [...byKey.values()].sort((a, b) => a.key.localeCompare(b.key))
 }
 
-function main() {
+function stableStatusCounts(rows) {
+  const order = ['ADD', 'READY_FOR_SHEET', 'UPDATE', 'REVIEW', 'UNUSED']
+  const counts = {}
+  for (const row of rows) {
+    counts[row.status] = (counts[row.status] || 0) + 1
+  }
+  const ordered = {}
+  for (const status of order) {
+    if (counts[status] != null) {
+      ordered[status] = counts[status]
+    }
+  }
+  for (const status of Object.keys(counts).sort()) {
+    if (ordered[status] == null) {
+      ordered[status] = counts[status]
+    }
+  }
+  return ordered
+}
+
+async function main() {
   const catalogs = loadCatalogs()
   const keyCounts = Object.fromEntries(
     LOCALES.map(l => [l, Object.keys(catalogs[l]).length]),
@@ -632,15 +750,20 @@ function main() {
       }
     }
   }
+  placeholderMismatches.sort(
+    (a, b) => a.key.localeCompare(b.key) || a.locale.localeCompare(b.locale),
+  )
 
-  const files = walkSourceFiles(SRC_ROOT)
+  const files = walkSourceFiles(SRC_ROOT).sort((a, b) =>
+    relSrc(a).localeCompare(relSrc(b)),
+  )
   const { used, missing, catalogKeys } = collectKeyUsages(files)
   const unusedKeys = new Set(
     [...catalogKeys].filter(k => !used.has(k)).sort(),
   )
 
   const sameAsEn = { nl: 0, es: 0, zh: 0 }
-  for (const key of catalogKeys) {
+  for (const key of [...catalogKeys].sort()) {
     const en = catalogs.en[key]
     if (!en || en.length < 6) continue
     for (const locale of ['nl', 'es', 'zh']) {
@@ -659,8 +782,8 @@ function main() {
   fs.mkdirSync(ARTIFACTS_DIR, { recursive: true })
   fs.mkdirSync(DOCS_DIR, { recursive: true })
 
-  const csvPath = path.join(ARTIFACTS_DIR, 'i18n-sheet-import.csv')
-  writeCsv(csvPath, header, rows)
+  const csvPath = path.join(REPO_ROOT, ...CSV_REPO_PATH.split('/'))
+  const csvWritten = writeIfChanged(csvPath, renderCsv(header, rows))
 
   const uniqueMissingKeys = [...new Set(missing.map(m => m.key))].sort()
 
@@ -675,10 +798,7 @@ function main() {
     sameAsEn,
     proposedAdditionCount: proposedAdditions.length,
     csvRowCount: rows.length,
-    csvStatusCounts: rows.reduce((acc, r) => {
-      acc[r.status] = (acc[r.status] || 0) + 1
-      return acc
-    }, {}),
+    csvStatusCounts: stableStatusCounts(rows),
     hardcodedCandidateCount: hardcoded.length,
     hardcodedAllowlistedCount: hardcoded.filter(h => h.allowlisted).length,
     sheetsCapability: {
@@ -690,29 +810,39 @@ function main() {
     },
   }
 
-  const summaryPath = path.join(ARTIFACTS_DIR, 'i18n-audit-summary.json')
-  fs.writeFileSync(summaryPath, `${JSON.stringify(summary, null, 2)}\n`, 'utf8')
+  const summaryPath = path.join(REPO_ROOT, ...SUMMARY_REPO_PATH.split('/'))
+  const summaryJson = await formatWithPrettier(
+    `${JSON.stringify(summary, null, 2)}\n`,
+    summaryPath,
+  )
+  const summaryWritten = writeIfChanged(summaryPath, summaryJson)
 
   const md = buildMarkdown({
     keyCounts,
     placeholderMismatches,
     missingKeys: missing,
-    unusedKeys: [...unusedKeys],
+    unusedKeys: [...unusedKeys].sort(),
     sameAsEn,
-    csvPath,
     hardcoded,
-    sheetsCapability: summary.sheetsCapability,
     proposedAdditions,
     terminology: terminologyNotes(catalogs),
   })
-  const mdPath = path.join(DOCS_DIR, 'i18n-audit.md')
-  fs.writeFileSync(mdPath, md, 'utf8')
+  const mdPath = path.join(REPO_ROOT, ...MD_REPO_PATH.split('/'))
+  const mdFormatted = await formatWithPrettier(md, mdPath)
+  const mdWritten = writeIfChanged(mdPath, mdFormatted)
 
   console.log('Phase 35D2 i18n audit complete')
   console.log(JSON.stringify(summary, null, 2))
-  console.log(`Wrote ${path.relative(REPO_ROOT, csvPath)}`)
-  console.log(`Wrote ${path.relative(REPO_ROOT, mdPath)}`)
-  console.log(`Wrote ${path.relative(REPO_ROOT, summaryPath)}`)
+  console.log(
+    `${csvWritten ? 'Wrote' : 'Unchanged'} ${CSV_REPO_PATH}`,
+  )
+  console.log(`${mdWritten ? 'Wrote' : 'Unchanged'} ${MD_REPO_PATH}`)
+  console.log(
+    `${summaryWritten ? 'Wrote' : 'Unchanged'} ${SUMMARY_REPO_PATH}`,
+  )
 }
 
-main()
+main().catch(error => {
+  console.error(error)
+  process.exitCode = 1
+})
