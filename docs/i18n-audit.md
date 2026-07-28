@@ -136,13 +136,13 @@ _No heuristic hits._
 
 ## 6. Untranslated or suspicious values
 
-Key counts: nl=1077, en=1077, es=1077, zh=1077
+Key counts: nl=1078, en=1078, es=1078, zh=1078
 
 | Locale | Values identical to EN (≥6 chars) |
 | ------ | --------------------------------- |
 | nl     | 37                                |
-| es     | 833                               |
-| zh     | 831                               |
+| es     | 834                               |
+| zh     | 832                               |
 
 Most `es`/`zh` catalog entries still mirror English Default. Treat as **REVIEW** in the CSV (do not auto-rewrite style of already-localised NL).
 
@@ -150,7 +150,7 @@ NL clones excluding allowlist: see CSV `REVIEW` rows with `nl=en`.
 
 ## 7. Stale / unused keys
 
-Count: **68** (heuristic harvest — may include dynamic-only keys).
+Count: **69** (heuristic harvest — may include dynamic-only keys).
 
 Do **not** delete in this phase unless clearly dangerous duplicates. Listed as `UNUSED` in the CSV.
 

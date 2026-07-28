@@ -11,12 +11,22 @@ const loadProfileOptions = vi.fn()
 const generateDeliveryRoute = vi.fn()
 const updateRouteStatus = vi.fn()
 
+function todayLocalDate(): string {
+  const now = new Date()
+  const year = now.getFullYear()
+  const month = String(now.getMonth() + 1).padStart(2, '0')
+  const day = String(now.getDate()).padStart(2, '0')
+  return `${year}-${month}-${day}`
+}
+
+const today = todayLocalDate()
+
 const deliveryRoutes = ref([
   {
     id: 'route-1',
-    deliveryDate: '2026-07-28',
+    deliveryDate: today,
     status: 'ASSIGNED',
-    generatedAt: '2026-07-28T07:00:00.000Z',
+    generatedAt: `${today}T07:00:00.000Z`,
     bezorgerProfileId: 'b1',
     skippedApothekerProfileIds: [],
     locationStatus: null,
@@ -24,7 +34,7 @@ const deliveryRoutes = ref([
       {
         fromStatus: null,
         toStatus: 'ASSIGNED',
-        changedAt: '2026-07-28T07:00:00.000Z',
+        changedAt: `${today}T07:00:00.000Z`,
       },
     ],
     stops: [
