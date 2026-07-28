@@ -85,3 +85,17 @@ export function notificationReadLabel(isRead: boolean): string {
     isRead ? 'status.notification.read' : 'status.notification.unread',
   )
 }
+
+export function deliveryMethodLabel(method: string | null | undefined): string {
+  if (method == null || method === '') {
+    return translate('orderHistory.value.unavailable')
+  }
+  const value = String(method)
+  if (value === 'ADMIN') {
+    return translate('orderHistory.deliveryMethod.admin')
+  }
+  if (value === 'QR') {
+    return translate('orderHistory.deliveryMethod.qr')
+  }
+  return translate('common.unknown')
+}

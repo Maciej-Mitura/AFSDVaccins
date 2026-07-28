@@ -115,6 +115,11 @@ const router = createRouter({
           component: () => import('@/views/apotheker/ViewApothekerOrders.vue'),
         },
         {
+          path: 'history',
+          name: 'apotheker-history',
+          component: () => import('@/views/apotheker/ViewApothekerHistory.vue'),
+        },
+        {
           path: 'notifications',
           name: 'apotheker-notifications',
           component: () =>
@@ -162,6 +167,11 @@ const router = createRouter({
           path: 'orders',
           name: 'admin-orders',
           component: () => import('@/views/admin/ViewAdminOrders.vue'),
+        },
+        {
+          path: 'history',
+          name: 'admin-history',
+          component: () => import('@/views/admin/ViewAdminHistory.vue'),
         },
         {
           path: 'route-templates',

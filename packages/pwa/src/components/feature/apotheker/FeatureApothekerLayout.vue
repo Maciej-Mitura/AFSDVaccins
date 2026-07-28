@@ -32,6 +32,7 @@ const apothekerNavLinks = computed<AppShellLink[]>(() => [
   { label: t('navigation.apotheker.vaccines'), to: '/apotheker/vaccines' },
   { label: t('navigation.apotheker.newOrder'), to: '/apotheker/orders/new' },
   { label: t('navigation.apotheker.orders'), to: '/apotheker/orders' },
+  { label: t('navigation.apotheker.history'), to: '/apotheker/history' },
 ])
 
 const apothekerAccountLinks = computed<AppShellLink[]>(() => [

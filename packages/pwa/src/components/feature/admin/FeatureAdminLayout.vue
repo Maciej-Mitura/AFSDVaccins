@@ -29,6 +29,7 @@ const { t } = useI18n()
 const adminNavLinks = computed<AppShellLink[]>(() => [
   { label: t('navigation.admin.dashboard'), to: '/admin' },
   { label: t('navigation.admin.orders'), to: '/admin/orders' },
+  { label: t('navigation.admin.history'), to: '/admin/history' },
   { label: t('navigation.admin.routePlanning'), to: '/admin/route-planning' },
   { label: t('navigation.admin.routeTemplates'), to: '/admin/route-templates' },
   {

@@ -73,6 +73,7 @@ export {
   operationsFeedEventTypeLabel,
   activeInactiveLabel,
   notificationReadLabel,
+  deliveryMethodLabel,
 } from './status-labels'
 export {
   isVaccineImageBrowseable,
