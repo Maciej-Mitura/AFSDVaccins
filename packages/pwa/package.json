@@ -18,7 +18,8 @@
     "typecheck": "vue-tsc --build",
     "lint": "eslint .",
     "test": "vitest run",
-    "audit:hardcoded-strings": "node ./scripts/audit-hardcoded-strings.mjs"
+    "audit:hardcoded-strings": "node ./scripts/audit-hardcoded-strings.mjs",
+    "audit:i18n": "node ./scripts/phase35d2-i18n-audit.mjs"
   },
   "dependencies": {
     "@apollo/client": "^3.14.0",

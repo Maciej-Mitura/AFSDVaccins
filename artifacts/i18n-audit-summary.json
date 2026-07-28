@@ -1,0 +1,58 @@
+{
+  "generatedBy": "phase35d2-i18n-audit.mjs",
+  "locales": ["nl", "en", "es", "zh"],
+  "keyCounts": {
+    "nl": 1020,
+    "en": 1020,
+    "es": 1020,
+    "zh": 1020
+  },
+  "placeholderMismatchCount": 0,
+  "missingKeyCount": 22,
+  "missingKeys": [
+    "arrival.arrivedAt",
+    "arrival.cancelPending",
+    "arrival.cancelPendingConfirm",
+    "arrival.conflict",
+    "arrival.discardPending",
+    "arrival.markArrived",
+    "arrival.pending",
+    "arrival.retrySync",
+    "arrival.synchronising",
+    "arrival.unableToRecord",
+    "arrival.willSyncWhenOnline",
+    "deliveryManifest.downloadRoute",
+    "deliveryManifest.downloadRouteAria",
+    "deliveryManifest.downloadStop",
+    "deliveryManifest.downloadStopAria",
+    "deliveryManifest.downloaded",
+    "deliveryManifest.error.forbidden",
+    "deliveryManifest.error.unable",
+    "deliveryManifest.error.unavailable",
+    "deliveryManifest.generating",
+    "errors.deliveryArrival.generic",
+    "errors.deliveryArrival.network"
+  ],
+  "unusedKeyCount": 61,
+  "sameAsEn": {
+    "nl": 33,
+    "es": 830,
+    "zh": 829
+  },
+  "proposedAdditionCount": 51,
+  "csvRowCount": 940,
+  "csvStatusCounts": {
+    "ADD": 51,
+    "REVIEW": 828,
+    "UNUSED": 61
+  },
+  "hardcodedCandidateCount": 5,
+  "hardcodedAllowlistedCount": 5,
+  "sheetsCapability": {
+    "read": true,
+    "writeKeysOnly": true,
+    "writeFullCatalog": false,
+    "dryRun": true,
+    "overwritesHumanTranslations": false
+  }
+}

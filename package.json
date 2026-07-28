@@ -28,6 +28,7 @@
     "validate:production-readiness": "node --test infrastructure/production-readiness.validation.test.mjs",
     "bootstrap:database:demo": "npm run bootstrap:database:demo --workspace=@vaccin-delivery/api",
     "export:i18n": "npm run export --workspace=@vaccin-delivery/i18n-export",
+    "audit:i18n": "npm run audit:i18n --workspace=@vaccin-delivery/pwa",
     "sync:i18n:keys": "npm exec --workspace=@vaccin-delivery/i18n-export -- tsx src/sync-keys.ts",
     "lint:api": "npm run lint --workspace=@vaccin-delivery/api",
     "lint:pwa": "npm run lint --workspace=@vaccin-delivery/pwa",
