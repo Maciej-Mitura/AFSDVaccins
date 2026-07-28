@@ -2,6 +2,8 @@
  * Phase 34C voice recorder state machine and MIME negotiation helpers.
  */
 
+import { translate } from '@/i18n'
+
 export const VOICE_RECORDER_STATES = [
   'IDLE',
   'REQUESTING_PERMISSION',
@@ -191,13 +193,26 @@ export function formatDurationSeconds(totalSeconds: number): string {
 }
 
 export function formatFileSizeBytes(bytes: number): string {
+  const unitBytes = translate('routeVoiceReports.preview.unit.bytes')
+  const unitKib = translate('routeVoiceReports.preview.unit.kib')
+  const unitMib = translate('routeVoiceReports.preview.unit.mib')
+
   if (bytes < 1024) {
-    return `${bytes} B`
+    return translate('routeVoiceReports.preview.fileSizeValue', {
+      size: String(bytes),
+      unit: unitBytes,
+    })
   }
   if (bytes < 1024 * 1024) {
-    return `${(bytes / 1024).toFixed(1)} KiB`
+    return translate('routeVoiceReports.preview.fileSizeValue', {
+      size: (bytes / 1024).toFixed(1),
+      unit: unitKib,
+    })
   }
-  return `${(bytes / (1024 * 1024)).toFixed(2)} MiB`
+  return translate('routeVoiceReports.preview.fileSizeValue', {
+    size: (bytes / (1024 * 1024)).toFixed(2),
+    unit: unitMib,
+  })
 }
 
 export function defaultSelectedLocaleFromUi(

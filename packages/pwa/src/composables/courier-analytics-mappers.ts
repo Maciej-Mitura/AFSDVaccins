@@ -6,6 +6,7 @@
 import { CourierAnalyticsDataCompleteness } from '@vaccin-delivery/types'
 
 import type { CourierPerformanceAnalyticsQuery } from '@/assets/graphql/courier-analytics'
+import { translate } from '@/i18n'
 
 export type AnalyticsPayload = NonNullable<
   CourierPerformanceAnalyticsQuery['courierPerformanceAnalytics']
@@ -92,14 +93,14 @@ export function isInsufficient(
 
 export function formatScore(value: number | null | undefined): string {
   if (value === null || value === undefined || Number.isNaN(value)) {
-    return '—'
+    return translate('common.emDash')
   }
   return value.toFixed(1)
 }
 
 export function formatRatePercent(value: number | null | undefined): string {
   if (value === null || value === undefined || Number.isNaN(value)) {
-    return '—'
+    return translate('common.emDash')
   }
   return `${value.toFixed(1)}%`
 }
@@ -108,19 +109,27 @@ export function formatHandlingDuration(
   seconds: number | null | undefined,
 ): string {
   if (seconds === null || seconds === undefined || !Number.isFinite(seconds)) {
-    return '—'
+    return translate('common.emDash')
   }
   const total = Math.max(0, Math.round(seconds))
   const hours = Math.floor(total / 3600)
   const minutes = Math.floor((total % 3600) / 60)
   const secs = total % 60
   if (hours > 0) {
-    return `${hours}h ${minutes}m`
+    return translate('admin.courierAnalytics.duration.hoursMinutes', {
+      hours,
+      minutes,
+    })
   }
   if (minutes > 0) {
-    return `${minutes}m ${secs}s`
+    return translate('admin.courierAnalytics.duration.minutesSeconds', {
+      minutes,
+      seconds: secs,
+    })
   }
-  return `${secs}s`
+  return translate('admin.courierAnalytics.duration.secondsOnly', {
+    seconds: secs,
+  })
 }
 
 /**

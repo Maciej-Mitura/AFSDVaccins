@@ -64,38 +64,13 @@ const HARDCODED_AUDIT_GLOBS = [
 
 /**
  * Allowlist: path substring + regex that may contain hard-coded user text.
- * Keep narrow — only justified exceptions.
+ * Keep narrow — only justified remaining exceptions after Phase 35D3.
  */
 const HARDCODED_ALLOWLIST = [
-  {
-    pathIncludes: 'notification-display.ts',
-    pattern: /'A pharmacy'|'Notification'/,
-    reason: 'Tracked ADD fallbacks; migrate to notifications.fallback.*',
-  },
-  {
-    pathIncludes: 'courier-analytics-mappers.ts',
-    pattern: /'—'|`\$\{hours\}h|`\$\{minutes\}m|`\$\{secs\}s|`\$\{seconds\}s/,
-    reason: 'Tracked ADD duration / emDash keys',
-  },
-  {
-    pathIncludes: 'voice-recorder-types.ts',
-    pattern: /'B'|'KiB'|'MiB'/,
-    reason: 'Tracked ADD file-size unit keys',
-  },
   {
     pathIncludes: 'supported-locales.ts',
     pattern: /Nederlands|English|Español|中文/,
     reason: 'Language endonyms are intentional',
-  },
-  {
-    pathIncludes: 'ViewAdminDashboard.vue',
-    pattern: /event\.message/,
-    reason: 'API Dutch feed copy — architectural follow-up, not a missing key',
-  },
-  {
-    pathIncludes: 'ViewAdminOrders.vue',
-    pattern: /event\.message/,
-    reason: 'API Dutch feed copy — architectural follow-up, not a missing key',
   },
 ]
 
@@ -229,13 +204,15 @@ function buildCsvRows(catalogs, unusedKeys, proposedAdditions) {
     const exists = catalogs.en[add.key] !== undefined
     rows.push({
       key: add.key,
-      nl: add.nl,
-      en: add.en,
-      es: add.es,
-      zh: add.zh,
-      status: exists ? 'UPDATE' : 'ADD',
+      nl: add.nl || catalogs.nl[add.key] || '',
+      en: add.en || catalogs.en[add.key] || '',
+      es: add.es || catalogs.es[add.key] || '',
+      zh: add.zh || catalogs.zh[add.key] || '',
+      status: exists ? 'READY_FOR_SHEET' : 'ADD',
       source: add.source,
-      notes: add.notes,
+      notes: exists
+        ? `IMPLEMENTED in runtime catalogs — copy to Sheet then npm run export:i18n. ${add.notes}`
+        : add.notes,
     })
   }
 
@@ -283,7 +260,13 @@ function buildCsvRows(catalogs, unusedKeys, proposedAdditions) {
   }
 
   // Stable sort: status order then key
-  const statusOrder = { ADD: 0, UPDATE: 1, REVIEW: 2, UNUSED: 3 }
+  const statusOrder = {
+    ADD: 0,
+    READY_FOR_SHEET: 1,
+    UPDATE: 2,
+    REVIEW: 3,
+    UNUSED: 4,
+  }
   rows.sort((a, b) => {
     const sa = statusOrder[a.status] ?? 9
     const sb = statusOrder[b.status] ?? 9
@@ -541,13 +524,13 @@ See git status after the agent run. Expected deliverables:
 
 - CSV: \`${path.relative(REPO_ROOT, csvPath).replaceAll('\\\\', '/')}\`
 - Columns: \`key,nl,en,es,zh,status,source,notes\`
-- Statuses: \`ADD\`, \`UPDATE\`, \`REVIEW\`, \`UNUSED\`
+- Statuses: \`ADD\`, \`READY_FOR_SHEET\`, \`UPDATE\`, \`REVIEW\`, \`UNUSED\`
 
 ### Mapping CSV → Google Sheet tabs
 
 Each locale tab expects: \`Key | Default | {locale}\`.
 
-For each CSV \`ADD\` row:
+For each CSV \`READY_FOR_SHEET\` / \`ADD\` row:
 
 1. On tab \`en\`: Key=\`key\`, Default=\`en\`, en=\`en\`
 2. On tab \`nl\`: Key=\`key\`, Default=\`en\`, nl=\`nl\`
@@ -556,7 +539,15 @@ For each CSV \`ADD\` row:
 
 Prefer Default = English. Then run \`npm run export:i18n\`.
 
-**Critical gap:** Phase 28C (\`arrival.*\`, \`errors.deliveryArrival.*\`) and Phase 29A (\`deliveryManifest.*\`) keys exist in \`packages/i18n-export/src/phase28c-keys.ts\` / \`phase29a-keys.ts\` and are used in the PWA, but are **absent from committed locale JSON**. Until Sheet import + export, those UI paths can surface raw keys via vue-i18n fallback.
+**Phase 35D3:** runtime catalogs already contain these keys (\`READY_FOR_SHEET\`). Sheet import remains manual so the spreadsheet stays the long-term source of truth.
+
+**Manual workflow:**
+
+1. Import or copy \`READY_FOR_SHEET\` / \`ADD\` rows into the Sheet;
+2. Preserve \`Key | Default | locale\` structure;
+3. Run \`npm run export:i18n\`;
+4. Run \`npm run audit:i18n\`;
+5. Review the diff before commit.
 
 ## 11. Exact safe commands
 

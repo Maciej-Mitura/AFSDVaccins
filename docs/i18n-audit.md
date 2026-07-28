@@ -51,38 +51,19 @@ Spreadsheet / document identifiers are treated as secret — not printed here.
 
 ## 3. Missing keys (code → catalog)
 
-- `arrival.arrivedAt` — `views/bezorger/ViewBezorgerTodayRoute.vue`
-- `arrival.cancelPending` — `views/bezorger/ViewBezorgerTodayRoute.vue`
-- `arrival.cancelPendingConfirm` — `views/bezorger/ViewBezorgerTodayRoute.vue`
-- `arrival.conflict` — `views/bezorger/ViewBezorgerTodayRoute.vue`
-- `arrival.discardPending` — `views/bezorger/ViewBezorgerTodayRoute.vue`
-- `arrival.markArrived` — `views/bezorger/ViewBezorgerTodayRoute.vue`
-- `arrival.pending` — `views/bezorger/ViewBezorgerTodayRoute.vue`
-- `arrival.retrySync` — `views/bezorger/ViewBezorgerTodayRoute.vue`
-- `arrival.synchronising` — `views/bezorger/ViewBezorgerTodayRoute.vue`
-- `arrival.unableToRecord` — `views/bezorger/ViewBezorgerTodayRoute.vue`
-- `arrival.willSyncWhenOnline` — `views/bezorger/ViewBezorgerTodayRoute.vue`
-- `deliveryManifest.downloaded` — `composables/useDeliveryManifestDownload.ts`
-- `deliveryManifest.downloadRoute` — `views/admin/ViewAdminRoutePlanning.vue`
-- `deliveryManifest.downloadRoute` — `views/bezorger/ViewBezorgerTodayRoute.vue`
-- `deliveryManifest.downloadRouteAria` — `views/admin/ViewAdminRoutePlanning.vue`
-- `deliveryManifest.downloadRouteAria` — `views/bezorger/ViewBezorgerTodayRoute.vue`
-- `deliveryManifest.downloadStop` — `components/feature/apotheker/FeatureApothekerPlannedDeliveries.vue`
-- `deliveryManifest.downloadStopAria` — `components/feature/apotheker/FeatureApothekerPlannedDeliveries.vue`
-- `deliveryManifest.error.forbidden` — `composables/useDeliveryManifestDownload.ts`
-- `deliveryManifest.error.unable` — `composables/useDeliveryManifestDownload.ts`
-- `deliveryManifest.error.unavailable` — `composables/useDeliveryManifestDownload.ts`
-- `deliveryManifest.generating` — `components/feature/apotheker/FeatureApothekerPlannedDeliveries.vue`
-- `deliveryManifest.generating` — `views/admin/ViewAdminRoutePlanning.vue`
-- `deliveryManifest.generating` — `views/bezorger/ViewBezorgerTodayRoute.vue`
-- `errors.deliveryArrival.generic` — `api/delivery-arrival-errors.ts`
-- `errors.deliveryArrival.network` — `api/delivery-arrival-errors.ts`
+_None found_ in non-test `t()` / `translate()` calls.
 
 Proposed ADD keys (hard-coded gaps, not yet wired in code):
 
 - `admin.courierAnalytics.duration.hoursMinutes` — Localise formatHandlingDuration hour+minute units
 - `admin.courierAnalytics.duration.minutesSeconds` — Localise formatHandlingDuration minute+second units
 - `admin.courierAnalytics.duration.secondsOnly` — Localise formatHandlingDuration seconds-only unit
+- `admin.operationsFeed.lowStock` — Phase 35D3 — structured LOW_STOCK feed detail
+- `admin.operationsFeed.newOrder` — Phase 35D3 — structured NEW_ORDER feed detail (no event.message)
+- `admin.operationsFeed.orderStatusChanged` — Phase 35D3 — structured ORDER_STATUS_CHANGED feed detail
+- `admin.operationsFeed.unknown` — Phase 35D3 — generic feed fallback
+- `app.description` — Phase 35D3 — localised document meta description
+- `app.shortName` — Phase 35D3 — PWA short name (brand abbreviation)
 - `arrival.arrived` — Phase 28C key file; ensure Sheet + catalogs include it
 - `arrival.arrivedAt` — Phase 28C — missing from catalogs; preserve {time}
 - `arrival.cancelPending` — Phase 28C — missing from catalogs
@@ -138,7 +119,7 @@ _None_ — placeholder token multisets match across nl/en/es/zh for every key.
 
 ## 5. Hard-coded visible strings (audited feature paths)
 
-Allowlisted / tracked findings: **5**  
+Allowlisted / tracked findings: **0**  
 Non-allowlisted candidates: **0**
 
 ### Priority findings (manual)
@@ -151,21 +132,17 @@ Non-allowlisted candidates: **0**
 
 Sample rows:
 
-- `composables/courier-analytics-mappers.ts:118` _(allowlisted)_: `return '${hours}h ${minutes}m'`
-- `utils/notification-display.ts:77` _(allowlisted)_: `? 'A pharmacy'`
-- `utils/notification-display.ts:119` _(allowlisted)_: `return 'Notification'`
-- `views/admin/ViewAdminDashboard.vue:185` _(allowlisted)_: `— {{ event.message }}`
-- `views/admin/ViewAdminOrders.vue:323` _(allowlisted)_: `— {{ event.message }}`
+_No heuristic hits._
 
 ## 6. Untranslated or suspicious values
 
-Key counts: nl=1020, en=1020, es=1020, zh=1020
+Key counts: nl=1077, en=1077, es=1077, zh=1077
 
 | Locale | Values identical to EN (≥6 chars) |
 | ------ | --------------------------------- |
-| nl     | 33                                |
-| es     | 830                               |
-| zh     | 829                               |
+| nl     | 37                                |
+| es     | 833                               |
+| zh     | 831                               |
 
 Most `es`/`zh` catalog entries still mirror English Default. Treat as **REVIEW** in the CSV (do not auto-rewrite style of already-localised NL).
 
@@ -173,13 +150,13 @@ NL clones excluding allowlist: see CSV `REVIEW` rows with `nl=en`.
 
 ## 7. Stale / unused keys
 
-Count: **61** (heuristic harvest — may include dynamic-only keys).
+Count: **68** (heuristic harvest — may include dynamic-only keys).
 
 Do **not** delete in this phase unless clearly dangerous duplicates. Listed as `UNUSED` in the CSV.
 
 ## 8. Terminology consistency
 
-- Courier-related keys: 242; pharmacist/pharmacy-related keys: 84. Prefer "bezorger"/"apotheker" in Dutch UI and "courier"/"pharmacist" in English.
+- Courier-related keys: 245; pharmacist/pharmacy-related keys: 84. Prefer "bezorger"/"apotheker" in Dutch UI and "courier"/"pharmacist" in English.
 
 Keep: order / delivery / route / stop / doses / history / notifications / voice report / transcription aligned with existing NL product language (`bestelling`, `levering`, `route`, `stop`, `dosissen`, `geschiedenis`, `meldingen`, `spraakrapport`, `transcriptie`).
 
@@ -197,13 +174,13 @@ See git status after the agent run. Expected deliverables:
 
 - CSV: `artifacts\i18n-sheet-import.csv`
 - Columns: `key,nl,en,es,zh,status,source,notes`
-- Statuses: `ADD`, `UPDATE`, `REVIEW`, `UNUSED`
+- Statuses: `ADD`, `READY_FOR_SHEET`, `UPDATE`, `REVIEW`, `UNUSED`
 
 ### Mapping CSV → Google Sheet tabs
 
 Each locale tab expects: `Key | Default | {locale}`.
 
-For each CSV `ADD` row:
+For each CSV `READY_FOR_SHEET` / `ADD` row:
 
 1. On tab `en`: Key=`key`, Default=`en`, en=`en`
 2. On tab `nl`: Key=`key`, Default=`en`, nl=`nl`
@@ -212,7 +189,15 @@ For each CSV `ADD` row:
 
 Prefer Default = English. Then run `npm run export:i18n`.
 
-**Critical gap:** Phase 28C (`arrival.*`, `errors.deliveryArrival.*`) and Phase 29A (`deliveryManifest.*`) keys exist in `packages/i18n-export/src/phase28c-keys.ts` / `phase29a-keys.ts` and are used in the PWA, but are **absent from committed locale JSON**. Until Sheet import + export, those UI paths can surface raw keys via vue-i18n fallback.
+**Phase 35D3:** runtime catalogs already contain these keys (`READY_FOR_SHEET`). Sheet import remains manual so the spreadsheet stays the long-term source of truth.
+
+**Manual workflow:**
+
+1. Import or copy `READY_FOR_SHEET` / `ADD` rows into the Sheet;
+2. Preserve `Key | Default | locale` structure;
+3. Run `npm run export:i18n`;
+4. Run `npm run audit:i18n`;
+5. Review the diff before commit.
 
 ## 11. Exact safe commands
 

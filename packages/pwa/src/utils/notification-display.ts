@@ -26,6 +26,8 @@ export type TranslateFn = (
 const OPTIONAL_EMPTY_KEYS = ['city'] as const
 
 const FALLBACK_PHARMACY_KEY = 'notifications.fallback.pharmacyName'
+const FALLBACK_TITLE_KEY = 'notifications.fallback.title'
+const FALLBACK_BODY_KEY = 'notifications.fallback.body'
 const NEXT_STOP_BODY_KEY = 'notifications.apotheker.nextStop.body'
 const NEXT_STOP_BODY_NO_CITY_KEY = 'notifications.apotheker.nextStop.bodyNoCity'
 
@@ -46,6 +48,15 @@ function scalarToDisplayString(value: unknown): string {
   if (typeof value === 'string' || typeof value === 'number') {
     return String(value)
   }
+  return ''
+}
+
+function resolveCatalogFallback(t: TranslateFn, key: string): string {
+  const translated = t(key)
+  if (!looksUnresolved(translated, key)) {
+    return translated
+  }
+  // Last resort — never return a dotted key or English hardcode.
   return ''
 }
 
@@ -74,7 +85,7 @@ function toTranslateValues(
   if (!pharmacyName) {
     const fallback = t(FALLBACK_PHARMACY_KEY)
     values.pharmacyName = looksUnresolved(fallback, FALLBACK_PHARMACY_KEY)
-      ? 'A pharmacy'
+      ? resolveCatalogFallback(t, FALLBACK_TITLE_KEY)
       : fallback
   }
 
@@ -98,6 +109,7 @@ function resolveKeyedText(
   mirrored: string,
   values: Record<string, unknown>,
   t: TranslateFn,
+  catalogFallbackKey: string,
 ): string {
   const resolvedKey = key || (looksLikeI18nKey(mirrored) ? mirrored : null)
 
@@ -116,7 +128,7 @@ function resolveKeyedText(
     )
   }
 
-  return 'Notification'
+  return resolveCatalogFallback(t, catalogFallbackKey)
 }
 
 export function resolveNotificationTitle(
@@ -124,7 +136,13 @@ export function resolveNotificationTitle(
   t: TranslateFn,
 ): string {
   const values = toTranslateValues(notification.interpolationData, t)
-  return resolveKeyedText(notification.titleKey, notification.title, values, t)
+  return resolveKeyedText(
+    notification.titleKey,
+    notification.title,
+    values,
+    t,
+    FALLBACK_TITLE_KEY,
+  )
 }
 
 export function resolveNotificationBody(
@@ -141,7 +159,13 @@ export function resolveNotificationBody(
     bodyKey = NEXT_STOP_BODY_NO_CITY_KEY
   }
 
-  return resolveKeyedText(bodyKey, notification.body, values, t)
+  return resolveKeyedText(
+    bodyKey,
+    notification.body,
+    values,
+    t,
+    FALLBACK_BODY_KEY,
+  )
 }
 
 export function resolveNotificationCopy(

@@ -45,8 +45,8 @@ export default defineConfig(({ mode }) => {
           name: 'Vaccinatie-levering',
           short_name: 'Vaccin',
           description:
-            'Platform voor vaccinbestellingen, voorraad en bezorgroutes.',
-          lang: 'nl',
+            'Platform for vaccine orders, stock and delivery routes.',
+          lang: 'en',
           start_url: '/',
           scope: '/',
           display: 'standalone',

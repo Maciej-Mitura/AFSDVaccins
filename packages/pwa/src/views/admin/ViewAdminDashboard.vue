@@ -21,6 +21,7 @@ import {
   orderStatusLabel,
   userRoleLabel,
 } from '@/i18n'
+import { resolveOperationsFeedDetail } from '@/utils/operations-feed-display'
 
 const { t } = useI18n()
 const { currentUser, loading: userLoading } = useCurrentUser()
@@ -182,7 +183,7 @@ onUnmounted(() => {
           <span class="font-medium">{{
             operationsFeedEventTypeLabel(event.eventType)
           }}</span>
-          — {{ event.message }}
+          — {{ resolveOperationsFeedDetail(event, t) }}
         </li>
       </ul>
     </UCard>

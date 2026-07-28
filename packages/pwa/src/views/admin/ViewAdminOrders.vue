@@ -20,6 +20,7 @@ import {
   orderStatusLabel,
   translatePlural,
 } from '@/i18n'
+import { resolveOperationsFeedDetail } from '@/utils/operations-feed-display'
 
 const { t } = useI18n()
 const { isOnline } = useOnlineStatus()
@@ -320,7 +321,7 @@ function historyEntryLabel(entry: {
           <span class="font-medium">{{
             operationsFeedEventTypeLabel(event.eventType)
           }}</span>
-          — {{ event.message }}
+          — {{ resolveOperationsFeedDetail(event, t) }}
         </li>
       </ul>
     </UCard>

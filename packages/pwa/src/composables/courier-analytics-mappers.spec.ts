@@ -1,5 +1,5 @@
 import { CourierAnalyticsDataCompleteness } from '@vaccin-delivery/types'
-import { describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 
 import {
   formatHandlingDuration,
@@ -17,6 +17,10 @@ import {
   type AnalyticsPayload,
   type RankingRow,
 } from '@/composables/courier-analytics-mappers'
+import { __resetAppI18nForTests } from '@/i18n'
+import { __resetLocaleLoaderForTests } from '@/i18n/locale-loader'
+import { createTestI18n } from '@/i18n/test-utils'
+import { useLanguage } from '@/composables/useLanguage'
 
 function rawMetrics(overrides: Partial<RankingRow['rawMetrics']> = {}) {
   return {
@@ -177,6 +181,17 @@ function samplePayload(
 }
 
 describe('courier-analytics-mappers', () => {
+  beforeEach(() => {
+    __resetLocaleLoaderForTests()
+    __resetAppI18nForTests()
+    createTestI18n('en')
+  })
+
+  afterEach(() => {
+    __resetLocaleLoaderForTests()
+    __resetAppI18nForTests()
+  })
+
   it('maps KPI cards from summary without inventing rates', () => {
     const cards = mapKpiCards(samplePayload().summary)
     expect(cards).toHaveLength(6)
@@ -245,11 +260,19 @@ describe('courier-analytics-mappers', () => {
     expect(items[0]?.sampleCount).toBe(12)
   })
 
-  it('formats handling durations readably', () => {
+  it('formats handling durations readably', async () => {
     expect(formatHandlingDuration(45)).toBe('45s')
     expect(formatHandlingDuration(125)).toBe('2m 5s')
     expect(formatHandlingDuration(3725)).toBe('1h 2m')
     expect(formatHandlingDuration(null)).toBe('—')
+
+    const { setLocale } = useLanguage()
+    await setLocale('nl')
+    expect(formatHandlingDuration(3725)).toBe('1u 2m')
+    await setLocale('zh')
+    expect(formatHandlingDuration(45)).toBe('45秒')
+    await setLocale('es')
+    expect(formatHandlingDuration(125)).toBe('2min 5s')
   })
 
   it('formats scores and null rates without inventing perfect values', () => {

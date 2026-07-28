@@ -20,7 +20,13 @@ describe('PWA safety and configuration', () => {
     expect(viteConfig).toContain("display: 'standalone'")
     expect(viteConfig).toContain("start_url: '/'")
     expect(viteConfig).toContain("scope: '/'")
-    expect(viteConfig).toContain("lang: 'nl'")
+    expect(viteConfig).toContain("lang: 'en'")
+    expect(viteConfig).toContain(
+      'Platform for vaccine orders, stock and delivery routes.',
+    )
+    expect(viteConfig).not.toContain(
+      'Platform voor vaccinbestellingen, voorraad en bezorgroutes.',
+    )
     expect(viteConfig).toContain('theme_color')
     expect(viteConfig).toContain('background_color')
     expect(viteConfig).toContain('icons/icon-192.png')

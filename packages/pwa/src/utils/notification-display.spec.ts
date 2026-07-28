@@ -23,6 +23,8 @@ describe('notification display resolution', () => {
       '{pharmacyName} placed an order for delivery on {routeDate} ({orderCount} products).',
     'notifications.admin.newOrder.title': 'New order received',
     'notifications.fallback.pharmacyName': 'A pharmacy',
+    'notifications.fallback.title': 'Notification',
+    'notifications.fallback.body': 'Notification',
   }
 
   const t = (key: string, values?: Record<string, unknown>) => {
@@ -98,6 +100,8 @@ describe('notification display resolution', () => {
 
     expect(copy.title).not.toMatch(/^notifications\./)
     expect(copy.body).not.toMatch(/^notifications\./)
+    expect(copy.title).toBe('Notification')
+    expect(copy.body).toBe('Notification')
   })
 
   it('omits optional city without braces or undefined', () => {

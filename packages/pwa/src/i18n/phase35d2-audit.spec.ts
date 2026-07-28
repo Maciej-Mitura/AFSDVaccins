@@ -73,12 +73,19 @@ describe('phase35d2 i18n audit', () => {
       csv1.trim().split('\n').slice(1).map(parseCsvStatusColumn),
     )
     for (const status of statuses) {
-      expect(['ADD', 'UPDATE', 'REVIEW', 'UNUSED']).toContain(status)
+      expect([
+        'ADD',
+        'READY_FOR_SHEET',
+        'UPDATE',
+        'REVIEW',
+        'UNUSED',
+      ]).toContain(status)
     }
 
     const summary = JSON.parse(summary1) as {
       keyCounts: Record<string, number>
       placeholderMismatchCount: number
+      missingKeyCount: number
       missingKeys: string[]
       sheetsCapability: {
         writeFullCatalog: boolean
@@ -95,11 +102,12 @@ describe('phase35d2 i18n audit', () => {
     expect(summary.sheetsCapability.writeFullCatalog).toBe(false)
     expect(summary.sheetsCapability.overwritesHumanTranslations).toBe(false)
     expect(summary.sheetsCapability.dryRun).toBe(true)
-    expect(summary.csvStatusCounts.ADD).toBeGreaterThan(0)
+    expect(summary.csvStatusCounts.READY_FOR_SHEET).toBeGreaterThan(0)
     expect(summary.csvStatusCounts.REVIEW).toBeGreaterThan(0)
     expect(csv1).toContain('arrival.markArrived')
     expect(csv1).toContain('deliveryManifest.downloadRoute')
-    expect(summary.missingKeys).toContain('arrival.markArrived')
+    expect(summary.missingKeys).not.toContain('arrival.markArrived')
+    expect(summary.missingKeyCount).toBe(0)
 
     expect(md1).toContain('Phase 35D2')
     expect(md1).toContain('Exact safe commands')

@@ -1,6 +1,6 @@
 import { loadLocaleWithFallback } from './locale-loader'
 import { resolveInitialLocale } from './locale-resolution'
-import { createAppI18n, type AppI18n } from './app-i18n'
+import { createAppI18n, getAppI18n, type AppI18n } from './app-i18n'
 import { FALLBACK_LOCALE, type SupportedLocale } from './supported-locales'
 
 export { flatKeyMessageResolver } from './message-resolver'
@@ -11,11 +11,32 @@ export {
   type AppI18n,
 } from './app-i18n'
 
+/**
+ * Sync document language + shell title/description with the active UI locale.
+ * Brand name stays `app.title` (product identity across locales).
+ */
 export function syncDocumentLang(locale: SupportedLocale): void {
   if (typeof document === 'undefined') {
     return
   }
   document.documentElement.lang = locale
+
+  try {
+    const i18n = getAppI18n()
+    const title = String(i18n.global.t('app.title'))
+    const description = String(i18n.global.t('app.description'))
+
+    if (title && title !== 'app.title') {
+      document.title = title
+    }
+
+    const meta = document.querySelector('meta[name="description"]')
+    if (meta && description && description !== 'app.description') {
+      meta.setAttribute('content', description)
+    }
+  } catch {
+    // Bootstrap / tests may call before messages are loaded — lang still set.
+  }
 }
 
 /**

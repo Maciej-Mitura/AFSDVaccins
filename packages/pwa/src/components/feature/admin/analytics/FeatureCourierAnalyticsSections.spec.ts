@@ -1,21 +1,28 @@
 /**
  * @vitest-environment happy-dom
  */
-import { describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { mount } from '@vue/test-utils'
 import { CourierAnalyticsDataCompleteness } from '@vaccin-delivery/types'
 
-vi.mock('vue-i18n', () => ({
-  useI18n: () => ({
-    t: (key: string, params?: Record<string, unknown>) =>
-      params ? `${key}:${JSON.stringify(params)}` : key,
-  }),
-}))
+vi.mock('vue-i18n', async importOriginal => {
+  const actual = await importOriginal<typeof import('vue-i18n')>()
+  return {
+    ...actual,
+    useI18n: () => ({
+      t: (key: string, params?: Record<string, unknown>) =>
+        params ? `${key}:${JSON.stringify(params)}` : key,
+    }),
+  }
+})
 
 import FeatureCourierAnalyticsKpi from '@/components/feature/admin/analytics/FeatureCourierAnalyticsKpi.vue'
 import FeatureCourierAnalyticsLeaderboard from '@/components/feature/admin/analytics/FeatureCourierAnalyticsLeaderboard.vue'
 import FeatureCourierAnalyticsDetail from '@/components/feature/admin/analytics/FeatureCourierAnalyticsDetail.vue'
 import type { RankingRow } from '@/composables/courier-analytics-mappers'
+import { __resetAppI18nForTests } from '@/i18n'
+import { __resetLocaleLoaderForTests } from '@/i18n/locale-loader'
+import { createTestI18n } from '@/i18n/test-utils'
 
 function ranking(partial: Partial<RankingRow> = {}): RankingRow {
   return {
@@ -77,6 +84,17 @@ function ranking(partial: Partial<RankingRow> = {}): RankingRow {
 }
 
 describe('courier analytics UI sections', () => {
+  beforeEach(() => {
+    __resetLocaleLoaderForTests()
+    __resetAppI18nForTests()
+    createTestI18n('en')
+  })
+
+  afterEach(() => {
+    __resetLocaleLoaderForTests()
+    __resetAppI18nForTests()
+  })
+
   it('renders KPI card values', () => {
     const wrapper = mount(FeatureCourierAnalyticsKpi, {
       props: {

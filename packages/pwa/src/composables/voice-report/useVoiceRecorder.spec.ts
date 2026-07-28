@@ -16,6 +16,9 @@ import {
   stopMediaStreamTracks,
 } from '@/composables/voice-report/voice-recorder-types'
 import { useVoiceRecorder } from '@/composables/voice-report/useVoiceRecorder'
+import { __resetAppI18nForTests } from '@/i18n'
+import { __resetLocaleLoaderForTests } from '@/i18n/locale-loader'
+import { createTestI18n } from '@/i18n/test-utils'
 
 function createMockTrack() {
   return {
@@ -160,8 +163,14 @@ describe('voice-recorder-types', () => {
   })
 
   it('formats duration and size', () => {
+    __resetLocaleLoaderForTests()
+    __resetAppI18nForTests()
+    createTestI18n('en')
     expect(formatDurationSeconds(65)).toBe('01:05')
     expect(formatFileSizeBytes(2048)).toContain('KiB')
+    expect(formatFileSizeBytes(512)).toBe('512 B')
+    __resetLocaleLoaderForTests()
+    __resetAppI18nForTests()
   })
 
   it('generates client upload ids', () => {
