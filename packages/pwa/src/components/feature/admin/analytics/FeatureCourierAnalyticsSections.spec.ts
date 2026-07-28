@@ -100,6 +100,8 @@ describe('courier analytics UI sections', () => {
     })
     expect(wrapper.text()).toContain('3')
     expect(wrapper.text()).toContain('admin.courierAnalytics.insufficientData')
+    expect(wrapper.html()).toMatch(/text-warning/)
+    expect(wrapper.html()).toMatch(/text-highlighted/)
   })
 
   it('shows official rank and highlights top three subtly', async () => {
@@ -131,7 +133,8 @@ describe('courier analytics UI sections', () => {
     expect(wrapper.text()).toContain('Ada')
     expect(wrapper.text()).toContain('admin.courierAnalytics.insufficientData')
     const rows = wrapper.findAll('tbody tr')
-    expect(rows[0]?.classes().join(' ')).toMatch(/teal/)
+    expect(rows[0]?.classes().join(' ')).toMatch(/primary/)
+    expect(wrapper.html()).toMatch(/text-warning/)
     expect(rows[3]?.text()).toContain('4')
     await rows[0]?.trigger('click')
     expect(wrapper.emitted('select')?.[0]).toEqual(['p1'])

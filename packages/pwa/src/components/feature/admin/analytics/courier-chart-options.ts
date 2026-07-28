@@ -2,7 +2,7 @@ import type { EChartsOption } from '@/components/feature/admin/analytics/echarts
 import {
   baseChartTextStyle,
   baseTooltip,
-  CHART_COLORS,
+  resolveChartThemeColors,
   prefersReducedMotion,
 } from '@/components/feature/admin/analytics/echarts-setup'
 import type {
@@ -24,20 +24,21 @@ export function buildScoreComparisonOption(
   items: ScoreBarItem[],
   t: Translate,
 ): EChartsOption {
+  const colors = resolveChartThemeColors()
   const names = items.map(i => i.displayName)
   const values = items.map(i => ({
     value: i.totalScore,
     courierProfileId: i.courierProfileId,
     itemStyle: {
-      color: i.insufficient ? CHART_COLORS.muted : CHART_COLORS.primary,
+      color: i.insufficient ? colors.muted : colors.primary,
     },
   }))
 
   return {
     animation: animationFlag(),
-    textStyle: baseChartTextStyle(),
+    textStyle: baseChartTextStyle(colors),
     tooltip: {
-      ...baseTooltip(),
+      ...baseTooltip(colors),
       trigger: 'axis',
       axisPointer: { type: 'shadow' },
       formatter: (params: unknown) => {
@@ -63,15 +64,15 @@ export function buildScoreComparisonOption(
       type: 'value',
       min: 0,
       max: 100,
-      axisLabel: { color: CHART_COLORS.textMuted },
-      splitLine: { lineStyle: { color: CHART_COLORS.border } },
+      axisLabel: { color: colors.textMuted },
+      splitLine: { lineStyle: { color: colors.border } },
     },
     yAxis: {
       type: 'category',
       data: names,
       inverse: true,
       axisLabel: {
-        color: CHART_COLORS.text,
+        color: colors.text,
         width: 100,
         overflow: 'truncate',
       },
@@ -90,7 +91,7 @@ export function buildScoreComparisonOption(
             const value = (p as { value?: unknown }).value
             return typeof value === 'number' ? value.toFixed(1) : ''
           },
-          color: CHART_COLORS.textMuted,
+          color: colors.textMuted,
           fontSize: 11,
         },
       },
@@ -102,6 +103,7 @@ export function buildComponentMatrixOption(
   rows: ComponentMatrixRow[],
   t: Translate,
 ): EChartsOption {
+  const colors = resolveChartThemeColors()
   const categories = [
     t('admin.courierAnalytics.component.routeCompletion'),
     t('admin.courierAnalytics.component.deliveryCompletion'),
@@ -129,19 +131,19 @@ export function buildComponentMatrixOption(
     })),
     barMaxWidth: 14,
     itemStyle: {
-      color: CHART_COLORS.series[index % CHART_COLORS.series.length],
+      color: colors.series[index % colors.series.length],
     },
   }))
 
   return {
     animation: animationFlag(),
-    textStyle: baseChartTextStyle(),
+    textStyle: baseChartTextStyle(colors),
     legend: {
       bottom: 0,
-      textStyle: { color: CHART_COLORS.textMuted, fontSize: 11 },
+      textStyle: { color: colors.textMuted, fontSize: 11 },
     },
     tooltip: {
-      ...baseTooltip(),
+      ...baseTooltip(colors),
       trigger: 'axis',
       axisPointer: { type: 'shadow' },
       formatter: (params: unknown) => {
@@ -181,15 +183,15 @@ export function buildComponentMatrixOption(
       type: 'value',
       min: 0,
       max: 100,
-      axisLabel: { color: CHART_COLORS.textMuted },
-      splitLine: { lineStyle: { color: CHART_COLORS.border } },
+      axisLabel: { color: colors.textMuted },
+      splitLine: { lineStyle: { color: colors.border } },
     },
     yAxis: {
       type: 'category',
       data: names,
       inverse: true,
       axisLabel: {
-        color: CHART_COLORS.text,
+        color: colors.text,
         width: 100,
         overflow: 'truncate',
       },
@@ -204,15 +206,16 @@ export function buildMonthlyActivityOption(
   months: MonthlyActivityVm[],
   t: Translate,
 ): EChartsOption {
+  const colors = resolveChartThemeColors()
   return {
     animation: animationFlag(),
-    textStyle: baseChartTextStyle(),
+    textStyle: baseChartTextStyle(colors),
     legend: {
       bottom: 0,
-      textStyle: { color: CHART_COLORS.textMuted, fontSize: 11 },
+      textStyle: { color: colors.textMuted, fontSize: 11 },
     },
     tooltip: {
-      ...baseTooltip(),
+      ...baseTooltip(colors),
       trigger: 'axis',
     },
     grid: {
@@ -226,7 +229,7 @@ export function buildMonthlyActivityOption(
       type: 'category',
       data: months.map(m => m.month),
       axisLabel: {
-        color: CHART_COLORS.textMuted,
+        color: colors.textMuted,
         rotate: months.length > 8 ? 30 : 0,
       },
       boundaryGap: false,
@@ -234,8 +237,8 @@ export function buildMonthlyActivityOption(
     yAxis: {
       type: 'value',
       minInterval: 1,
-      axisLabel: { color: CHART_COLORS.textMuted },
-      splitLine: { lineStyle: { color: CHART_COLORS.border } },
+      axisLabel: { color: colors.textMuted },
+      splitLine: { lineStyle: { color: colors.border } },
     },
     series: [
       {
@@ -244,24 +247,24 @@ export function buildMonthlyActivityOption(
         smooth: true,
         areaStyle: { opacity: 0.12 },
         data: months.map(m => m.deliveredStops),
-        itemStyle: { color: CHART_COLORS.primary },
-        lineStyle: { color: CHART_COLORS.primary, width: 2 },
+        itemStyle: { color: colors.primary },
+        lineStyle: { color: colors.primary, width: 2 },
       },
       {
         name: t('admin.courierAnalytics.series.completedRoutes'),
         type: 'line',
         smooth: true,
         data: months.map(m => m.completedRoutes),
-        itemStyle: { color: CHART_COLORS.info },
-        lineStyle: { color: CHART_COLORS.info, width: 2 },
+        itemStyle: { color: colors.info },
+        lineStyle: { color: colors.info, width: 2 },
       },
       {
         name: t('admin.courierAnalytics.series.deliveredOrders'),
         type: 'line',
         smooth: true,
         data: months.map(m => m.deliveredOrders),
-        itemStyle: { color: CHART_COLORS.warning },
-        lineStyle: { color: CHART_COLORS.warning, width: 2 },
+        itemStyle: { color: colors.warning },
+        lineStyle: { color: colors.warning, width: 2 },
       },
     ],
   }
@@ -272,12 +275,13 @@ export function buildDonutOption(
   labelForKey: (key: string) => string,
   t: Translate,
 ): EChartsOption {
+  const colors = resolveChartThemeColors()
   const total = slices.reduce((sum, s) => sum + s.count, 0)
   return {
     animation: animationFlag(),
-    textStyle: baseChartTextStyle(),
+    textStyle: baseChartTextStyle(colors),
     tooltip: {
-      ...baseTooltip(),
+      ...baseTooltip(colors),
       trigger: 'item',
       formatter: (params: unknown) => {
         const p = params as {
@@ -291,7 +295,7 @@ export function buildDonutOption(
     legend: {
       orient: 'horizontal',
       bottom: 0,
-      textStyle: { color: CHART_COLORS.textMuted, fontSize: 11 },
+      textStyle: { color: colors.textMuted, fontSize: 11 },
     },
     series: [
       {
@@ -304,7 +308,7 @@ export function buildDonutOption(
           name: labelForKey(slice.key),
           value: slice.count,
           itemStyle: {
-            color: CHART_COLORS.series[index % CHART_COLORS.series.length],
+            color: colors.series[index % colors.series.length],
           },
         })),
       },
@@ -316,7 +320,7 @@ export function buildDonutOption(
         top: '40%',
         style: {
           text: String(total),
-          fill: CHART_COLORS.text,
+          fill: colors.text,
           fontSize: 20,
           fontWeight: 600,
           align: 'center',
@@ -328,7 +332,7 @@ export function buildDonutOption(
         top: '52%',
         style: {
           text: t('admin.courierAnalytics.total'),
-          fill: CHART_COLORS.textMuted,
+          fill: colors.textMuted,
           fontSize: 11,
           align: 'center',
         },
@@ -341,11 +345,12 @@ export function buildHandlingDurationOption(
   items: HandlingBarItem[],
   t: Translate,
 ): EChartsOption {
+  const colors = resolveChartThemeColors()
   return {
     animation: animationFlag(),
-    textStyle: baseChartTextStyle(),
+    textStyle: baseChartTextStyle(colors),
     tooltip: {
-      ...baseTooltip(),
+      ...baseTooltip(colors),
       trigger: 'axis',
       axisPointer: { type: 'shadow' },
       formatter: (params: unknown) => {
@@ -367,17 +372,17 @@ export function buildHandlingDurationOption(
     xAxis: {
       type: 'value',
       axisLabel: {
-        color: CHART_COLORS.textMuted,
+        color: colors.textMuted,
         formatter: (v: number) => formatHandlingDuration(v),
       },
-      splitLine: { lineStyle: { color: CHART_COLORS.border } },
+      splitLine: { lineStyle: { color: colors.border } },
     },
     yAxis: {
       type: 'category',
       data: items.map(i => i.displayName),
       inverse: false,
       axisLabel: {
-        color: CHART_COLORS.text,
+        color: colors.text,
         width: 100,
         overflow: 'truncate',
       },
@@ -394,7 +399,7 @@ export function buildHandlingDurationOption(
           medianSeconds: i.medianSeconds,
         })),
         barMaxWidth: 22,
-        itemStyle: { color: CHART_COLORS.secondary },
+        itemStyle: { color: colors.secondary },
         label: {
           show: true,
           position: 'right',
@@ -404,7 +409,7 @@ export function buildHandlingDurationOption(
               typeof value === 'number' ? value : null,
             )
           },
-          color: CHART_COLORS.textMuted,
+          color: colors.textMuted,
           fontSize: 11,
         },
       },

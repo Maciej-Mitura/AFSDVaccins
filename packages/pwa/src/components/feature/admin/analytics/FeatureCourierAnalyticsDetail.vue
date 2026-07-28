@@ -6,13 +6,17 @@
   >
     <div class="mb-4 flex items-start justify-between gap-3">
       <div>
-        <h2 class="text-lg font-semibold">
+        <h2 class="text-lg font-semibold text-highlighted">
           {{ courier.displayName }}
         </h2>
-        <p class="mt-1 text-sm text-muted">
+        <p class="mt-1 text-sm text-toned">
           {{ t('admin.courierAnalytics.column.rank') }} {{ courier.rank }}
           ·
-          <span v-if="isInsufficient(courier.dataCompleteness)">
+          <span
+            v-if="isInsufficient(courier.dataCompleteness)"
+            class="font-medium text-warning"
+            role="status"
+          >
             {{ t('admin.courierAnalytics.insufficientData') }}
           </span>
           <span v-else>{{ t('admin.courierAnalytics.eligibleData') }}</span>
@@ -32,23 +36,26 @@
 
     <div class="space-y-5">
       <div>
-        <p class="text-xs uppercase tracking-wide text-muted">
+        <p class="text-xs uppercase tracking-wide text-toned">
           {{ t('admin.courierAnalytics.reliabilityScore') }}
         </p>
-        <p class="text-3xl font-semibold tabular-nums">
+        <p class="text-3xl font-semibold tabular-nums text-highlighted">
           {{ formatScore(courier.totalScore) }}
         </p>
       </div>
 
       <section aria-labelledby="detail-components-heading">
-        <h3 id="detail-components-heading" class="mb-2 text-sm font-semibold">
+        <h3
+          id="detail-components-heading"
+          class="mb-2 text-sm font-semibold text-highlighted"
+        >
           {{ t('admin.courierAnalytics.componentBreakdown') }}
         </h3>
         <ul class="space-y-3">
           <li v-for="item in componentItems" :key="item.key" class="space-y-1">
-            <div class="flex justify-between text-sm">
+            <div class="flex justify-between text-sm text-default">
               <span>{{ item.label }}</span>
-              <span class="tabular-nums text-muted">
+              <span class="tabular-nums text-toned">
                 {{ formatScore(item.score) }}
                 <span class="text-xs">
                   ({{ t('admin.courierAnalytics.weightedContribution') }}:
@@ -57,7 +64,7 @@
               </span>
             </div>
             <div
-              class="h-2 overflow-hidden rounded-full bg-slate-100"
+              class="h-2 overflow-hidden rounded-full bg-accented"
               role="progressbar"
               :aria-valuenow="item.score"
               aria-valuemin="0"
@@ -65,7 +72,7 @@
               :aria-label="item.label"
             >
               <div
-                class="h-full rounded-full bg-teal-600"
+                class="h-full rounded-full bg-primary"
                 :style="{
                   width: `${Math.min(100, Math.max(0, item.score))}%`,
                 }"
@@ -84,7 +91,7 @@
         </h3>
         <div>
           <h4
-            class="mb-1 text-xs font-semibold uppercase tracking-wide text-muted"
+            class="mb-1 text-xs font-semibold uppercase tracking-wide text-toned"
           >
             {{ t('admin.courierAnalytics.detail.routeMetrics') }}
           </h4>
@@ -113,7 +120,7 @@
         </div>
         <div>
           <h4
-            class="mb-1 text-xs font-semibold uppercase tracking-wide text-muted"
+            class="mb-1 text-xs font-semibold uppercase tracking-wide text-toned"
           >
             {{ t('admin.courierAnalytics.detail.stopMetrics') }}
           </h4>
@@ -141,7 +148,10 @@
       </section>
 
       <section aria-labelledby="detail-consistency-heading">
-        <h3 id="detail-consistency-heading" class="mb-2 text-sm font-semibold">
+        <h3
+          id="detail-consistency-heading"
+          class="mb-2 text-sm font-semibold text-highlighted"
+        >
           {{ t('admin.courierAnalytics.component.consistency') }}
         </h3>
         <dl class="space-y-1 text-sm">
@@ -172,7 +182,10 @@
       </section>
 
       <section aria-labelledby="detail-handling-heading">
-        <h3 id="detail-handling-heading" class="mb-2 text-sm font-semibold">
+        <h3
+          id="detail-handling-heading"
+          class="mb-2 text-sm font-semibold text-highlighted"
+        >
           {{ t('admin.courierAnalytics.handlingTime') }}
         </h3>
         <dl class="space-y-1 text-sm">

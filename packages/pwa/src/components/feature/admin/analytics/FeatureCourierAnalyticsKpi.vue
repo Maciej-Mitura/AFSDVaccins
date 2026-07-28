@@ -4,11 +4,17 @@
     data-testid="courier-analytics-kpi"
   >
     <UCard v-for="card in cards" :key="card.id" :ui="{ body: 'p-4 sm:p-4' }">
-      <p class="text-2xl font-semibold tabular-nums tracking-tight">
+      <p
+        class="text-2xl font-semibold tabular-nums tracking-tight text-highlighted"
+      >
         {{ card.value }}
       </p>
-      <p class="mt-1 text-sm text-muted">{{ t(card.labelKey) }}</p>
-      <p v-if="card.insufficient" class="mt-1 text-xs text-amber-700">
+      <p class="mt-1 text-sm text-toned">{{ t(card.labelKey) }}</p>
+      <p
+        v-if="card.insufficient"
+        class="mt-1 text-xs font-medium text-warning"
+        role="status"
+      >
         {{ t('admin.courierAnalytics.insufficientData') }}
       </p>
       <p v-else-if="card.supportKey" class="mt-1 text-xs text-muted">

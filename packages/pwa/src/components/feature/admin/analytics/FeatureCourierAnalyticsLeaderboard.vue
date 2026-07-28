@@ -8,7 +8,7 @@
       </caption>
       <thead>
         <tr
-          class="border-b border-default text-xs uppercase tracking-wide text-muted"
+          class="border-b border-default text-xs uppercase tracking-wide text-toned"
         >
           <th
             scope="col"
@@ -55,7 +55,7 @@
           @keydown.space.prevent="emit('select', row.courierProfileId)"
         >
           <td
-            class="sticky left-0 bg-inherit py-2.5 pr-3 font-medium tabular-nums"
+            class="sticky left-0 bg-inherit py-2.5 pr-3 font-medium tabular-nums text-highlighted"
           >
             <span class="sr-only">{{
               t('admin.courierAnalytics.column.rank')
@@ -63,15 +63,17 @@
             {{ row.rank }}
           </td>
           <td class="sticky left-10 bg-inherit py-2.5 pr-3">
-            <span class="font-medium">{{ row.displayName }}</span>
+            <span class="font-medium text-highlighted">{{
+              row.displayName
+            }}</span>
             <span
               v-if="row.vehicleLabel"
-              class="mt-0.5 block text-xs text-muted"
+              class="mt-0.5 block text-xs text-toned"
             >
               {{ row.vehicleLabel }}
             </span>
           </td>
-          <td class="py-2.5 pr-3 tabular-nums">
+          <td class="py-2.5 pr-3 tabular-nums text-default">
             {{ formatScore(row.totalScore) }}
           </td>
           <td class="py-2.5 pr-3 tabular-nums">
@@ -89,11 +91,12 @@
           <td class="py-2.5">
             <span
               v-if="isInsufficient(row.dataCompleteness)"
-              class="text-xs text-amber-700"
+              class="text-xs font-medium text-warning"
+              role="status"
             >
               {{ t('admin.courierAnalytics.insufficientData') }}
             </span>
-            <span v-else class="text-xs text-muted">
+            <span v-else class="text-xs text-toned">
               {{ t('admin.courierAnalytics.eligibleData') }}
             </span>
           </td>
@@ -127,14 +130,14 @@ const { t } = useI18n()
 function rowClass(row: RankingRow): string {
   const classes: string[] = []
   if (row.courierProfileId === props.selectedId) {
-    classes.push('bg-primary-50')
+    classes.push('bg-primary/10')
   } else if (row.rank === 1) {
-    classes.push('bg-teal-50/70')
+    classes.push('bg-primary/5')
   } else if (row.rank === 2 || row.rank === 3) {
-    classes.push('bg-slate-50')
+    classes.push('bg-elevated')
   }
   if (isInsufficient(row.dataCompleteness)) {
-    classes.push('opacity-80')
+    classes.push('text-toned')
   }
   return classes.join(' ')
 }

@@ -1,12 +1,12 @@
 <template>
   <UCard>
     <template #header>
-      <h2 class="text-lg font-semibold">
+      <h2 class="text-lg font-semibold text-highlighted">
         {{ t('auth.forgotPassword.title') }}
       </h2>
     </template>
 
-    <p class="mb-4 text-sm text-muted">
+    <p class="mb-4 text-sm text-toned">
       {{ t('auth.forgotPassword.intro') }}
     </p>
 
@@ -41,8 +41,11 @@
       </UButton>
     </UForm>
 
-    <p class="mt-4 text-center text-sm text-muted">
-      <RouterLink class="text-primary hover:underline" to="/auth/login">
+    <p class="mt-4 text-center text-sm text-toned">
+      <RouterLink
+        class="font-medium text-primary underline-offset-2 hover:underline focus-visible:rounded-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+        to="/auth/login"
+      >
         {{ t('common.back.login') }}
       </RouterLink>
     </p>

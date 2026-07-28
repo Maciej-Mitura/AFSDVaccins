@@ -5,10 +5,10 @@
     role="img"
   >
     <div v-if="title || subtitle" class="mb-3">
-      <h3 v-if="title" class="text-sm font-semibold text-default">
+      <h3 v-if="title" class="text-sm font-semibold text-highlighted">
         {{ title }}
       </h3>
-      <p v-if="subtitle" class="mt-0.5 text-xs text-muted">{{ subtitle }}</p>
+      <p v-if="subtitle" class="mt-0.5 text-xs text-toned">{{ subtitle }}</p>
     </div>
 
     <div

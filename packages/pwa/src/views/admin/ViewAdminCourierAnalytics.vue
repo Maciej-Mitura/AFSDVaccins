@@ -22,8 +22,10 @@ import {
   isInsufficient,
 } from '@/composables/courier-analytics-mappers'
 import { useCourierPerformanceAnalytics } from '@/composables/useCourierPerformanceAnalytics'
+import { useChartThemeRevision } from '@/composables/useChartThemeRevision'
 
 const { t } = useI18n()
+const chartThemeRevision = useChartThemeRevision()
 
 const {
   loading,
@@ -94,47 +96,54 @@ function proofLabel(key: string): string {
   return map[key] ?? key
 }
 
-const scoreOption = computed(() =>
-  scoreComparison.value.length > 0
+const scoreOption = computed(() => {
+  void chartThemeRevision.value
+  return scoreComparison.value.length > 0
     ? buildScoreComparisonOption(scoreComparison.value, t)
-    : null,
-)
+    : null
+})
 
-const componentOption = computed(() =>
-  componentMatrix.value.length > 0
+const componentOption = computed(() => {
+  void chartThemeRevision.value
+  return componentMatrix.value.length > 0
     ? buildComponentMatrixOption(componentMatrix.value, t)
-    : null,
-)
+    : null
+})
 
-const monthlyOption = computed(() =>
-  monthlyActivity.value.length > 0
+const monthlyOption = computed(() => {
+  void chartThemeRevision.value
+  return monthlyActivity.value.length > 0
     ? buildMonthlyActivityOption(monthlyActivity.value, t)
-    : null,
-)
+    : null
+})
 
-const routeDonutOption = computed(() =>
-  routeStatusDistribution.value.some(s => s.count > 0)
+const routeDonutOption = computed(() => {
+  void chartThemeRevision.value
+  return routeStatusDistribution.value.some(s => s.count > 0)
     ? buildDonutOption(routeStatusDistribution.value, routeStatusLabel, t)
-    : null,
-)
+    : null
+})
 
-const timelinessDonutOption = computed(() =>
-  timelinessDistribution.value.some(s => s.count > 0)
+const timelinessDonutOption = computed(() => {
+  void chartThemeRevision.value
+  return timelinessDistribution.value.some(s => s.count > 0)
     ? buildDonutOption(timelinessDistribution.value, timelinessLabel, t)
-    : null,
-)
+    : null
+})
 
-const proofDonutOption = computed(() =>
-  proofDistribution.value.some(s => s.count > 0)
+const proofDonutOption = computed(() => {
+  void chartThemeRevision.value
+  return proofDistribution.value.some(s => s.count > 0)
     ? buildDonutOption(proofDistribution.value, proofLabel, t)
-    : null,
-)
+    : null
+})
 
-const handlingOption = computed(() =>
-  handlingDurations.value.length > 0
+const handlingOption = computed(() => {
+  void chartThemeRevision.value
+  return handlingDurations.value.length > 0
     ? buildHandlingDurationOption(handlingDurations.value, t)
-    : null,
-)
+    : null
+})
 
 function onChartSelect(payload: { courierProfileId?: string }): void {
   if (payload.courierProfileId) {
@@ -157,10 +166,10 @@ async function onExportCsv(): Promise<void> {
       class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between"
     >
       <div class="min-w-0">
-        <h1 class="text-xl font-semibold tracking-tight">
+        <h1 class="text-xl font-semibold tracking-tight text-highlighted">
           {{ t('admin.courierAnalytics.title') }}
         </h1>
-        <p class="mt-1 text-sm text-muted">
+        <p class="mt-1 text-sm text-toned">
           {{ t('admin.courierAnalytics.subtitle') }}
         </p>
         <p
@@ -637,7 +646,7 @@ async function onExportCsv(): Promise<void> {
                     {{ row.displayName }}
                     <span
                       v-if="isInsufficient(row.dataCompleteness)"
-                      class="ml-1 text-xs text-amber-700"
+                      class="ml-1 text-xs font-medium text-warning"
                     >
                       ({{ t('admin.courierAnalytics.insufficientData') }})
                     </span>

@@ -21,9 +21,17 @@ vi.mock('@/components/feature/admin/analytics/echarts-setup', () => ({
   CHART_COLORS: {
     primary: '#0d9488',
     text: '#0f172a',
-    textMuted: '#64748b',
+    textMuted: '#475569',
     border: '#e2e8f0',
   },
+  resolveChartThemeColors: () => ({
+    primary: '#0d9488',
+    text: '#0f172a',
+    textMuted: '#475569',
+    border: '#e2e8f0',
+    tooltipBg: '#ffffff',
+    series: ['#0d9488'],
+  }),
   baseChartTextStyle: () => ({}),
   baseTooltip: () => ({}),
 }))

@@ -1,7 +1,9 @@
 <template>
   <UCard>
     <template #header>
-      <h2 class="text-lg font-semibold">{{ t('auth.login.title') }}</h2>
+      <h2 class="text-lg font-semibold text-highlighted">
+        {{ t('auth.login.title') }}
+      </h2>
     </template>
 
     <UAlert
@@ -61,7 +63,7 @@
         class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between"
       >
         <RouterLink
-          class="text-sm text-primary hover:underline"
+          class="text-sm text-toned underline-offset-2 hover:text-highlighted hover:underline focus-visible:rounded-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
           to="/auth/forgot-password"
         >
           {{ t('auth.login.forgotPassword') }}
@@ -79,9 +81,12 @@
       </div>
     </UForm>
 
-    <p class="mt-4 text-center text-sm text-muted">
+    <p class="mt-4 text-center text-sm text-toned">
       {{ t('auth.login.noAccount') }}
-      <RouterLink class="text-primary hover:underline" to="/auth/register">
+      <RouterLink
+        class="font-medium text-primary underline-offset-2 hover:underline focus-visible:rounded-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+        to="/auth/register"
+      >
         {{ t('auth.login.register') }}
       </RouterLink>
     </p>
