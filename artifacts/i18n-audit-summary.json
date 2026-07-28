@@ -2,25 +2,25 @@
   "generatedBy": "phase35d2-i18n-audit.mjs",
   "locales": ["nl", "en", "es", "zh"],
   "keyCounts": {
-    "nl": 1098,
-    "en": 1098,
-    "es": 1098,
-    "zh": 1098
+    "nl": 1126,
+    "en": 1126,
+    "es": 1126,
+    "zh": 1126
   },
   "placeholderMismatchCount": 0,
   "missingKeyCount": 0,
   "missingKeys": [],
   "unusedKeyCount": 72,
   "sameAsEn": {
-    "nl": 37,
+    "nl": 38,
     "es": 834,
     "zh": 832
   },
   "proposedAdditionCount": 57,
-  "csvRowCount": 957,
+  "csvRowCount": 959,
   "csvStatusCounts": {
     "READY_FOR_SHEET": 57,
-    "REVIEW": 828,
+    "REVIEW": 830,
     "UNUSED": 72
   },
   "hardcodedCandidateCount": 0,

@@ -19,7 +19,9 @@
     "lint": "eslint .",
     "test": "vitest run",
     "audit:hardcoded-strings": "node ./scripts/audit-hardcoded-strings.mjs",
-    "audit:i18n": "node ./scripts/phase35d2-i18n-audit.mjs"
+    "audit:i18n": "node ./scripts/phase35d2-i18n-audit.mjs --check",
+    "audit:i18n:check": "node ./scripts/phase35d2-i18n-audit.mjs --check",
+    "audit:i18n:update": "node ./scripts/phase35d2-i18n-audit.mjs --update"
   },
   "dependencies": {
     "@apollo/client": "^3.14.0",

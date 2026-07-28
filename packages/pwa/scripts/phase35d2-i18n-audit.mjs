@@ -1,19 +1,26 @@
 #!/usr/bin/env node
 /**
- * Phase 35D2 / 35D4 — deterministic localisation audit + spreadsheet-ready CSV export.
+ * Phase 35D2 / 35D4 / 35D5 — deterministic localisation audit + spreadsheet-ready CSV export.
  *
- * Outputs (repo-relative, POSIX paths, LF newlines):
+ * Tracked artefacts (repo-relative, POSIX paths, LF newlines):
  *   - docs/i18n-audit.md
  *   - artifacts/i18n-sheet-import.csv
  *   - artifacts/i18n-audit-summary.json
  *
  * Does NOT call Google Sheets. Does NOT mutate locale JSON.
- * Writes a file only when normalised content differs (idempotent).
- * Exit 0 on success; exit 1 only on internal failures (parity crash, IO).
+ *
+ * Modes (Phase 35D5):
+ *   --check   Generate expected output and compare to artefacts; never write. Exit 1 if stale.
+ *   --update  Rewrite tracked artefacts when content differs (idempotent).
+ *
+ * Optional: --out-dir <path>  Read/write artefacts under a directory (tests / dry runs).
+ *
+ * Default with no mode flag: --check (safe; does not modify the working tree).
  *
  * Usage:
- *   node packages/pwa/scripts/phase35d2-i18n-audit.mjs
- *   npm run audit:i18n --workspace=@vaccin-delivery/pwa
+ *   npm run audit:i18n:check
+ *   npm run audit:i18n:update
+ *   npm run audit:i18n   # alias of check
  */
 import fs from 'node:fs'
 import path from 'node:path'
@@ -26,8 +33,6 @@ const PWA_ROOT = path.resolve(__dirname, '..')
 const REPO_ROOT = path.resolve(PWA_ROOT, '../..')
 const SRC_ROOT = path.join(PWA_ROOT, 'src')
 const LOCALES_DIR = path.join(SRC_ROOT, 'locales')
-const ARTIFACTS_DIR = path.join(REPO_ROOT, 'artifacts')
-const DOCS_DIR = path.join(REPO_ROOT, 'docs')
 
 /** Optional Prettier (repo root) — keeps JSON/MD aligned with project formatting. */
 async function formatWithPrettier(source, filepath) {
@@ -639,19 +644,36 @@ Prefer Default = English. Then run \`npm run export:i18n\`.
 
 **Phase 35D3:** runtime catalogs already contain these keys (\`READY_FOR_SHEET\`). Sheet import remains manual so the spreadsheet stays the long-term source of truth.
 
-**Manual workflow:**
+**Manual Sheet workflow:**
 
 1. Import or copy \`READY_FOR_SHEET\` / \`ADD\` rows into the Sheet;
 2. Preserve \`Key | Default | locale\` structure;
 3. Run \`npm run export:i18n\`;
-4. Run \`npm run audit:i18n\`;
-5. Review the diff before commit.
+4. Run \`npm run audit:i18n:update\` and review the three artefacts;
+5. Stage source + artefacts together and commit.
+
+### Artefact check vs update (Phase 35D5)
+
+After changing translations or audited UI strings:
+
+1. \`npm run audit:i18n:update\`
+2. Review \`docs/i18n-audit.md\`, \`artifacts/i18n-audit-summary.json\`, \`artifacts/i18n-sheet-import.csv\`
+3. Stage source changes and generated artefacts together
+4. Commit (pre-commit / Vitest use **check-only** — they never rewrite artefacts)
+5. \`npm run audit:i18n:check\` (or \`npm run audit:i18n\`) validates artefacts without writing
+
+For ordinary testing: run \`npm run audit:i18n:check\` — no files are modified.
 
 ## 11. Exact safe commands
 
 \`\`\`bash
-# Localisation audit + CSV (no Google)
-npm run audit:i18n --workspace=@vaccin-delivery/pwa
+# Check artefacts are current (no writes)
+npm run audit:i18n:check
+# alias:
+npm run audit:i18n
+
+# Explicitly rewrite tracked audit artefacts
+npm run audit:i18n:update
 
 # Existing offline parity / soft Dutch audit
 npm run test --workspace=@vaccin-delivery/pwa -- src/i18n
@@ -663,7 +685,7 @@ npm run export:i18n
 # Repo → Sheet key rows DRY-RUN only (safe; no writes)
 npm run sync:i18n:keys -- --preview "example.key=Example default"
 
-# LIVE key sync — DO NOT RUN in Phase 35D2 without explicit approval
+# LIVE key sync — DO NOT RUN without explicit approval
 # npm run sync:i18n:keys -- "example.key=Example default" --en "..." --nl "..." --es "..." --zh "..."
 \`\`\`
 
@@ -671,11 +693,12 @@ After humans paste CSV ADD/UPDATE rows into the Sheet locale tabs (\`Key | Defau
 
 \`\`\`bash
 npm run export:i18n
+npm run audit:i18n:update
 \`\`\`
 
 ## 12–14. Tests, builds, manual Sheet actions
 
-- Run PWA i18n Vitest suite and \`test:i18n\` exporter package tests.
+- Run PWA i18n Vitest suite and \`test:i18n\` exporter package tests (audit tests use check / temp dirs only).
 - Manual Sheet: import/review CSV \`ADD\` + prioritise \`REVIEW\` for recent domains (\`admin.courierAnalytics.*\`, \`routeVoiceReports.*\`, \`notifications.*\`, history).
 - Do **not** deploy as part of this phase.
 `
@@ -719,7 +742,10 @@ function stableStatusCounts(rows) {
   return ordered
 }
 
-async function main() {
+/**
+ * @returns {{ csv: string, summaryJson: string, md: string, summary: object }}
+ */
+async function generateArtefactContents() {
   const catalogs = loadCatalogs()
   const keyCounts = Object.fromEntries(
     LOCALES.map(l => [l, Object.keys(catalogs[l]).length]),
@@ -779,11 +805,7 @@ async function main() {
     proposedAdditions,
   )
 
-  fs.mkdirSync(ARTIFACTS_DIR, { recursive: true })
-  fs.mkdirSync(DOCS_DIR, { recursive: true })
-
-  const csvPath = path.join(REPO_ROOT, ...CSV_REPO_PATH.split('/'))
-  const csvWritten = writeIfChanged(csvPath, renderCsv(header, rows))
+  const csv = finalizeContent(renderCsv(header, rows))
 
   const uniqueMissingKeys = [...new Set(missing.map(m => m.key))].sort()
 
@@ -810,14 +832,18 @@ async function main() {
     },
   }
 
-  const summaryPath = path.join(REPO_ROOT, ...SUMMARY_REPO_PATH.split('/'))
-  const summaryJson = await formatWithPrettier(
-    `${JSON.stringify(summary, null, 2)}\n`,
-    summaryPath,
+  const summaryPathForPrettier = path.join(
+    REPO_ROOT,
+    ...SUMMARY_REPO_PATH.split('/'),
   )
-  const summaryWritten = writeIfChanged(summaryPath, summaryJson)
+  const summaryJson = finalizeContent(
+    await formatWithPrettier(
+      `${JSON.stringify(summary, null, 2)}\n`,
+      summaryPathForPrettier,
+    ),
+  )
 
-  const md = buildMarkdown({
+  const mdRaw = buildMarkdown({
     keyCounts,
     placeholderMismatches,
     missingKeys: missing,
@@ -827,19 +853,156 @@ async function main() {
     proposedAdditions,
     terminology: terminologyNotes(catalogs),
   })
-  const mdPath = path.join(REPO_ROOT, ...MD_REPO_PATH.split('/'))
-  const mdFormatted = await formatWithPrettier(md, mdPath)
-  const mdWritten = writeIfChanged(mdPath, mdFormatted)
-
-  console.log('Phase 35D2 i18n audit complete')
-  console.log(JSON.stringify(summary, null, 2))
-  console.log(
-    `${csvWritten ? 'Wrote' : 'Unchanged'} ${CSV_REPO_PATH}`,
+  const mdPathForPrettier = path.join(REPO_ROOT, ...MD_REPO_PATH.split('/'))
+  const md = finalizeContent(
+    await formatWithPrettier(mdRaw, mdPathForPrettier),
   )
+
+  return { csv, summaryJson, md, summary }
+}
+
+function finalizeContent(content) {
+  const next = normalizeNewlines(content)
+  return next.endsWith('\n') ? next : `${next}\n`
+}
+
+function readNormalizedFile(filePath) {
+  if (!fs.existsSync(filePath)) {
+    return null
+  }
+  return finalizeContent(fs.readFileSync(filePath, 'utf8'))
+}
+
+function resolveArtefactPaths(outDir) {
+  const root = outDir ? path.resolve(outDir) : REPO_ROOT
+  return {
+    root,
+    csv: path.join(root, ...CSV_REPO_PATH.split('/')),
+    summary: path.join(root, ...SUMMARY_REPO_PATH.split('/')),
+    md: path.join(root, ...MD_REPO_PATH.split('/')),
+  }
+}
+
+function parseCliArgs(argv) {
+  let mode = 'check'
+  let outDir = null
+  const args = argv.slice(2)
+  for (let i = 0; i < args.length; i += 1) {
+    const arg = args[i]
+    if (arg === '--check') {
+      mode = 'check'
+      continue
+    }
+    if (arg === '--update') {
+      mode = 'update'
+      continue
+    }
+    if (arg === '--out-dir') {
+      outDir = args[i + 1]
+      if (!outDir || outDir.startsWith('--')) {
+        throw new Error('--out-dir requires a path argument')
+      }
+      i += 1
+      continue
+    }
+    if (arg === '--help' || arg === '-h') {
+      mode = 'help'
+      continue
+    }
+    throw new Error(`Unknown argument: ${arg}`)
+  }
+  return { mode, outDir }
+}
+
+async function runCheck(paths, contents) {
+  const comparisons = [
+    { repoPath: CSV_REPO_PATH, filePath: paths.csv, expected: contents.csv },
+    {
+      repoPath: SUMMARY_REPO_PATH,
+      filePath: paths.summary,
+      expected: contents.summaryJson,
+    },
+    { repoPath: MD_REPO_PATH, filePath: paths.md, expected: contents.md },
+  ]
+
+  const stale = []
+  for (const item of comparisons) {
+    const onDisk = readNormalizedFile(item.filePath)
+    if (onDisk === null) {
+      stale.push(`${item.repoPath} (missing)`)
+      continue
+    }
+    if (onDisk !== item.expected) {
+      stale.push(item.repoPath)
+    }
+  }
+
+  console.log('Phase 35D2 i18n audit check')
+  console.log(JSON.stringify(contents.summary, null, 2))
+
+  if (stale.length > 0) {
+    console.error('Stale i18n audit artefacts (run npm run audit:i18n:update):')
+    for (const name of stale) {
+      console.error(`  - ${name}`)
+    }
+    process.exitCode = 1
+    return
+  }
+
+  console.log(`Current ${CSV_REPO_PATH}`)
+  console.log(`Current ${MD_REPO_PATH}`)
+  console.log(`Current ${SUMMARY_REPO_PATH}`)
+}
+
+async function runUpdate(paths, contents) {
+  fs.mkdirSync(path.dirname(paths.csv), { recursive: true })
+  fs.mkdirSync(path.dirname(paths.summary), { recursive: true })
+  fs.mkdirSync(path.dirname(paths.md), { recursive: true })
+
+  const csvWritten = writeIfChanged(paths.csv, contents.csv)
+  const summaryWritten = writeIfChanged(paths.summary, contents.summaryJson)
+  const mdWritten = writeIfChanged(paths.md, contents.md)
+
+  console.log('Phase 35D2 i18n audit update')
+  console.log(JSON.stringify(contents.summary, null, 2))
+  console.log(`${csvWritten ? 'Wrote' : 'Unchanged'} ${CSV_REPO_PATH}`)
   console.log(`${mdWritten ? 'Wrote' : 'Unchanged'} ${MD_REPO_PATH}`)
   console.log(
     `${summaryWritten ? 'Wrote' : 'Unchanged'} ${SUMMARY_REPO_PATH}`,
   )
+
+  if (!csvWritten && !summaryWritten && !mdWritten) {
+    console.log('All i18n audit artefacts already up to date')
+  }
+}
+
+async function main() {
+  const { mode, outDir } = parseCliArgs(process.argv)
+  if (mode === 'help') {
+    console.log(`Usage:
+  node phase35d2-i18n-audit.mjs --check [--out-dir <dir>]
+  node phase35d2-i18n-audit.mjs --update [--out-dir <dir>]
+
+--check   Compare generated output to artefacts; never write (default)
+--update  Rewrite artefacts when content differs
+--out-dir Optional directory for artefact read/write (tests)`)
+    return
+  }
+
+  const paths = resolveArtefactPaths(outDir)
+  const contents = await generateArtefactContents()
+
+  if (mode === 'check') {
+    await runCheck(paths, contents)
+    return
+  }
+
+  if (mode === 'update') {
+    await runUpdate(paths, contents)
+    return
+  }
+
+  throw new Error(`Unsupported mode: ${mode}`)
 }
 
 main().catch(error => {

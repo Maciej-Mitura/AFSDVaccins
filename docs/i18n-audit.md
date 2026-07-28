@@ -136,11 +136,11 @@ _No heuristic hits._
 
 ## 6. Untranslated or suspicious values
 
-Key counts: nl=1098, en=1098, es=1098, zh=1098
+Key counts: nl=1126, en=1126, es=1126, zh=1126
 
 | Locale | Values identical to EN (≥6 chars) |
 | ------ | --------------------------------- |
-| nl     | 37                                |
+| nl     | 38                                |
 | es     | 834                               |
 | zh     | 832                               |
 
@@ -156,7 +156,7 @@ Do **not** delete in this phase unless clearly dangerous duplicates. Listed as `
 
 ## 8. Terminology consistency
 
-- Courier-related keys: 245; pharmacist/pharmacy-related keys: 104. Prefer "bezorger"/"apotheker" in Dutch UI and "courier"/"pharmacist" in English.
+- Courier-related keys: 273; pharmacist/pharmacy-related keys: 104. Prefer "bezorger"/"apotheker" in Dutch UI and "courier"/"pharmacist" in English.
 
 Keep: order / delivery / route / stop / doses / history / notifications / voice report / transcription aligned with existing NL product language (`bestelling`, `levering`, `route`, `stop`, `dosissen`, `geschiedenis`, `meldingen`, `spraakrapport`, `transcriptie`).
 
@@ -191,19 +191,36 @@ Prefer Default = English. Then run `npm run export:i18n`.
 
 **Phase 35D3:** runtime catalogs already contain these keys (`READY_FOR_SHEET`). Sheet import remains manual so the spreadsheet stays the long-term source of truth.
 
-**Manual workflow:**
+**Manual Sheet workflow:**
 
 1. Import or copy `READY_FOR_SHEET` / `ADD` rows into the Sheet;
 2. Preserve `Key | Default | locale` structure;
 3. Run `npm run export:i18n`;
-4. Run `npm run audit:i18n`;
-5. Review the diff before commit.
+4. Run `npm run audit:i18n:update` and review the three artefacts;
+5. Stage source + artefacts together and commit.
+
+### Artefact check vs update (Phase 35D5)
+
+After changing translations or audited UI strings:
+
+1. `npm run audit:i18n:update`
+2. Review `docs/i18n-audit.md`, `artifacts/i18n-audit-summary.json`, `artifacts/i18n-sheet-import.csv`
+3. Stage source changes and generated artefacts together
+4. Commit (pre-commit / Vitest use **check-only** — they never rewrite artefacts)
+5. `npm run audit:i18n:check` (or `npm run audit:i18n`) validates artefacts without writing
+
+For ordinary testing: run `npm run audit:i18n:check` — no files are modified.
 
 ## 11. Exact safe commands
 
 ```bash
-# Localisation audit + CSV (no Google)
-npm run audit:i18n --workspace=@vaccin-delivery/pwa
+# Check artefacts are current (no writes)
+npm run audit:i18n:check
+# alias:
+npm run audit:i18n
+
+# Explicitly rewrite tracked audit artefacts
+npm run audit:i18n:update
 
 # Existing offline parity / soft Dutch audit
 npm run test --workspace=@vaccin-delivery/pwa -- src/i18n
@@ -215,7 +232,7 @@ npm run export:i18n
 # Repo → Sheet key rows DRY-RUN only (safe; no writes)
 npm run sync:i18n:keys -- --preview "example.key=Example default"
 
-# LIVE key sync — DO NOT RUN in Phase 35D2 without explicit approval
+# LIVE key sync — DO NOT RUN without explicit approval
 # npm run sync:i18n:keys -- "example.key=Example default" --en "..." --nl "..." --es "..." --zh "..."
 ```
 
@@ -223,10 +240,11 @@ After humans paste CSV ADD/UPDATE rows into the Sheet locale tabs (`Key | Defaul
 
 ```bash
 npm run export:i18n
+npm run audit:i18n:update
 ```
 
 ## 12–14. Tests, builds, manual Sheet actions
 
-- Run PWA i18n Vitest suite and `test:i18n` exporter package tests.
+- Run PWA i18n Vitest suite and `test:i18n` exporter package tests (audit tests use check / temp dirs only).
 - Manual Sheet: import/review CSV `ADD` + prioritise `REVIEW` for recent domains (`admin.courierAnalytics.*`, `routeVoiceReports.*`, `notifications.*`, history).
 - Do **not** deploy as part of this phase.
