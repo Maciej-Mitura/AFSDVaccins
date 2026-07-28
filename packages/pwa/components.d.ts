@@ -19,6 +19,8 @@ declare module 'vue' {
     CommonLoadingSkeleton: typeof import('./src/components/common/CommonLoadingSkeleton.vue')['default']
     CommonNotificationBell: typeof import('./src/components/common/CommonNotificationBell.vue')['default']
     CommonOfflineBanner: typeof import('./src/components/common/CommonOfflineBanner.vue')['default']
+    CommonPageHeader: typeof import('./src/components/common/CommonPageHeader.vue')['default']
+    CommonPageSection: typeof import('./src/components/common/CommonPageSection.vue')['default']
     CommonPermissionDenied: typeof import('./src/components/common/CommonPermissionDenied.vue')['default']
     CommonPushNotificationSettings: typeof import('./src/components/common/CommonPushNotificationSettings.vue')['default']
     CommonPushPermissionBanner: typeof import('./src/components/common/CommonPushPermissionBanner.vue')['default']

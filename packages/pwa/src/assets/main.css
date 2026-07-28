@@ -4,3 +4,14 @@
 @theme {
   --font-sans: 'Inter', sans-serif;
 }
+
+/*
+  Visual hierarchy tokens (Phase 35G2).
+  - Primary semantic colour is Nuxt UI `primary` → Tailwind `teal`
+    (teal-600 #0d9488 aligns with PWA theme_color).
+  - Status colours (success / warning / error / info) stay on Nuxt UI defaults.
+  - Dark mode continues to use Nuxt UI `.dark` semantic variables.
+*/
+:root {
+  --ui-radius: 0.375rem;
+}

@@ -14,6 +14,17 @@ describe('PWA safety and configuration', () => {
   const offlineHtml = readFileSync(offlineHtmlPath, 'utf8')
   const swSource = readFileSync(swSourcePath, 'utf8')
 
+  it('aligns Nuxt UI primary with PWA teal brand', () => {
+    expect(viteConfig).toMatch(/primary:\s*['"]teal['"]/)
+    const mainCss = readFileSync(
+      join(pwaRoot, 'src', 'assets', 'main.css'),
+      'utf8',
+    )
+    expect(mainCss).toContain('--ui-radius: 0.375rem')
+    expect(mainCss).toContain('--font-sans')
+    expect(mainCss).toContain('Inter')
+  })
+
   it('manifest contains required fields', () => {
     expect(viteConfig).toContain("name: 'Vaccinatie-levering'")
     expect(viteConfig).toContain("short_name: 'Vaccin'")

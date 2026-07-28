@@ -1,10 +1,12 @@
 <script setup lang="ts">
-import { onMounted } from 'vue'
+import { computed, onMounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 
 import CommonEmptyState from '@/components/common/CommonEmptyState.vue'
 import CommonErrorState from '@/components/common/CommonErrorState.vue'
 import CommonLoadingSkeleton from '@/components/common/CommonLoadingSkeleton.vue'
+import CommonPageHeader from '@/components/common/CommonPageHeader.vue'
+import CommonPageSection from '@/components/common/CommonPageSection.vue'
 import FeatureOrderHistoryCard from '@/components/feature/order-history/FeatureOrderHistoryCard.vue'
 import FeatureOrderHistoryFilters from '@/components/feature/order-history/FeatureOrderHistoryFilters.vue'
 import FeatureOrderHistoryTable from '@/components/feature/order-history/FeatureOrderHistoryTable.vue'
@@ -41,6 +43,13 @@ const {
   buildInput,
 } = history
 
+const resultMeta = computed(() => {
+  if (totalCount.value == null || loading.value) {
+    return undefined
+  }
+  return t('orderHistory.totalCount', { count: totalCount.value })
+})
+
 onMounted(() => {
   void load()
 })
@@ -58,20 +67,10 @@ defineExpose({
 </script>
 
 <template>
-  <div class="space-y-6" data-testid="order-history-list">
-    <div>
-      <h2 class="text-lg font-semibold">{{ title }}</h2>
-      <p class="mt-1 text-sm text-muted">{{ summary }}</p>
-      <p
-        v-if="totalCount != null && !loading"
-        class="mt-1 text-sm text-muted"
-        data-testid="order-history-total"
-      >
-        {{ t('orderHistory.totalCount', { count: totalCount }) }}
-      </p>
-    </div>
+  <div class="space-y-8" data-testid="order-history-list">
+    <CommonPageHeader :title="title" :subtitle="summary" :meta="resultMeta" />
 
-    <UCard>
+    <CommonPageSection variant="inset">
       <FeatureOrderHistoryFilters
         v-model:filters="filters"
         :show-pharmacy-filter="allowApothekerFilter"
@@ -79,7 +78,7 @@ defineExpose({
         @apply="applyFilters"
         @clear="clearFilters"
       />
-    </UCard>
+    </CommonPageSection>
 
     <CommonLoadingSkeleton v-if="loading && orders.length === 0" />
 
@@ -101,7 +100,7 @@ defineExpose({
       :description="t('orderHistory.empty.description')"
     />
 
-    <template v-else-if="orders.length > 0">
+    <CommonPageSection v-else-if="orders.length > 0">
       <div class="hidden md:block">
         <FeatureOrderHistoryTable
           :orders="orders"
@@ -109,7 +108,10 @@ defineExpose({
         />
       </div>
 
-      <div class="space-y-3 md:hidden" data-testid="order-history-cards">
+      <div
+        class="divide-y divide-default md:hidden"
+        data-testid="order-history-cards"
+      >
         <FeatureOrderHistoryCard
           v-for="order in orders"
           :key="order.id"
@@ -118,7 +120,7 @@ defineExpose({
         />
       </div>
 
-      <div class="flex flex-col items-start gap-3">
+      <div class="mt-4 flex flex-col items-start gap-3">
         <p
           v-if="loadingMore"
           class="text-sm text-muted"
@@ -154,6 +156,6 @@ defineExpose({
           :title="errorMessage"
         />
       </div>
-    </template>
+    </CommonPageSection>
   </div>
 </template>

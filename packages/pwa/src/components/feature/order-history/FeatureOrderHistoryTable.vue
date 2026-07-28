@@ -54,57 +54,58 @@ function displayOrUnavailable(value: string | null | undefined): string {
   <div class="overflow-x-auto" data-testid="order-history-table">
     <table class="min-w-full border-collapse text-left text-sm">
       <thead>
-        <tr class="border-b border-default">
-          <th scope="col" class="px-3 py-2 font-medium">
+        <tr class="border-b border-default bg-muted">
+          <th scope="col" class="px-3 py-2.5 font-medium text-toned">
             {{ t('orderHistory.column.orderId') }}
           </th>
-          <th scope="col" class="px-3 py-2 font-medium">
+          <th scope="col" class="px-3 py-2.5 font-medium text-toned">
             {{ t('orderHistory.column.status') }}
           </th>
-          <th v-if="showPharmacy" scope="col" class="px-3 py-2 font-medium">
+          <th
+            v-if="showPharmacy"
+            scope="col"
+            class="px-3 py-2.5 font-medium text-toned"
+          >
             {{ t('orderHistory.column.pharmacy') }}
           </th>
-          <th scope="col" class="px-3 py-2 font-medium">
+          <th scope="col" class="px-3 py-2.5 font-medium text-toned">
             {{ t('orderHistory.column.lines') }}
           </th>
-          <th scope="col" class="px-3 py-2 font-medium">
+          <th scope="col" class="px-3 py-2.5 font-medium text-toned">
             {{ t('orderHistory.column.totalQuantity') }}
           </th>
-          <th scope="col" class="px-3 py-2 font-medium">
+          <th scope="col" class="px-3 py-2.5 font-medium text-toned">
             {{ t('orderHistory.column.submittedAt') }}
           </th>
-          <th scope="col" class="px-3 py-2 font-medium">
+          <th scope="col" class="px-3 py-2.5 font-medium text-toned">
             {{ t('orderHistory.column.deliveryDate') }}
           </th>
-          <th scope="col" class="px-3 py-2 font-medium">
+          <th scope="col" class="px-3 py-2.5 font-medium text-toned">
             {{ t('orderHistory.column.deliveredAt') }}
           </th>
-          <th scope="col" class="px-3 py-2 font-medium">
+          <th scope="col" class="px-3 py-2.5 font-medium text-toned">
             {{ t('orderHistory.column.cancelledAt') }}
           </th>
-          <th scope="col" class="px-3 py-2 font-medium">
+          <th scope="col" class="px-3 py-2.5 font-medium text-toned">
             {{ t('orderHistory.column.cancellationReason') }}
           </th>
-          <th scope="col" class="px-3 py-2 font-medium">
+          <th scope="col" class="px-3 py-2.5 font-medium text-toned">
             {{ t('orderHistory.column.completedBy') }}
           </th>
-          <th scope="col" class="px-3 py-2 font-medium">
+          <th scope="col" class="px-3 py-2.5 font-medium text-toned">
             {{ t('orderHistory.column.deliveryMethod') }}
           </th>
         </tr>
       </thead>
-      <tbody>
+      <tbody class="divide-y divide-default">
         <template v-for="order in orders" :key="order.id">
-          <tr
-            class="border-b border-default align-top"
-            data-testid="order-history-row"
-          >
-            <td class="px-3 py-2">
+          <tr class="align-top" data-testid="order-history-row">
+            <td class="px-3 py-2.5">
               <span :title="order.id">
                 {{ shortOrderId(order.id) }}
               </span>
             </td>
-            <td class="px-3 py-2">
+            <td class="px-3 py-2.5">
               <UBadge
                 variant="subtle"
                 :aria-label="orderStatusLabel(order.status)"
@@ -112,10 +113,10 @@ function displayOrUnavailable(value: string | null | undefined): string {
                 {{ orderStatusLabel(order.status) }}
               </UBadge>
             </td>
-            <td v-if="showPharmacy" class="px-3 py-2">
+            <td v-if="showPharmacy" class="px-3 py-2.5">
               {{ pharmacyLabel(order) }}
             </td>
-            <td class="px-3 py-2">
+            <td class="px-3 py-2.5">
               <button
                 type="button"
                 class="inline-flex items-center gap-1 text-left font-medium underline-offset-2 hover:underline"
@@ -143,22 +144,22 @@ function displayOrUnavailable(value: string | null | undefined): string {
                 </span>
               </button>
             </td>
-            <td class="px-3 py-2">
+            <td class="px-3 py-2.5">
               {{
                 translatePlural('admin.orders.totalDoses', order.totalQuantity)
               }}
             </td>
-            <td class="px-3 py-2">
+            <td class="px-3 py-2.5">
               <span :aria-label="t('orderHistory.field.submittedAt')">
                 {{ formatDateTime(order.submittedAt) }}
               </span>
             </td>
-            <td class="px-3 py-2">
+            <td class="px-3 py-2.5">
               <span :aria-label="t('orderHistory.field.deliveryDate')">
                 {{ formatDate(order.deliveryDate) }}
               </span>
             </td>
-            <td class="px-3 py-2">
+            <td class="px-3 py-2.5">
               <span :aria-label="t('orderHistory.field.deliveredAt')">
                 {{
                   order.deliveredAt
@@ -167,7 +168,7 @@ function displayOrUnavailable(value: string | null | undefined): string {
                 }}
               </span>
             </td>
-            <td class="px-3 py-2">
+            <td class="px-3 py-2.5">
               <span :aria-label="t('orderHistory.field.cancelledAt')">
                 {{
                   order.cancelledAt
@@ -176,16 +177,19 @@ function displayOrUnavailable(value: string | null | undefined): string {
                 }}
               </span>
             </td>
-            <td class="px-3 py-2">
+            <td class="px-3 py-2.5">
               {{ displayOrUnavailable(order.cancellationReason) }}
             </td>
-            <td class="px-3 py-2">{{ completedByLabel(order) }}</td>
-            <td class="px-3 py-2">
+            <td class="px-3 py-2.5">{{ completedByLabel(order) }}</td>
+            <td class="px-3 py-2.5">
               {{ deliveryMethodLabel(order.deliveryMethod) }}
             </td>
           </tr>
           <tr v-if="isExpanded(order.id)">
-            <td :colspan="showPharmacy ? 12 : 11" class="bg-muted/30 px-3 py-2">
+            <td
+              :colspan="showPharmacy ? 12 : 11"
+              class="bg-muted/40 px-3 py-2.5"
+            >
               <ul
                 :id="`order-history-table-lines-${order.id}`"
                 class="space-y-1"

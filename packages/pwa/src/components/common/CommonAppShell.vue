@@ -8,9 +8,13 @@
           <p class="text-xs uppercase tracking-wide text-toned">
             {{ t('app.title') }}
           </p>
-          <h1 class="truncate text-lg font-semibold text-highlighted">
+          <!-- Role-area label only; page content owns the document h1 via CommonPageHeader. -->
+          <p
+            class="truncate text-lg font-semibold text-highlighted"
+            data-testid="app-shell-title"
+          >
             {{ title }}
-          </h1>
+          </p>
         </div>
 
         <nav

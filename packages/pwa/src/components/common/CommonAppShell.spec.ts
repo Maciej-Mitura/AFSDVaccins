@@ -137,7 +137,8 @@ describe('CommonAppShell layout', () => {
 
   it('groups brand left, primary nav, and account actions separately', () => {
     const wrapper = mountShell()
-    expect(wrapper.get('h1').text()).toBe('Admin')
+    expect(wrapper.get('[data-testid="app-shell-title"]').text()).toBe('Admin')
+    expect(wrapper.find('h1').exists()).toBe(false)
 
     const primaryHrefs = wrapper
       .findAll('[data-testid="app-shell-primary-nav"] a')

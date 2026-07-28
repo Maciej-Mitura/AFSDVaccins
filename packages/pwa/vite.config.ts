@@ -16,7 +16,14 @@ export default defineConfig(({ mode }) => {
   return {
     plugins: [
       vue(),
-      ui(),
+      // Primary maps to Tailwind `teal` (#0d9488 at 600) — matches PWA theme_color.
+      ui({
+        ui: {
+          colors: {
+            primary: 'teal',
+          },
+        },
+      }),
       VitePWA({
         // Prompt the user before activating a waiting service worker.
         registerType: 'prompt',

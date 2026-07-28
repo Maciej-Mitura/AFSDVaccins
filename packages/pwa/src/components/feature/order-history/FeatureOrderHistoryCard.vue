@@ -57,10 +57,7 @@ function toggleLines() {
 </script>
 
 <template>
-  <article
-    class="space-y-3 rounded-lg border border-default p-4 text-sm"
-    data-testid="order-history-card"
-  >
+  <article class="space-y-3 py-4 text-sm" data-testid="order-history-card">
     <div class="flex flex-wrap items-center gap-2">
       <h3 class="font-semibold" :title="order.id">
         {{ t('orderHistory.orderId.short', { id: shortOrderId(order.id) }) }}

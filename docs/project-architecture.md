@@ -942,6 +942,8 @@ Document in README as **demo credentials only**.
 | Responsive        | Bezorger views mobile-first; admin tables scroll on small screens                                                               |
 | a11y              | Keyboard nav, focus management on route change, `aria-live` for toasts, sufficient contrast, `prefers-reduced-motion` respected |
 
+Frontend visual hierarchy conventions (page header, sections, nested-card rule, teal primary) are documented in [visual-hierarchy.md](./visual-hierarchy.md).
+
 ---
 
 ## 12. Realtime design

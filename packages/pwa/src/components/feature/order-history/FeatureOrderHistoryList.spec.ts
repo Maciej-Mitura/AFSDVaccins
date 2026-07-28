@@ -170,7 +170,6 @@ describe('FeatureOrderHistoryList', () => {
       },
       global: {
         stubs: {
-          UCard: { template: '<div><slot /></div>' },
           UButton: true,
           UAlert: true,
           UBadge: { template: '<span><slot /></span>' },
@@ -185,6 +184,63 @@ describe('FeatureOrderHistoryList', () => {
     expect(load).toHaveBeenCalled()
   })
 
+  it('uses page h1 and keeps role-specific pharmacy behaviour', () => {
+    orders.value = [sampleOrder()]
+    const admin = mount(FeatureOrderHistoryList, {
+      props: {
+        title: 'Admin',
+        summary: 'All',
+        showPharmacy: true,
+        allowApothekerFilter: true,
+      },
+      global: {
+        stubs: {
+          UButton: { template: '<button><slot /></button>' },
+          UAlert: true,
+          UBadge: { template: '<span><slot /></span>' },
+          UIcon: true,
+          UInput: true,
+          USelect: true,
+        },
+      },
+    })
+    expect(admin.findAll('h1')).toHaveLength(1)
+    expect(admin.get('h1').text()).toBe('Admin')
+    expect(admin.get('[data-testid="common-page-header"]').text()).toContain(
+      'All',
+    )
+    expect(admin.text()).toContain('Central Pharmacy')
+    expect(admin.find('[data-testid="order-history-table"]').exists()).toBe(
+      true,
+    )
+    expect(admin.find('[data-testid="order-history-cards"]').exists()).toBe(
+      true,
+    )
+    expect(admin.findComponent({ name: 'UCard' }).exists()).toBe(false)
+
+    const apotheker = mount(FeatureOrderHistoryList, {
+      props: {
+        title: 'Apotheker',
+        summary: 'Own',
+        showPharmacy: false,
+        allowApothekerFilter: false,
+      },
+      global: {
+        stubs: {
+          UButton: { template: '<button><slot /></button>' },
+          UAlert: true,
+          UBadge: { template: '<span><slot /></span>' },
+          UIcon: true,
+          UInput: true,
+          USelect: true,
+        },
+      },
+    })
+    expect(apotheker.get('h1').text()).toBe('Apotheker')
+    expect(apotheker.text()).not.toContain('Central Pharmacy')
+    expect(apotheker.text()).not.toContain('orderHistory.column.pharmacy')
+  })
+
   it('shows empty and filtered empty states', async () => {
     isEmpty.value = true
     const wrapper = mount(FeatureOrderHistoryList, {
@@ -196,7 +252,6 @@ describe('FeatureOrderHistoryList', () => {
       },
       global: {
         stubs: {
-          UCard: { template: '<div><slot /></div>' },
           UButton: true,
           UAlert: true,
           UInput: true,
@@ -226,7 +281,6 @@ describe('FeatureOrderHistoryList', () => {
       },
       global: {
         stubs: {
-          UCard: { template: '<div><slot /></div>' },
           UButton: true,
           UAlert: true,
           UInput: true,
@@ -237,58 +291,6 @@ describe('FeatureOrderHistoryList', () => {
     expect(wrapper.find('[data-testid="error-state"]').text()).toContain(
       'mapped-error',
     )
-  })
-
-  it('ADMIN shows pharmacy; APOTHEKER does not', () => {
-    orders.value = [sampleOrder()]
-    const admin = mount(FeatureOrderHistoryList, {
-      props: {
-        title: 'Admin',
-        summary: 'All',
-        showPharmacy: true,
-        allowApothekerFilter: true,
-      },
-      global: {
-        stubs: {
-          UCard: { template: '<div><slot /></div>' },
-          UButton: { template: '<button><slot /></button>' },
-          UAlert: true,
-          UBadge: { template: '<span><slot /></span>' },
-          UIcon: true,
-          UInput: true,
-          USelect: true,
-        },
-      },
-    })
-    expect(admin.text()).toContain('Central Pharmacy')
-    expect(admin.find('[data-testid="order-history-table"]').exists()).toBe(
-      true,
-    )
-    expect(admin.find('[data-testid="order-history-cards"]').exists()).toBe(
-      true,
-    )
-
-    const apotheker = mount(FeatureOrderHistoryList, {
-      props: {
-        title: 'Apotheker',
-        summary: 'Own',
-        showPharmacy: false,
-        allowApothekerFilter: false,
-      },
-      global: {
-        stubs: {
-          UCard: { template: '<div><slot /></div>' },
-          UButton: { template: '<button><slot /></button>' },
-          UAlert: true,
-          UBadge: { template: '<span><slot /></span>' },
-          UIcon: true,
-          UInput: true,
-          USelect: true,
-        },
-      },
-    })
-    expect(apotheker.text()).not.toContain('Central Pharmacy')
-    expect(apotheker.text()).not.toContain('orderHistory.column.pharmacy')
   })
 
   it('renders unavailable for null deliveredAt and cancellation reason', () => {
@@ -308,7 +310,6 @@ describe('FeatureOrderHistoryList', () => {
       },
       global: {
         stubs: {
-          UCard: { template: '<div><slot /></div>' },
           UButton: { template: '<button><slot /></button>' },
           UAlert: true,
           UBadge: { template: '<span><slot /></span>' },
@@ -332,7 +333,6 @@ describe('FeatureOrderHistoryList', () => {
       },
       global: {
         stubs: {
-          UCard: { template: '<div><slot /></div>' },
           UButton: { template: '<button><slot /></button>' },
           UAlert: true,
           UBadge: { template: '<span><slot /></span>' },
@@ -370,7 +370,6 @@ describe('FeatureOrderHistoryList', () => {
       },
       global: {
         stubs: {
-          UCard: { template: '<div><slot /></div>' },
           UButton: {
             inheritAttrs: false,
             template:
@@ -386,5 +385,33 @@ describe('FeatureOrderHistoryList', () => {
       .get('[data-testid="order-history-load-more"]')
       .trigger('click')
     expect(loadMore).toHaveBeenCalled()
+  })
+
+  it('places filters in an inset section without page-level cards', () => {
+    const wrapper = mount(FeatureOrderHistoryList, {
+      props: {
+        title: 'History',
+        summary: 'Summary',
+        showPharmacy: false,
+        allowApothekerFilter: false,
+      },
+      global: {
+        stubs: {
+          UButton: true,
+          UAlert: true,
+          UInput: true,
+          USelect: true,
+        },
+      },
+    })
+
+    const filterSection = wrapper
+      .findAll('[data-testid="common-page-section"]')
+      .find(section => section.attributes('data-variant') === 'inset')
+    expect(filterSection).toBeTruthy()
+    expect(filterSection!.find('[data-testid="filters-stub"]').exists()).toBe(
+      true,
+    )
+    expect(wrapper.findComponent({ name: 'UCard' }).exists()).toBe(false)
   })
 })
