@@ -1,4 +1,4 @@
-import { ObjectId } from 'mongodb'
+import { ObjectId, type AnyBulkWriteOperation, type Document } from 'mongodb'
 
 import {
   applyAnalyticsDemoPlan,
@@ -140,30 +140,25 @@ export function createMemoryAnalyticsDemoDb(
           }
           return Promise.resolve({ deletedCount })
         },
-        bulkWrite: operations => {
+        bulkWrite: (operations: readonly AnyBulkWriteOperation<Document>[]) => {
           let upsertedCount = 0
           let modifiedCount = 0
           for (const operation of operations) {
-            const replaceOne = operation.replaceOne as
-              | {
-                  filter: { _id: ObjectId }
-                  replacement: Doc
-                  upsert?: boolean
-                }
-              | undefined
-            if (!replaceOne) {
+            if (!('replaceOne' in operation) || !operation.replaceOne) {
               continue
             }
+            const replaceOne = operation.replaceOne
             writes += 1
             const current = store[name] ?? []
             const index = current.findIndex(
               doc => idString(doc._id) === idString(replaceOne.filter._id),
             )
+            const replacement = replaceOne.replacement as Doc
             if (index >= 0) {
-              current[index] = { ...replaceOne.replacement }
+              current[index] = { ...replacement }
               modifiedCount += 1
             } else if (replaceOne.upsert) {
-              current.push({ ...replaceOne.replacement })
+              current.push({ ...replacement })
               upsertedCount += 1
             }
             store[name] = current

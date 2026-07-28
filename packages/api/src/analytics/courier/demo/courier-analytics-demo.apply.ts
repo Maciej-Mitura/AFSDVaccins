@@ -1,4 +1,4 @@
-import { ObjectId } from 'mongodb'
+import { ObjectId, type AnyBulkWriteOperation, type Document } from 'mongodb'
 
 import {
   ANALYTICS_DEMO_DISPLAY_NAME_PATTERN,
@@ -33,7 +33,7 @@ export type AnalyticsDemoCollection = {
     filter: Record<string, unknown>,
   ) => Promise<{ deletedCount: number }>
   bulkWrite: (
-    operations: Array<Record<string, unknown>>,
+    operations: readonly AnyBulkWriteOperation<Document>[],
     options?: { ordered?: boolean },
   ) => Promise<{ upsertedCount: number; modifiedCount: number }>
 }
@@ -105,60 +105,70 @@ export async function applyAnalyticsDemoPlan(
   const orders = db.collection('orders')
 
   await users.bulkWrite(
-    plan.couriers.map(courier => ({
-      replaceOne: {
-        filter: { _id: courier.user._id },
-        replacement: courier.user,
-        upsert: true,
-      },
-    })),
+    plan.couriers.map(
+      (courier): AnyBulkWriteOperation<Document> => ({
+        replaceOne: {
+          filter: { _id: courier.user._id },
+          replacement: courier.user,
+          upsert: true,
+        },
+      }),
+    ),
     { ordered: false },
   )
 
   await profiles.bulkWrite(
-    plan.couriers.map(courier => ({
-      replaceOne: {
-        filter: { _id: courier.profile._id },
-        replacement: courier.profile,
-        upsert: true,
-      },
-    })),
+    plan.couriers.map(
+      (courier): AnyBulkWriteOperation<Document> => ({
+        replaceOne: {
+          filter: { _id: courier.profile._id },
+          replacement: courier.profile,
+          upsert: true,
+        },
+      }),
+    ),
     { ordered: false },
   )
 
   await templates.bulkWrite(
-    plan.couriers.map(courier => ({
-      replaceOne: {
-        filter: { _id: courier.template._id },
-        replacement: courier.template,
-        upsert: true,
-      },
-    })),
+    plan.couriers.map(
+      (courier): AnyBulkWriteOperation<Document> => ({
+        replaceOne: {
+          filter: { _id: courier.template._id },
+          replacement: courier.template,
+          upsert: true,
+        },
+      }),
+    ),
     { ordered: false },
   )
 
   if (plan.routes.length > 0) {
     await routes.bulkWrite(
-      plan.routes.map(route => ({
-        replaceOne: {
-          filter: { _id: route._id },
-          replacement: route,
-          upsert: true,
-        },
-      })),
+      plan.routes.map(
+        (route): AnyBulkWriteOperation<Document> => ({
+          replaceOne: {
+            filter: { _id: route._id },
+            replacement: route,
+            upsert: true,
+          },
+        }),
+      ),
       { ordered: false },
     )
   }
 
   if (plan.orders.length > 0) {
     await orders.bulkWrite(
-      plan.orders.map(order => ({
-        replaceOne: {
-          filter: { _id: order._id },
-          replacement: order,
-          upsert: true,
-        },
-      })),
+      plan.orders.map(
+        (order): AnyBulkWriteOperation<Document> => ({
+          replaceOne: {
+            filter: { _id: order._id },
+            replacement: order,
+            upsert: true,
+          },
+        }),
+      ),
       { ordered: false },
     )
   }
