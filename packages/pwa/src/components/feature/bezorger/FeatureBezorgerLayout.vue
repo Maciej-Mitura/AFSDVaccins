@@ -2,6 +2,7 @@
   <CommonAppShell
     :title="t('shell.bezorger.title')"
     :nav-links="bezorgerNavLinks"
+    :account-links="bezorgerAccountLinks"
   >
     <template #header-actions>
       <CommonNotificationBell
@@ -29,10 +30,9 @@ const bezorgerNavLinks = computed<AppShellLink[]>(() => [
   { label: t('navigation.bezorger.dashboard'), to: '/bezorger' },
   { label: t('navigation.bezorger.today'), to: '/bezorger/today' },
   { label: t('navigation.bezorger.tomorrow'), to: '/bezorger/tomorrow' },
-  {
-    label: t('navigation.bezorger.notifications'),
-    to: '/bezorger/notifications',
-  },
+])
+
+const bezorgerAccountLinks = computed<AppShellLink[]>(() => [
   { label: t('navigation.bezorger.profile'), to: '/profile' },
 ])
 

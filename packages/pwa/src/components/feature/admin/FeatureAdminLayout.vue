@@ -1,17 +1,14 @@
 <template>
-  <CommonAppShell :title="t('shell.admin.title')" :nav-links="adminNavLinks">
+  <CommonAppShell
+    :title="t('shell.admin.title')"
+    :nav-links="adminNavLinks"
+    :account-links="adminAccountLinks"
+  >
     <template #header-actions>
-      <UButton
+      <CommonNotificationBell
         to="/admin/notifications"
-        size="sm"
-        variant="ghost"
-        color="neutral"
-      >
-        {{ t('navigation.admin.notifications') }}
-        <UBadge v-if="hasUnread" color="warning" variant="solid" class="ml-1">
-          {{ unreadCount }}
-        </UBadge>
-      </UButton>
+        :label="t('navigation.admin.notifications')"
+      />
     </template>
     <RouterView />
   </CommonAppShell>
@@ -24,6 +21,7 @@ import { useI18n } from 'vue-i18n'
 import CommonAppShell, {
   type AppShellLink,
 } from '@/components/common/CommonAppShell.vue'
+import CommonNotificationBell from '@/components/common/CommonNotificationBell.vue'
 import { useNotifications } from '@/composables/useNotifications'
 
 const { t } = useI18n()
@@ -39,14 +37,14 @@ const adminNavLinks = computed<AppShellLink[]>(() => [
   },
   { label: t('navigation.admin.vaccines'), to: '/admin/vaccines' },
   { label: t('navigation.admin.stock'), to: '/admin/stock' },
-  { label: t('navigation.admin.notifications'), to: '/admin/notifications' },
   { label: t('navigation.admin.settings'), to: '/admin/settings' },
+])
+
+const adminAccountLinks = computed<AppShellLink[]>(() => [
   { label: t('navigation.admin.profile'), to: '/profile' },
 ])
 
 const {
-  unreadCount,
-  hasUnread,
   loadUnreadCount,
   subscribeToNotificationEvents,
   stopNotificationSubscription,

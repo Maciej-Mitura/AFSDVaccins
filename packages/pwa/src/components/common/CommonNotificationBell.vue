@@ -43,8 +43,10 @@ const { t } = useI18n()
 const { unreadCount } = useNotifications()
 
 const label = computed(() => props.label ?? t('accessibility.notifications'))
-const ariaLabel = computed(() => label.value)
 const unreadLabel = computed(() =>
   t('notifications.centre.unreadCount', { count: unreadCount.value }),
+)
+const ariaLabel = computed(() =>
+  unreadCount.value > 0 ? `${label.value}. ${unreadLabel.value}` : label.value,
 )
 </script>

@@ -2,9 +2,13 @@
   <CommonAppShell
     :title="t('shell.apotheker.title')"
     :nav-links="apothekerNavLinks"
+    :account-links="apothekerAccountLinks"
   >
     <template #header-actions>
-      <CommonNotificationBell />
+      <CommonNotificationBell
+        to="/apotheker/notifications"
+        :label="t('navigation.apotheker.notifications')"
+      />
     </template>
     <RouterView />
   </CommonAppShell>
@@ -28,10 +32,9 @@ const apothekerNavLinks = computed<AppShellLink[]>(() => [
   { label: t('navigation.apotheker.vaccines'), to: '/apotheker/vaccines' },
   { label: t('navigation.apotheker.newOrder'), to: '/apotheker/orders/new' },
   { label: t('navigation.apotheker.orders'), to: '/apotheker/orders' },
-  {
-    label: t('navigation.apotheker.notifications'),
-    to: '/apotheker/notifications',
-  },
+])
+
+const apothekerAccountLinks = computed<AppShellLink[]>(() => [
   { label: t('navigation.apotheker.profile'), to: '/profile' },
 ])
 
