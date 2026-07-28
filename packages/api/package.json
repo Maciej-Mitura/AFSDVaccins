@@ -25,6 +25,7 @@
     "diagnose:voice-reports:azure": "ts-node --transpile-only scripts/diagnose-voice-reports-azure.ts",
     "diagnose:route-template-assignments": "ts-node --transpile-only scripts/diagnose-route-template-assignments.ts",
     "repair:route-template-assignments": "ts-node --transpile-only scripts/repair-route-template-assignments.ts",
+    "seed:courier-analytics-demo": "ts-node --transpile-only scripts/seed-courier-analytics-demo.ts",
     "test:voice-reports:azure-storage": "ts-node --transpile-only scripts/test-voice-reports-azure-storage.ts",
     "test:voice-reports:azure-speech": "ts-node --transpile-only scripts/test-voice-reports-azure-speech.ts",
     "test:voice-reports:azure": "ts-node --transpile-only scripts/test-voice-reports-azure.ts"

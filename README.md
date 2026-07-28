@@ -252,6 +252,23 @@ Populate Firebase Authentication and MongoDB with a **deterministic, idempotent*
 demo dataset for presentation, role testing, and authz demos. The seed does
 **not** start on API boot — run it explicitly.
 
+### Courier analytics demo data (Phase 35C)
+
+To populate meaningful courier-performance charts (separate from presentation
+Courier A/B), see
+[`docs/phase-35c-courier-analytics-demo-data.md`](docs/phase-35c-courier-analytics-demo-data.md).
+
+```bash
+# Prefer direct ts-node from packages/api (not monorepo root)
+cd packages/api
+npx ts-node --transpile-only scripts/seed-courier-analytics-demo.ts --dry-run
+npx ts-node --transpile-only scripts/seed-courier-analytics-demo.ts --apply
+npx ts-node --transpile-only scripts/seed-courier-analytics-demo.ts --cleanup
+```
+
+Default is dry-run. Do not run `--apply` against production without
+`CONFIRM_ANALYTICS_DEMO_DATA=SEED_ANALYTICS_DEMO_DATA`.
+
 ### Prerequisites
 
 1. MongoDB running (`infrastructure/docker-compose-dev.yml` or local).
