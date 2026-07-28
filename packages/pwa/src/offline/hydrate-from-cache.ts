@@ -134,6 +134,13 @@ export function hydrateNotificationsFromCache(
           city: record.interpolationData.city ?? null,
           orderReference: record.interpolationData.orderReference ?? null,
           orderCount: record.interpolationData.orderCount ?? null,
+          stopCount: record.interpolationData.stopCount ?? null,
+          doseCount: record.interpolationData.doseCount ?? null,
+          warningPercentage: record.interpolationData.warningPercentage ?? null,
+          weeklyDoseCap: record.interpolationData.weeklyDoseCap ?? null,
+          vaccineName: record.interpolationData.vaccineName ?? null,
+          quantityRemaining: record.interpolationData.quantityRemaining ?? null,
+          stockThreshold: record.interpolationData.stockThreshold ?? null,
         }
       : null,
     read: Boolean(record.readAt),

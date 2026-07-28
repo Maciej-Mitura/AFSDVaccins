@@ -5,12 +5,15 @@ import { OrderStatus } from '../order/order-status.enum'
 import { Order } from '../order/order.entity'
 import { NotificationType } from './notification-type.enum'
 import { OrderNotificationService } from './order-notification.service'
-import { NotificationService } from './notification.service'
+import {
+  CreateTypedNotificationInput,
+  NotificationService,
+} from './notification.service'
 
 describe('OrderNotificationService', () => {
   let service: OrderNotificationService
   let notificationService: jest.Mocked<
-    Pick<NotificationService, 'createNotification'>
+    Pick<NotificationService, 'createTypedNotification'>
   >
 
   const apotheker: User = {
@@ -54,9 +57,18 @@ describe('OrderNotificationService', () => {
     updatedAt: new Date('2026-07-14T10:00:00.000Z'),
   }
 
+  function typedCalls(): CreateTypedNotificationInput[] {
+    return notificationService.createTypedNotification.mock.calls.map(
+      call => call[0],
+    )
+  }
+
   beforeEach(() => {
     notificationService = {
-      createNotification: jest.fn().mockResolvedValue({}),
+      createTypedNotification: jest.fn().mockResolvedValue({
+        notification: {},
+        created: true,
+      }),
     }
 
     service = new OrderNotificationService(
@@ -67,52 +79,65 @@ describe('OrderNotificationService', () => {
   it('creates weekly warning only when threshold is crossed', async () => {
     await service.handleOrderCreated(apotheker, order, 170, settings)
 
-    expect(notificationService.createNotification).toHaveBeenCalledTimes(2)
-    expect(notificationService.createNotification).toHaveBeenCalledWith(
-      expect.objectContaining({
-        type: NotificationType.WEEK_LIMIT_WARNING,
-        deduplicationKey:
-          'weekly-warning:507f1f77bcf86cd799439011:2026:29:90',
-      }),
+    expect(notificationService.createTypedNotification).toHaveBeenCalledTimes(2)
+    const weekCall = typedCalls().find(
+      call => call.type === NotificationType.WEEK_LIMIT_WARNING,
     )
+    expect(weekCall).toMatchObject({
+      type: NotificationType.WEEK_LIMIT_WARNING,
+      eventId: 'weekly-warning:507f1f77bcf86cd799439011:2026:29:90',
+      interpolationData: {
+        warningPercentage: 90,
+        weeklyDoseCap: 200,
+      },
+      actionPath: '/apotheker/orders',
+    })
   })
 
   it('does not create weekly warning when already above threshold', async () => {
     await service.handleOrderCreated(apotheker, order, 185, settings)
 
-    expect(notificationService.createNotification).toHaveBeenCalledTimes(1)
-    expect(notificationService.createNotification).toHaveBeenCalledWith(
-      expect.objectContaining({
-        type: NotificationType.ORDER_CONFIRMATION,
-      }),
-    )
+    expect(notificationService.createTypedNotification).toHaveBeenCalledTimes(1)
+    expect(typedCalls()[0]).toMatchObject({
+      type: NotificationType.ORDER_CONFIRMATION,
+      interpolationData: {
+        doseCount: 10,
+        routeDate: '2026-07-14',
+      },
+      actionPath: '/apotheker/orders',
+    })
   })
 
-  it('creates cancellation notification with deterministic deduplication key', async () => {
+  it('creates cancellation notification with deterministic eventId', async () => {
     await service.createOrderCancelledNotification(apotheker, {
       ...order,
       status: OrderStatus.CANCELLED,
     } as Order)
 
-    expect(notificationService.createNotification).toHaveBeenCalledWith(
-      expect.objectContaining({
-        type: NotificationType.ORDER_CANCELLED,
-        deduplicationKey: 'order-cancelled:order-a',
-      }),
-    )
+    expect(typedCalls()[0]).toMatchObject({
+      type: NotificationType.ORDER_CANCELLED,
+      eventId: 'order-cancelled:order-a',
+      actionPath: '/apotheker/orders',
+    })
   })
 
-  it('creates delivered notification once with deterministic deduplication key', async () => {
-    await service.createOrderDeliveredNotification({
-      ...order,
-      status: OrderStatus.DELIVERED,
-    } as Order)
+  it('uses admin-cancelled body key when cancelled by administrator', async () => {
+    await service.createAdminCancelledOrderNotification(order)
 
-    expect(notificationService.createNotification).toHaveBeenCalledWith(
-      expect.objectContaining({
-        type: NotificationType.ORDER_DELIVERED,
-        deduplicationKey: 'order-delivered:order-a',
-      }),
-    )
+    expect(typedCalls()[0]).toMatchObject({
+      type: NotificationType.ORDER_CANCELLED,
+      bodyKey: 'notifications.apotheker.orderCancelledByAdmin.body',
+      eventId: 'order-cancelled:order-a',
+    })
+  })
+
+  it('creates delivered notification with structured keys', async () => {
+    await service.createOrderDeliveredNotification(order)
+
+    expect(typedCalls()[0]).toMatchObject({
+      type: NotificationType.ORDER_DELIVERED,
+      eventId: 'order-delivered:order-a',
+      actionPath: '/apotheker/orders',
+    })
   })
 })

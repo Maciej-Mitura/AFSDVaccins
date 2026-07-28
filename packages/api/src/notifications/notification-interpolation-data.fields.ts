@@ -30,4 +30,28 @@ export class NotificationInterpolationDataFields {
   @Column({ nullable: true })
   @Field(() => Int, { nullable: true })
   stopCount?: number | null
+
+  @Column({ nullable: true })
+  @Field(() => Int, { nullable: true })
+  doseCount?: number | null
+
+  @Column({ nullable: true })
+  @Field(() => Int, { nullable: true })
+  warningPercentage?: number | null
+
+  @Column({ nullable: true })
+  @Field(() => Int, { nullable: true })
+  weeklyDoseCap?: number | null
+
+  @Column({ nullable: true })
+  @Field(() => String, { nullable: true })
+  vaccineName?: string | null
+
+  @Column({ nullable: true })
+  @Field(() => Int, { nullable: true })
+  quantityRemaining?: number | null
+
+  @Column({ nullable: true })
+  @Field(() => Int, { nullable: true })
+  stockThreshold?: number | null
 }

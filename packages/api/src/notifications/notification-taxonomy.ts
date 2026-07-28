@@ -9,6 +9,12 @@ export const NOTIFICATION_INTERPOLATION_KEYS = [
   'orderReference',
   'orderCount',
   'stopCount',
+  'doseCount',
+  'warningPercentage',
+  'weeklyDoseCap',
+  'vaccineName',
+  'quantityRemaining',
+  'stockThreshold',
 ] as const
 
 export type NotificationInterpolationKey =
@@ -28,7 +34,7 @@ export type NotificationTaxonomyEntry = {
   allowedInterpolationKeys: readonly NotificationInterpolationKey[]
 }
 
-const PHASE_27A_TAXONOMY: readonly NotificationTaxonomyEntry[] = [
+const STRUCTURED_NOTIFICATION_TAXONOMY: readonly NotificationTaxonomyEntry[] = [
   {
     type: NotificationType.APOTHEKER_ROUTE_STARTED,
     recipientRole: UserRole.APOTHEKER,
@@ -87,21 +93,69 @@ const PHASE_27A_TAXONOMY: readonly NotificationTaxonomyEntry[] = [
       'routeDate',
     ],
   },
+  {
+    type: NotificationType.ORDER_CONFIRMATION,
+    recipientRole: UserRole.APOTHEKER,
+    titleKey: 'notifications.apotheker.orderConfirmation.title',
+    bodyKey: 'notifications.apotheker.orderConfirmation.body',
+    actionPath: '/apotheker/orders',
+    allowedInterpolationKeys: ['routeDate', 'doseCount', 'orderReference'],
+  },
+  {
+    type: NotificationType.WEEK_LIMIT_WARNING,
+    recipientRole: UserRole.APOTHEKER,
+    titleKey: 'notifications.apotheker.weekLimitWarning.title',
+    bodyKey: 'notifications.apotheker.weekLimitWarning.body',
+    actionPath: '/apotheker/orders',
+    allowedInterpolationKeys: [
+      'warningPercentage',
+      'weeklyDoseCap',
+      'orderReference',
+    ],
+  },
+  {
+    type: NotificationType.ORDER_CANCELLED,
+    recipientRole: UserRole.APOTHEKER,
+    titleKey: 'notifications.apotheker.orderCancelled.title',
+    bodyKey: 'notifications.apotheker.orderCancelled.body',
+    actionPath: '/apotheker/orders',
+    allowedInterpolationKeys: ['routeDate', 'orderReference'],
+  },
+  {
+    type: NotificationType.ORDER_DELIVERED,
+    recipientRole: UserRole.APOTHEKER,
+    titleKey: 'notifications.apotheker.orderDelivered.title',
+    bodyKey: 'notifications.apotheker.orderDelivered.body',
+    actionPath: '/apotheker/orders',
+    allowedInterpolationKeys: ['routeDate', 'orderReference'],
+  },
+  {
+    type: NotificationType.LOW_STOCK_WARNING,
+    recipientRole: UserRole.ADMIN,
+    titleKey: 'notifications.admin.lowStock.title',
+    bodyKey: 'notifications.admin.lowStock.body',
+    actionPath: '/admin/stock',
+    allowedInterpolationKeys: [
+      'vaccineName',
+      'quantityRemaining',
+      'stockThreshold',
+    ],
+  },
 ] as const
 
+/** @deprecated Alias kept for Phase 27A test/call-site compatibility. */
+const PHASE_27A_TAXONOMY = STRUCTURED_NOTIFICATION_TAXONOMY
+
 const TAXONOMY_BY_TYPE = new Map(
-  PHASE_27A_TAXONOMY.map(entry => [entry.type, entry]),
+  STRUCTURED_NOTIFICATION_TAXONOMY.map(entry => [entry.type, entry]),
 )
 
-/** Legacy order/stock types keep Dutch title/body persistence (pre–Phase 27A). */
+/**
+ * Types that still use the legacy createNotification(title/body) path
+ * are empty — all emitters now use structured titleKey/bodyKey.
+ */
 export const LEGACY_NOTIFICATION_TYPES: ReadonlySet<NotificationType> = new Set(
-  [
-    NotificationType.ORDER_CONFIRMATION,
-    NotificationType.WEEK_LIMIT_WARNING,
-    NotificationType.ORDER_CANCELLED,
-    NotificationType.ORDER_DELIVERED,
-    NotificationType.LOW_STOCK_WARNING,
-  ],
+  [],
 )
 
 export function getNotificationTaxonomy(
@@ -111,6 +165,10 @@ export function getNotificationTaxonomy(
 }
 
 export function isPhase27ANotificationType(type: NotificationType): boolean {
+  return TAXONOMY_BY_TYPE.has(type)
+}
+
+export function isStructuredNotificationType(type: NotificationType): boolean {
   return TAXONOMY_BY_TYPE.has(type)
 }
 
@@ -137,4 +195,4 @@ export function resolveDefaultActionPath(
   return getNotificationTaxonomy(type)?.actionPath
 }
 
-export { PHASE_27A_TAXONOMY }
+export { PHASE_27A_TAXONOMY, STRUCTURED_NOTIFICATION_TAXONOMY }

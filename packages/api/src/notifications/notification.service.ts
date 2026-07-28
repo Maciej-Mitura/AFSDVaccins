@@ -34,7 +34,7 @@ export type CreateNotificationInput = {
   recipientRole?: UserRole | null
 }
 
-/** Phase 27A create path — taxonomy-driven keys, no translated copy. */
+/** Structured create path — taxonomy-driven keys, no translated copy. */
 export type CreateTypedNotificationInput = {
   recipientUserId: string
   recipientRole: UserRole
@@ -45,6 +45,9 @@ export type CreateTypedNotificationInput = {
   sourceEntityId?: string | null
   actionPath?: string | null
   expiresAt?: Date | null
+  /** Optional override when one type shares multiple body variants. */
+  titleKey?: string | null
+  bodyKey?: string | null
 }
 
 export type CreateTypedNotificationResult = {
@@ -182,6 +185,8 @@ export class NotificationService {
     }
 
     const taxonomy = getNotificationTaxonomy(input.type)!
+    const titleKey = input.titleKey?.trim() || taxonomy.titleKey
+    const bodyKey = input.bodyKey?.trim() || taxonomy.bodyKey
     const interpolationData = sanitizeInterpolationData(
       input.type,
       input.interpolationData,
@@ -189,20 +194,24 @@ export class NotificationService {
     const now = this.clock.now()
     const actionPath =
       input.actionPath ?? resolveDefaultActionPath(input.type) ?? null
+    const relatedOrderId =
+      input.sourceEntityType === 'order' && input.sourceEntityId
+        ? String(input.sourceEntityId)
+        : null
 
     const notification = this.notificationRepository.create({
       recipientUserId: input.recipientUserId,
       recipientRole: input.recipientRole,
       type: input.type,
       // GraphQL/UI compatibility: expose keys until the Notifications tab resolves i18n.
-      title: taxonomy.titleKey,
-      body: taxonomy.bodyKey,
-      titleKey: taxonomy.titleKey,
-      bodyKey: taxonomy.bodyKey,
+      title: titleKey,
+      body: bodyKey,
+      titleKey,
+      bodyKey,
       interpolationData: interpolationData
         ? this.toInterpolationFields(interpolationData)
         : null,
-      relatedOrderId: null,
+      relatedOrderId,
       // Omit null deduplicationKey so Mongo sparse unique index ignores typed rows.
       eventId,
       sourceEntityType: input.sourceEntityType ?? null,
@@ -245,6 +254,21 @@ export class NotificationService {
       orderCount:
         data.orderCount != null ? Number(data.orderCount) : null,
       stopCount: data.stopCount != null ? Number(data.stopCount) : null,
+      doseCount: data.doseCount != null ? Number(data.doseCount) : null,
+      warningPercentage:
+        data.warningPercentage != null
+          ? Number(data.warningPercentage)
+          : null,
+      weeklyDoseCap:
+        data.weeklyDoseCap != null ? Number(data.weeklyDoseCap) : null,
+      vaccineName:
+        data.vaccineName != null ? String(data.vaccineName) : null,
+      quantityRemaining:
+        data.quantityRemaining != null
+          ? Number(data.quantityRemaining)
+          : null,
+      stockThreshold:
+        data.stockThreshold != null ? Number(data.stockThreshold) : null,
     }
   }
 

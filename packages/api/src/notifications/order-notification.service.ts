@@ -2,18 +2,17 @@ import { Injectable } from '@nestjs/common'
 
 import { ApplicationSettings } from '../settings/settings.entity'
 import { User } from '../user/user.entity'
+import { UserRole } from '../user/user-role.enum'
 import { Order } from '../order/order.entity'
+import { sanitizeInternalActionPath } from './notification-action-path'
 import { NotificationType } from './notification-type.enum'
 import { NotificationService } from './notification.service'
+
+const ACTION_APOTHEKER_ORDERS = '/apotheker/orders'
 
 @Injectable()
 export class OrderNotificationService {
   constructor(private readonly notificationService: NotificationService) {}
-
-  private formatDeliveryDate(value: string): string {
-    const [year, month, day] = value.split('-')
-    return `${day}/${month}/${year}`
-  }
 
   buildWeeklyWarningDeduplicationKey(
     userId: string,
@@ -47,13 +46,19 @@ export class OrderNotificationService {
     user: User,
     order: Order,
   ): Promise<void> {
-    await this.notificationService.createNotification({
+    await this.notificationService.createTypedNotification({
       recipientUserId: user._id.toString(),
+      recipientRole: UserRole.APOTHEKER,
       type: NotificationType.ORDER_CONFIRMATION,
-      title: 'Bestelling geplaatst',
-      body: `Bestelling ${order.id} met ${order.totalQuantity} dosissen wordt geleverd op ${this.formatDeliveryDate(order.deliveryDate)}.`,
-      relatedOrderId: order.id,
-      deduplicationKey: `order-confirmation:${order.id}`,
+      eventId: `order-confirmation:${order.id}`,
+      interpolationData: {
+        routeDate: order.deliveryDate,
+        doseCount: order.totalQuantity,
+        orderReference: String(order.id),
+      },
+      sourceEntityType: 'order',
+      sourceEntityId: String(order.id),
+      actionPath: this.requireInternalPath(ACTION_APOTHEKER_ORDERS),
     })
   }
 
@@ -81,18 +86,24 @@ export class OrderNotificationService {
       Math.round((weeklyQuantityAfter / settings.weeklyDoseCap) * 100),
     )
 
-    await this.notificationService.createNotification({
+    await this.notificationService.createTypedNotification({
       recipientUserId: user._id.toString(),
+      recipientRole: UserRole.APOTHEKER,
       type: NotificationType.WEEK_LIMIT_WARNING,
-      title: 'Weekwaarschuwing bereikt',
-      body: `Je hebt ${afterPercentage}% van het weekmaximum (${settings.weeklyDoseCap} dosissen) bereikt.`,
-      relatedOrderId: order.id,
-      deduplicationKey: this.buildWeeklyWarningDeduplicationKey(
+      eventId: this.buildWeeklyWarningDeduplicationKey(
         user._id.toString(),
         order.isoYear,
         order.isoWeek,
         settings.weeklyWarningPercentage,
       ),
+      interpolationData: {
+        warningPercentage: afterPercentage,
+        weeklyDoseCap: settings.weeklyDoseCap,
+        orderReference: String(order.id),
+      },
+      sourceEntityType: 'order',
+      sourceEntityId: String(order.id),
+      actionPath: this.requireInternalPath(ACTION_APOTHEKER_ORDERS),
     })
   }
 
@@ -100,35 +111,51 @@ export class OrderNotificationService {
     user: User,
     order: Order,
   ): Promise<void> {
-    await this.notificationService.createNotification({
+    await this.notificationService.createTypedNotification({
       recipientUserId: user._id.toString(),
+      recipientRole: UserRole.APOTHEKER,
       type: NotificationType.ORDER_CANCELLED,
-      title: 'Bestelling geannuleerd',
-      body: `Bestelling ${order.id} is geannuleerd.`,
-      relatedOrderId: order.id,
-      deduplicationKey: `order-cancelled:${order.id}`,
+      eventId: `order-cancelled:${order.id}`,
+      interpolationData: {
+        routeDate: order.deliveryDate,
+        orderReference: String(order.id),
+      },
+      sourceEntityType: 'order',
+      sourceEntityId: String(order.id),
+      actionPath: this.requireInternalPath(ACTION_APOTHEKER_ORDERS),
     })
   }
 
   async createOrderDeliveredNotification(order: Order): Promise<void> {
-    await this.notificationService.createNotification({
+    await this.notificationService.createTypedNotification({
       recipientUserId: order.apothekerId.toString(),
+      recipientRole: UserRole.APOTHEKER,
       type: NotificationType.ORDER_DELIVERED,
-      title: 'Bestelling geleverd',
-      body: `Bestelling ${order.id} is geleverd op ${this.formatDeliveryDate(order.deliveryDate)}.`,
-      relatedOrderId: order.id,
-      deduplicationKey: `order-delivered:${order.id}`,
+      eventId: `order-delivered:${order.id}`,
+      interpolationData: {
+        routeDate: order.deliveryDate,
+        orderReference: String(order.id),
+      },
+      sourceEntityType: 'order',
+      sourceEntityId: String(order.id),
+      actionPath: this.requireInternalPath(ACTION_APOTHEKER_ORDERS),
     })
   }
 
   async createAdminCancelledOrderNotification(order: Order): Promise<void> {
-    await this.notificationService.createNotification({
+    await this.notificationService.createTypedNotification({
       recipientUserId: order.apothekerId.toString(),
+      recipientRole: UserRole.APOTHEKER,
       type: NotificationType.ORDER_CANCELLED,
-      title: 'Bestelling geannuleerd',
-      body: `Bestelling ${order.id} is geannuleerd door de beheerder.`,
-      relatedOrderId: order.id,
-      deduplicationKey: `order-cancelled:${order.id}`,
+      eventId: `order-cancelled:${order.id}`,
+      bodyKey: 'notifications.apotheker.orderCancelledByAdmin.body',
+      interpolationData: {
+        routeDate: order.deliveryDate,
+        orderReference: String(order.id),
+      },
+      sourceEntityType: 'order',
+      sourceEntityId: String(order.id),
+      actionPath: this.requireInternalPath(ACTION_APOTHEKER_ORDERS),
     })
   }
 
@@ -145,5 +172,13 @@ export class OrderNotificationService {
       weeklyQuantityBefore,
       settings,
     )
+  }
+
+  private requireInternalPath(path: string): string {
+    const safe = sanitizeInternalActionPath(path)
+    if (!safe) {
+      throw new Error(`Invalid notification action path: ${path}`)
+    }
+    return safe
   }
 }

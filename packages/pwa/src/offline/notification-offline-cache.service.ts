@@ -57,6 +57,15 @@ export class NotificationOfflineCacheService {
               city: item.interpolationData.city ?? null,
               orderReference: item.interpolationData.orderReference ?? null,
               orderCount: item.interpolationData.orderCount ?? null,
+              stopCount: item.interpolationData.stopCount ?? null,
+              doseCount: item.interpolationData.doseCount ?? null,
+              warningPercentage:
+                item.interpolationData.warningPercentage ?? null,
+              weeklyDoseCap: item.interpolationData.weeklyDoseCap ?? null,
+              vaccineName: item.interpolationData.vaccineName ?? null,
+              quantityRemaining:
+                item.interpolationData.quantityRemaining ?? null,
+              stockThreshold: item.interpolationData.stockThreshold ?? null,
             }
           : null,
         actionPath: item.actionPath ?? null,

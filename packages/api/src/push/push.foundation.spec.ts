@@ -71,13 +71,19 @@ describe('FakePushNotificationProvider', () => {
 })
 
 describe('Push payload safety', () => {
-  it('excludes sensitive domain fields', () => {
+  it('excludes sensitive domain fields and resolves human-readable copy', () => {
     const notification = {
       id: '6a569d2cbb2590db980429cd',
       type: NotificationType.BEZORGER_ROUTE_ASSIGNED,
       title: 'notifications.bezorger.routeAssigned.title',
       body: 'notifications.bezorger.routeAssigned.body',
-      actionPath: '/bezorger/routes',
+      titleKey: 'notifications.bezorger.routeAssigned.title',
+      bodyKey: 'notifications.bezorger.routeAssigned.body',
+      interpolationData: {
+        routeDate: '2026-07-26',
+        stopCount: 2,
+      },
+      actionPath: '/bezorger/today',
       createdAt: new Date('2026-07-26T06:00:00.000Z'),
     } as Notification
 
@@ -86,6 +92,12 @@ describe('Push payload safety', () => {
     expect(payload).not.toHaveProperty('p256dh')
     expect(payload).not.toHaveProperty('auth')
     expect(payload).not.toHaveProperty('interpolationData')
+    expect(payload.title).toBe('A new route has been assigned to you')
+    expect(payload.body).toBe(
+      'Route for 2 pharmacies is scheduled for 2026-07-26.',
+    )
+    expect(payload.title).not.toMatch(/^notifications\./)
+    expect(payload.body).not.toMatch(/^notifications\./)
     expect(JSON.stringify(payload)).not.toMatch(/latitude|longitude|password/)
     expect(() => assertSafePushPayload(payload)).not.toThrow()
   })

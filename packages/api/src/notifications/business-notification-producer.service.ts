@@ -73,7 +73,7 @@ export class BusinessNotificationProducerService {
       const profile = await this.apothekerProfileService.findByUserId(
         order.apothekerId.toString(),
       )
-      const pharmacyName = profile?.pharmacyName?.trim() || 'Pharmacy'
+      const pharmacyName = profile?.pharmacyName?.trim() || ''
       const orderReference = String(order.id)
       const orderCount =
         order.orderLines?.length ??
@@ -91,7 +91,7 @@ export class BusinessNotificationProducerService {
             interpolationData: {
               orderReference,
               orderCount,
-              pharmacyName,
+              ...(pharmacyName ? { pharmacyName } : {}),
               routeDate: order.deliveryDate,
             },
             sourceEntityType: 'order',
@@ -157,9 +157,9 @@ export class BusinessNotificationProducerService {
             interpolationData: {
               routeDate: route.deliveryDate,
               pharmacyName: stop.pharmacyName,
-              city: stop.address?.city
-                ? ` (${stop.address.city})`
-                : '',
+              ...(stop.address?.city?.trim()
+                ? { city: stop.address.city.trim() }
+                : {}),
             },
             sourceEntityType: 'delivery_route',
             sourceEntityId: route.id,
@@ -227,7 +227,9 @@ export class BusinessNotificationProducerService {
         interpolationData: {
           pharmacyName: nextStop.pharmacyName,
           routeDate: route.deliveryDate,
-          city: lastKnownCourierCity || 'unknown',
+          ...(lastKnownCourierCity
+            ? { city: lastKnownCourierCity }
+            : {}),
         },
         sourceEntityType: 'delivery_route',
         sourceEntityId: route.id,

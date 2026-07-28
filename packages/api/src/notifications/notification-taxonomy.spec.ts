@@ -9,8 +9,8 @@ import { UserRole } from '../user/user-role.enum'
 import { sanitizeInterpolationData } from './notification-interpolation'
 
 describe('notification taxonomy', () => {
-  it('covers all six Phase 27A types with role + i18n keys', () => {
-    expect(PHASE_27A_TAXONOMY).toHaveLength(6)
+  it('covers all structured notification types with role + i18n keys', () => {
+    expect(PHASE_27A_TAXONOMY.length).toBeGreaterThanOrEqual(6)
 
     for (const entry of PHASE_27A_TAXONOMY) {
       expect(isPhase27ANotificationType(entry.type)).toBe(true)
@@ -51,5 +51,19 @@ describe('notification taxonomy', () => {
         orderReference: 'x',
       }),
     ).toThrow(/not allowed/)
+  })
+
+  it('allows legacy stock interpolation keys for LOW_STOCK_WARNING', () => {
+    expect(
+      sanitizeInterpolationData(NotificationType.LOW_STOCK_WARNING, {
+        vaccineName: 'Influenza',
+        quantityRemaining: 4,
+        stockThreshold: 5,
+      }),
+    ).toEqual({
+      vaccineName: 'Influenza',
+      quantityRemaining: 4,
+      stockThreshold: 5,
+    })
   })
 })

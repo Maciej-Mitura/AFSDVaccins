@@ -650,7 +650,7 @@ describe('StockService.applyDeliveryDecrement', () => {
 describe('StockNotificationService', () => {
   let service: StockNotificationService
   let notificationService: jest.Mocked<
-    Pick<NotificationService, 'createNotification'>
+    Pick<NotificationService, 'createTypedNotification'>
   >
   let userService: jest.Mocked<Pick<UserService, 'findUsersByRole'>>
 
@@ -682,7 +682,10 @@ describe('StockNotificationService', () => {
 
   beforeEach(() => {
     notificationService = {
-      createNotification: jest.fn().mockResolvedValue({}),
+      createTypedNotification: jest.fn().mockResolvedValue({
+        notification: {},
+        created: true,
+      }),
     }
 
     userService = {
@@ -699,11 +702,17 @@ describe('StockNotificationService', () => {
   it('creates low-stock notification when crossing threshold', async () => {
     await service.notifyAdminsIfEnteredLowStock(vaccine, 6, 5, 'adjustment-1')
 
-    expect(notificationService.createNotification).toHaveBeenCalledWith(
+    expect(notificationService.createTypedNotification).toHaveBeenCalledWith(
       expect.objectContaining({
         recipientUserId: admin._id.toString(),
         type: NotificationType.LOW_STOCK_WARNING,
-        deduplicationKey: 'low-stock:507f1f77bcf86cd799439011:adjustment-1',
+        eventId: 'low-stock:507f1f77bcf86cd799439011:adjustment-1',
+        interpolationData: {
+          vaccineName: 'Influenza',
+          quantityRemaining: 5,
+          stockThreshold: 5,
+        },
+        actionPath: '/admin/stock',
       }),
     )
   })

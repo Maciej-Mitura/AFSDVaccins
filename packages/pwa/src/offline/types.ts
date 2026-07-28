@@ -130,6 +130,13 @@ export type NotificationInterpolationSnapshot = {
   city?: string | null
   orderReference?: string | null
   orderCount?: number | null
+  stopCount?: number | null
+  doseCount?: number | null
+  warningPercentage?: number | null
+  weeklyDoseCap?: number | null
+  vaccineName?: string | null
+  quantityRemaining?: number | null
+  stockThreshold?: number | null
 }
 
 export type NotificationCacheRecord = {

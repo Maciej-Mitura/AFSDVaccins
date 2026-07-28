@@ -1,6 +1,7 @@
 import { createHash } from 'node:crypto'
 
 import type { PushNotificationPayload } from './push-notification.provider'
+import { resolveEnglishNotificationCopy } from '../notifications/notification-copy.en'
 import { Notification } from '../notifications/notification.entity'
 
 export const PUSH_ENDPOINT_MAX_LENGTH = 2048
@@ -15,16 +16,20 @@ export function hashPushEndpoint(endpoint: string): string {
 
 /**
  * Builds a bounded Web Push payload from a persisted notification.
- * Excludes interpolation secrets, order lines, GPS, and subscription material.
+ * Resolves English human copy from titleKey/bodyKey so the OS UI never
+ * shows raw i18n keys. Excludes interpolation secrets, order lines, GPS,
+ * and subscription material.
  */
 export function buildSafePushPayload(
   notification: Notification,
 ): PushNotificationPayload {
+  const copy = resolveEnglishNotificationCopy(notification)
+
   return {
     notificationId: notification.id,
     type: notification.type,
-    title: notification.title,
-    body: notification.body,
+    title: copy.title,
+    body: copy.body,
     actionPath: notification.actionPath ?? null,
     createdAt: notification.createdAt.toISOString(),
   }

@@ -15,6 +15,13 @@ export const myNotificationsQuerySource = gql`
         city
         orderReference
         orderCount
+        stopCount
+        doseCount
+        warningPercentage
+        weeklyDoseCap
+        vaccineName
+        quantityRemaining
+        stockThreshold
       }
       read
       readAt
@@ -81,6 +88,13 @@ export const notificationReceivedSubscriptionSource = gql`
         city
         orderReference
         orderCount
+        stopCount
+        doseCount
+        warningPercentage
+        weeklyDoseCap
+        vaccineName
+        quantityRemaining
+        stockThreshold
       }
       read
       readAt

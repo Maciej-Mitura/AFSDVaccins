@@ -9,11 +9,14 @@ import {
   AdminOperationsEventType,
   AdminOperationsFeedEvent,
 } from '../order/admin-operations-feed.type'
+import { sanitizeInternalActionPath } from '../notifications/notification-action-path'
 import { NotificationType } from '../notifications/notification-type.enum'
 import { NotificationService } from '../notifications/notification.service'
 import { UserRole } from '../user/user-role.enum'
 import { UserService } from '../user/user.service'
 import { Vaccine } from '../vaccine/vaccine.entity'
+
+const ACTION_ADMIN_STOCK = '/admin/stock'
 
 @Injectable()
 export class StockNotificationService {
@@ -55,19 +58,30 @@ export class StockNotificationService {
     }
 
     const admins = await this.userService.findUsersByRole(UserRole.ADMIN)
-    const deduplicationKey = this.buildLowStockEpisodeKey(
+    const eventId = this.buildLowStockEpisodeKey(
       vaccine._id.toString(),
       crossingAdjustmentId,
     )
+    const actionPath = sanitizeInternalActionPath(ACTION_ADMIN_STOCK)
+    if (!actionPath) {
+      throw new Error(`Invalid notification action path: ${ACTION_ADMIN_STOCK}`)
+    }
 
     await Promise.all(
       admins.map(admin =>
-        this.notificationService.createNotification({
+        this.notificationService.createTypedNotification({
           recipientUserId: admin._id.toString(),
+          recipientRole: UserRole.ADMIN,
           type: NotificationType.LOW_STOCK_WARNING,
-          title: 'Lage voorraad',
-          body: `${vaccine.name} heeft nog ${quantityAfter} dosissen (drempel: ${vaccine.stockWarningThreshold}).`,
-          deduplicationKey,
+          eventId,
+          interpolationData: {
+            vaccineName: vaccine.name,
+            quantityRemaining: quantityAfter,
+            stockThreshold: vaccine.stockWarningThreshold,
+          },
+          sourceEntityType: 'vaccine',
+          sourceEntityId: vaccine._id.toString(),
+          actionPath,
         }),
       ),
     )
