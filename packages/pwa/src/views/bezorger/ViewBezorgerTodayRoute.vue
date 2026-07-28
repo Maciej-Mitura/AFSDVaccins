@@ -419,6 +419,17 @@ watch([ownerUserId, ownerBezorgerProfileId, isOnline], () => {
         "
       />
 
+      <!-- Voice report in the live-route workflow (before start/QR/complete). -->
+      <FeatureRouteVoiceRecorder
+        :route-id="myTodayRoute.id"
+        :route-status="myTodayRoute.status"
+        :route-source="todayRouteSource"
+        :allow-recording="myTodayRoute.status === RouteStatus.InProgress"
+        :show-courier-name="false"
+        :can-retry-transcription="false"
+        title-key="routeVoiceReports.voiceReport"
+      />
+
       <div
         v-if="
           myTodayRoute.status === RouteStatus.Assigned ||
@@ -524,16 +535,6 @@ watch([ownerUserId, ownerBezorgerProfileId, isOnline], () => {
           {{ t('common.cancel') }}
         </UButton>
       </div>
-
-      <FeatureRouteVoiceRecorder
-        :route-id="myTodayRoute.id"
-        :route-status="myTodayRoute.status"
-        :route-source="todayRouteSource"
-        :allow-recording="myTodayRoute.status === RouteStatus.InProgress"
-        :show-courier-name="false"
-        :can-retry-transcription="false"
-        title-key="routeVoiceReports.title"
-      />
 
       <CommonErrorState
         v-if="statusError"

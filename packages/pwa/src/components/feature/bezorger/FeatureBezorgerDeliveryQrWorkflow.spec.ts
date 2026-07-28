@@ -182,6 +182,22 @@ const uiStubs = {
   CommonEmptyState: { template: '<div />' },
   CommonErrorState: { template: '<div />' },
   CommonLoadingSkeleton: { template: '<div />' },
+  FeatureRouteVoiceRecorder: {
+    props: [
+      'routeId',
+      'routeStatus',
+      'routeSource',
+      'allowRecording',
+      'showCourierName',
+      'canRetryTranscription',
+      'titleKey',
+    ],
+    template:
+      '<section data-testid="route-voice-reports-section"><slot /></section>',
+  },
+  FeatureRouteLocationStatusCard: {
+    template: '<div data-testid="route-location-status-card" />',
+  },
 }
 
 function makeRoute(status: RouteStatus) {

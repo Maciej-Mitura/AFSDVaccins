@@ -17,21 +17,31 @@ import {
 } from '@/composables/voice-report/voice-recorder-types'
 import type { RouteDataSource } from '@/offline/ui-error-category'
 
-const props = defineProps<{
-  routeId: string
-  routeStatus: RouteStatusValue | string
-  routeSource: RouteDataSource
-  /** Show recorder creation controls (courier IN_PROGRESS only). */
-  allowRecording: boolean
-  /** Show courier display name on cards (admin). */
-  showCourierName?: boolean
-  /** ADMIN may retry failed transcription. */
-  canRetryTranscription?: boolean
-  /** Section title key override. */
-  titleKey?: string
-  /** When false, hide entire feature (e.g. APOTHEKER). */
-  enabled?: boolean
-}>()
+const props = withDefaults(
+  defineProps<{
+    routeId: string
+    routeStatus: RouteStatusValue | string
+    routeSource: RouteDataSource
+    /** Show recorder creation controls (courier IN_PROGRESS only). */
+    allowRecording: boolean
+    /** Show courier display name on cards (admin). */
+    showCourierName?: boolean
+    /** ADMIN may retry failed transcription. */
+    canRetryTranscription?: boolean
+    /** Section title key override. */
+    titleKey?: string
+    /**
+     * When false, hide entire feature (e.g. APOTHEKER).
+     * Default must be true: Vue casts omitted Boolean props to false.
+     */
+    enabled?: boolean
+  }>(),
+  {
+    showCourierName: false,
+    canRetryTranscription: false,
+    enabled: true,
+  },
+)
 
 const { t } = useI18n()
 const { currentLocale } = useLanguage()
@@ -247,14 +257,14 @@ onBeforeUnmount(() => {
 
 <template>
   <section
-    v-if="enabled !== false"
-    class="space-y-4"
+    v-if="enabled"
+    class="space-y-4 rounded-lg border border-default px-4 py-3"
     data-testid="route-voice-reports-section"
-    :aria-label="t(titleKey ?? 'routeVoiceReports.title')"
+    :aria-label="t(titleKey ?? 'routeVoiceReports.voiceReport')"
   >
     <div>
       <h2 class="text-lg font-semibold">
-        {{ t(titleKey ?? 'routeVoiceReports.title') }}
+        {{ t(titleKey ?? 'routeVoiceReports.voiceReport') }}
       </h2>
       <p class="mt-1 text-sm text-muted">
         {{ t('routeVoiceReports.description') }}
@@ -295,6 +305,7 @@ onBeforeUnmount(() => {
           class="sr-only"
           role="status"
           aria-live="polite"
+          aria-atomic="true"
           data-testid="route-voice-live-status"
         >
           {{ liveStatusText }}
@@ -370,6 +381,7 @@ onBeforeUnmount(() => {
             :disabled="!canShowRecorder"
             :title="recordingDisabledReason ?? undefined"
             :aria-disabled="!canShowRecorder"
+            :aria-label="t('routeVoiceReports.recording.start')"
             @click="onStart"
           >
             {{ t('routeVoiceReports.recording.start') }}
@@ -406,7 +418,12 @@ onBeforeUnmount(() => {
               aria-hidden="true"
               data-testid="route-voice-recording-indicator"
             />
-            <p class="font-medium" data-testid="route-voice-recording-label">
+            <p
+              class="font-medium"
+              role="status"
+              aria-live="polite"
+              data-testid="route-voice-recording-label"
+            >
               {{
                 recorder.state.value === 'PAUSED'
                   ? t('routeVoiceReports.recording.paused')
@@ -468,6 +485,7 @@ onBeforeUnmount(() => {
               color="primary"
               data-testid="route-voice-stop"
               :disabled="recorder.state.value === 'STOPPING'"
+              :aria-label="t('routeVoiceReports.recording.stop')"
               @click="onStop"
             >
               {{ t('routeVoiceReports.recording.stop') }}
@@ -479,6 +497,7 @@ onBeforeUnmount(() => {
               variant="ghost"
               data-testid="route-voice-cancel"
               :disabled="recorder.state.value === 'STOPPING'"
+              :aria-label="t('routeVoiceReports.recording.cancel')"
               @click="onCancel"
             >
               {{ t('routeVoiceReports.recording.cancel') }}
@@ -548,6 +567,11 @@ onBeforeUnmount(() => {
               :disabled="
                 !isOnline || recorder.state.value === 'UPLOADING' || uploading
               "
+              :aria-label="
+                uploadErrorMessage
+                  ? t('routeVoiceReports.upload.retry')
+                  : t('routeVoiceReports.upload.upload')
+              "
               @click="uploadErrorMessage ? onRetryUpload() : onUpload()"
             >
               {{
@@ -565,6 +589,7 @@ onBeforeUnmount(() => {
               variant="ghost"
               data-testid="route-voice-discard"
               :disabled="recorder.state.value === 'UPLOADING' || uploading"
+              :aria-label="t('routeVoiceReports.upload.discard')"
               @click="onDiscard"
             >
               {{ t('routeVoiceReports.upload.discard') }}

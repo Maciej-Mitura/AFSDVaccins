@@ -765,7 +765,7 @@
     "routeVoiceReports.transcription.failed": "Transcription failed",
     "routeVoiceReports.transcription.machineGenerated": "Machine-generated transcript",
     "routeVoiceReports.transcription.noSpeech": "No speech recognised",
-    "routeVoiceReports.transcription.pending": "Waiting for transcription",
+    "routeVoiceReports.transcription.pending": "Queued",
     "routeVoiceReports.transcription.processing": "Transcribing…",
     "routeVoiceReports.transcription.providerThrottled": "Transcription temporarily limited",
     "routeVoiceReports.transcription.providerTimeout": "Transcription timed out",

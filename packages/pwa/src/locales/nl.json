@@ -765,7 +765,7 @@
     "routeVoiceReports.transcription.failed": "Transcriptie mislukt",
     "routeVoiceReports.transcription.machineGenerated": "Door machine gegenereerd transcript",
     "routeVoiceReports.transcription.noSpeech": "Geen spraak herkend",
-    "routeVoiceReports.transcription.pending": "Wachten op transcriptie",
+    "routeVoiceReports.transcription.pending": "In wachtrij",
     "routeVoiceReports.transcription.processing": "Bezig met transcriberen…",
     "routeVoiceReports.transcription.providerThrottled": "Transcriptie tijdelijk beperkt",
     "routeVoiceReports.transcription.providerTimeout": "Transcriptie time-out",
