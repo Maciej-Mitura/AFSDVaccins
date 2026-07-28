@@ -320,7 +320,7 @@ examAfsdMaciejMitura/
 | `build`             | Build api + pwa + types (runs `generate:graphql` first)              |
 | `test`              | Jest unit tests in api                                               |
 | `test:e2e`          | Supertest GraphQL E2E                                                |
-| `test:playwright`   | Root Playwright suite                                                |
+| `test:e2e:pwa`      | Root Playwright suite (Chromium browser E2E)                         |
 | `seed:database:all` | Idempotent seed via nestjs-command                                   |
 | `generate:graphql`  | Emit `schema.gql` + codegen to `@vaccin-delivery/types`              |
 | `lint`              | ESLint across packages                                               |

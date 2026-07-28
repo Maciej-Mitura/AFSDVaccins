@@ -2169,7 +2169,7 @@ test(api): add GraphQL E2E coverage for core flows
 ### Commands to run
 
 ```bash
-npm run test:playwright
+npm run test:e2e:pwa
 ```
 
 ### Manual acceptance checklist
