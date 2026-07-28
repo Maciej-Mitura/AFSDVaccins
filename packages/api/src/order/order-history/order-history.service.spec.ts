@@ -333,10 +333,9 @@ describe('OrderHistoryService', () => {
     const decoded = encodeOrderHistoryCursor(t2, idB)
     expect(after).toBe(decoded)
 
-    const secondCallArgs = createEntityCursor.mock.calls[1] as
-      | [{ $or?: unknown; $and?: unknown }]
-      | undefined
-    expect(secondCallArgs).toBeDefined()
+    const secondCallArgs = createEntityCursor.mock.calls[1] as [
+      { $or?: unknown; $and?: unknown },
+    ]
     const secondCallFilter = secondCallArgs[0]
     expect(secondCallFilter.$or ?? secondCallFilter.$and).toBeDefined()
   })
