@@ -4,11 +4,15 @@ import { TypeOrmModule } from '@nestjs/typeorm'
 import { PubSubModule } from '../common/pubsub/pubsub.module'
 import { BusinessNotificationModule } from '../notifications/business-notification.module'
 import { NotificationsCoreModule } from '../notifications/notifications-core.module'
+import { ProfileCoreModule } from '../profile/profile-core.module'
 import { SettingsCoreModule } from '../settings/settings-core.module'
 import { StockCoreModule } from '../stock/stock-core.module'
+import { UserCoreModule } from '../user/user-core.module'
 import { VaccineCoreModule } from '../vaccine/vaccine-core.module'
 import { CLOCK, SystemClock } from './clock.provider'
 import { OrderEventsService } from './order-events.service'
+import { OrderHistoryPersistenceService } from './order-history/order-history.persistence'
+import { OrderHistoryService } from './order-history/order-history.service'
 import { OrderNormalizationService } from './order-normalization.service'
 import { Order } from './order.entity'
 import { OrderService } from './order.service'
@@ -51,6 +55,30 @@ const orderNormalizationProvider = isSchemaGeneration
     }
   : OrderNormalizationService
 
+const orderHistoryServiceProvider = isSchemaGeneration
+  ? {
+      provide: OrderHistoryService,
+      useValue: {
+        findOrderHistory: () =>
+          Promise.resolve({
+            edges: [],
+            pageInfo: { hasNextPage: false, endCursor: null },
+            totalCount: 0,
+          }),
+      },
+    }
+  : OrderHistoryService
+
+const orderHistoryPersistenceProvider = isSchemaGeneration
+  ? {
+      provide: OrderHistoryPersistenceService,
+      useValue: {
+        onModuleInit: () => Promise.resolve(),
+        ensureIndexes: () => Promise.resolve(),
+      },
+    }
+  : OrderHistoryPersistenceService
+
 const persistenceImports = isSchemaGeneration
   ? []
   : [TypeOrmModule.forFeature([Order])]
@@ -63,17 +91,21 @@ const persistenceImports = isSchemaGeneration
     NotificationsCoreModule,
     BusinessNotificationModule,
     StockCoreModule,
+    UserCoreModule,
+    ProfileCoreModule,
     ...persistenceImports,
   ],
   providers: [
     orderServiceProvider,
     orderNormalizationProvider,
+    orderHistoryServiceProvider,
+    orderHistoryPersistenceProvider,
     OrderEventsService,
     {
       provide: CLOCK,
       useClass: SystemClock,
     },
   ],
-  exports: [OrderService, ...persistenceImports],
+  exports: [OrderService, OrderHistoryService, ...persistenceImports],
 })
 export class OrderCoreModule {}
