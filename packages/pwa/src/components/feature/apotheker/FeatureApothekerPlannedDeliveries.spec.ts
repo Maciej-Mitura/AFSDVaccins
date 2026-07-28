@@ -258,9 +258,12 @@ describe('FeatureApothekerPlannedDeliveries', () => {
     expect(
       wrapper.findAll('[data-testid="planned-delivery-order-ref"]'),
     ).toHaveLength(2)
-    expect(wrapper.text()).toContain(
-      translate('deliveryStopQr.planned.cardTitle'),
-    )
+    expect(
+      wrapper.find('[data-testid="planned-delivery-date"]').exists(),
+    ).toBe(true)
+    expect(
+      wrapper.find('[data-testid="planned-delivery-state"]').text(),
+    ).toContain(translate('deliveryStopQr.state.available'))
   })
 
   it('groups two orders in one stop into one card', async () => {

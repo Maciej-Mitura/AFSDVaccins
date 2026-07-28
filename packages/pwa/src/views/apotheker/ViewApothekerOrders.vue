@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted, onUnmounted, ref } from 'vue'
+import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 
 import { OrderStatus } from '@vaccin-delivery/types'
@@ -7,8 +7,11 @@ import { OrderStatus } from '@vaccin-delivery/types'
 import CommonEmptyState from '@/components/common/CommonEmptyState.vue'
 import CommonErrorState from '@/components/common/CommonErrorState.vue'
 import CommonLoadingSkeleton from '@/components/common/CommonLoadingSkeleton.vue'
+import CommonPageHeader from '@/components/common/CommonPageHeader.vue'
+import CommonPageSection from '@/components/common/CommonPageSection.vue'
 import CommonRealtimeStatus from '@/components/common/CommonRealtimeStatus.vue'
 import FeatureApothekerPlannedDeliveries from '@/components/feature/apotheker/FeatureApothekerPlannedDeliveries.vue'
+import { shortOrderId } from '@/composables/order-history-filters'
 import { registerReconnectHandler } from '@/composables/useGraphQL'
 import { useNotifications } from '@/composables/useNotifications'
 import { useOrders } from '@/composables/useOrders'
@@ -38,6 +41,7 @@ const { subscribeToNotificationEvents, stopNotificationSubscription } =
 
 const cancellingId = ref<string | null>(null)
 const actionError = ref<string | null>(null)
+const expandedOrderIds = ref<Set<string>>(new Set())
 let reconnectCleanup: (() => void) | null = null
 
 void loadMyOrders()
@@ -61,6 +65,36 @@ function canCancel(status: OrderStatus): boolean {
   return status === OrderStatus.Pending
 }
 
+function isActiveOrder(status: OrderStatus): boolean {
+  return status === OrderStatus.Pending || status === OrderStatus.Planned
+}
+
+function isQuietOrder(status: OrderStatus): boolean {
+  return status === OrderStatus.Delivered || status === OrderStatus.Cancelled
+}
+
+const activeOrders = computed(() =>
+  myOrders.value.filter(order => isActiveOrder(order.status)),
+)
+
+const completedOrders = computed(() =>
+  myOrders.value.filter(order => isQuietOrder(order.status)),
+)
+
+function isExpanded(orderId: string): boolean {
+  return expandedOrderIds.value.has(orderId)
+}
+
+function toggleLines(orderId: string): void {
+  const next = new Set(expandedOrderIds.value)
+  if (next.has(orderId)) {
+    next.delete(orderId)
+  } else {
+    next.add(orderId)
+  }
+  expandedOrderIds.value = next
+}
+
 async function onCancel(id: string) {
   actionError.value = null
   cancellingId.value = id
@@ -79,87 +113,148 @@ async function onCancel(id: string) {
 </script>
 
 <template>
-  <div class="space-y-6">
+  <div class="space-y-8" data-testid="apotheker-orders">
+    <CommonPageHeader
+      :title="t('apotheker.orders.title')"
+      :subtitle="t('apotheker.orders.subtitle')"
+    >
+      <template #actions>
+        <UButton to="/apotheker/orders/new" size="sm" color="primary">
+          {{ t('apotheker.orders.new') }}
+        </UButton>
+      </template>
+    </CommonPageHeader>
+
     <CommonRealtimeStatus />
 
     <FeatureApothekerPlannedDeliveries />
 
-    <UCard>
-      <template #header>
-        <div class="flex flex-wrap items-center justify-between gap-3">
-          <h2 class="text-lg font-semibold">
-            {{ t('apotheker.orders.title') }}
-          </h2>
-          <UButton to="/apotheker/orders/new" size="sm">{{
-            t('apotheker.orders.new')
-          }}</UButton>
-        </div>
-      </template>
-
-      <CommonLoadingSkeleton v-if="loading && myOrders.length === 0" />
-
-      <CommonErrorState
-        v-else-if="errorMessage"
-        :title="t('admin.orders.loadFailed')"
-        :description="errorMessage"
-      />
-
-      <CommonEmptyState
-        v-else-if="myOrders.length === 0"
-        :title="t('admin.orders.empty.title')"
-        :description="t('apotheker.orders.empty.description')"
-      />
-
-      <div v-else class="space-y-4">
-        <UCard
-          v-for="order in myOrders"
-          :key="order.id"
-          data-testid="order-card"
+    <CommonPageSection variant="inset">
+      <p class="text-sm text-toned">
+        {{ t('apotheker.orders.historyHint') }}
+        <UButton
+          to="/apotheker/history"
+          size="xs"
+          variant="link"
+          color="primary"
+          class="px-1"
         >
-          <div class="space-y-3 text-sm">
-            <div class="flex flex-wrap items-center gap-2">
-              <h3 class="font-semibold">
-                {{ t('admin.orders.orderId', { id: order.id }) }}
-              </h3>
-              <UBadge variant="subtle">{{
-                orderStatusLabel(order.status)
-              }}</UBadge>
-            </div>
-            <p>
-              <span class="font-medium"
-                >{{ t('admin.orders.submittedAt') }}:</span
-              >
-              {{ formatDateTime(order.submittedAt) }}
-            </p>
-            <p>
-              <span class="font-medium">{{ t('orders.deliveryDate') }}:</span>
-              {{ formatDate(order.deliveryDate) }}
-            </p>
-            <p>
-              <span class="font-medium">{{ t('orders.filter.isoWeek') }}:</span>
-              {{ order.isoWeek }} / {{ order.isoYear }}
-            </p>
-            <p>
-              <span class="font-medium">{{ t('admin.orders.total') }}:</span>
-              {{
-                translatePlural('admin.orders.totalDoses', order.totalQuantity)
-              }}
-            </p>
+          {{ t('apotheker.dashboard.goToHistory') }}
+        </UButton>
+      </p>
+    </CommonPageSection>
 
-            <div class="space-y-2">
-              <p class="font-medium">{{ t('admin.orders.lines') }}</p>
-              <div
-                v-for="line in order.orderLines"
-                :key="`${order.id}-${line.vaccineId}`"
-                class="rounded border border-default p-2"
-              >
+    <CommonLoadingSkeleton v-if="loading && myOrders.length === 0" />
+
+    <CommonErrorState
+      v-else-if="errorMessage"
+      :title="t('admin.orders.loadFailed')"
+      :description="errorMessage"
+    />
+
+    <CommonEmptyState
+      v-else-if="myOrders.length === 0"
+      :title="t('admin.orders.empty.title')"
+      :description="t('apotheker.orders.empty.description')"
+    />
+
+    <template v-else>
+      <CommonPageSection
+        v-if="activeOrders.length > 0"
+        :title="t('apotheker.orders.section.active')"
+      >
+        <ul class="divide-y divide-default" role="list">
+          <li
+            v-for="order in activeOrders"
+            :key="order.id"
+            class="space-y-3 py-4 text-sm"
+            data-testid="order-card"
+            data-order-state="active"
+          >
+            <div class="flex flex-wrap items-center gap-2">
+              <h3 class="font-semibold text-highlighted" :title="order.id">
                 {{
-                  t('admin.orders.line', {
-                    name: line.vaccineName,
-                    count: line.quantity,
+                  t('orderHistory.orderId.short', {
+                    id: shortOrderId(order.id),
                   })
                 }}
+              </h3>
+              <UBadge variant="subtle" color="primary">
+                {{ orderStatusLabel(order.status) }}
+              </UBadge>
+            </div>
+
+            <dl class="grid gap-1.5 text-toned sm:grid-cols-2">
+              <div>
+                <dt class="inline font-medium text-highlighted">
+                  {{ t('admin.orders.submittedAt') }}:
+                </dt>
+                {{ ' ' }}
+                <dd class="inline">{{ formatDateTime(order.submittedAt) }}</dd>
               </div>
+              <div>
+                <dt class="inline font-medium text-highlighted">
+                  {{ t('orders.deliveryDate') }}:
+                </dt>
+                {{ ' ' }}
+                <dd class="inline">{{ formatDate(order.deliveryDate) }}</dd>
+              </div>
+              <div>
+                <dt class="inline font-medium text-highlighted">
+                  {{ t('orders.filter.isoWeek') }}:
+                </dt>
+                {{ ' ' }}
+                <dd class="inline">
+                  {{ order.isoWeek }} / {{ order.isoYear }}
+                </dd>
+              </div>
+              <div>
+                <dt class="inline font-medium text-highlighted">
+                  {{ t('admin.orders.total') }}:
+                </dt>
+                {{ ' ' }}
+                <dd class="inline">
+                  {{
+                    translatePlural(
+                      'admin.orders.totalDoses',
+                      order.totalQuantity,
+                    )
+                  }}
+                </dd>
+              </div>
+            </dl>
+
+            <div>
+              <UButton
+                size="xs"
+                variant="ghost"
+                color="neutral"
+                :aria-expanded="isExpanded(order.id)"
+                :aria-controls="`order-lines-${order.id}`"
+                @click="toggleLines(order.id)"
+              >
+                {{ t('apotheker.orders.toggleLines') }}
+                ({{ order.orderLines.length }})
+              </UButton>
+              <ul
+                v-if="isExpanded(order.id)"
+                :id="`order-lines-${order.id}`"
+                class="mt-2 divide-y divide-default rounded-md bg-muted px-3"
+                role="list"
+              >
+                <li
+                  v-for="line in order.orderLines"
+                  :key="`${order.id}-${line.vaccineId}`"
+                  class="py-2 text-toned"
+                >
+                  {{
+                    t('admin.orders.line', {
+                      name: line.vaccineName,
+                      count: line.quantity,
+                    })
+                  }}
+                </li>
+              </ul>
             </div>
 
             <UButton
@@ -168,21 +263,92 @@ async function onCancel(id: string) {
               color="error"
               variant="outline"
               :loading="cancellingId === order.id"
+              :aria-label="t('common.cancel')"
               @click="onCancel(order.id)"
             >
               {{ t('common.cancel') }}
             </UButton>
-          </div>
-        </UCard>
-      </div>
+          </li>
+        </ul>
+      </CommonPageSection>
 
-      <UAlert
-        v-if="actionError"
-        class="mt-4"
-        color="error"
-        variant="subtle"
-        :title="actionError"
-      />
-    </UCard>
+      <CommonPageSection
+        v-if="completedOrders.length > 0"
+        :title="t('apotheker.orders.section.completed')"
+      >
+        <ul class="divide-y divide-default" role="list">
+          <li
+            v-for="order in completedOrders"
+            :key="order.id"
+            class="space-y-2 py-4 text-sm text-muted"
+            data-testid="order-card"
+            data-order-state="completed"
+          >
+            <div class="flex flex-wrap items-center gap-2">
+              <h3 class="font-medium" :title="order.id">
+                {{
+                  t('orderHistory.orderId.short', {
+                    id: shortOrderId(order.id),
+                  })
+                }}
+              </h3>
+              <UBadge variant="subtle" color="neutral">
+                {{ orderStatusLabel(order.status) }}
+              </UBadge>
+            </div>
+            <p>
+              {{ formatDate(order.deliveryDate) }}
+              ·
+              {{
+                translatePlural(
+                  'admin.orders.totalDoses',
+                  order.totalQuantity,
+                )
+              }}
+            </p>
+
+            <div>
+              <UButton
+                size="xs"
+                variant="ghost"
+                color="neutral"
+                :aria-expanded="isExpanded(order.id)"
+                :aria-controls="`order-lines-${order.id}`"
+                @click="toggleLines(order.id)"
+              >
+                {{ t('apotheker.orders.toggleLines') }}
+                ({{ order.orderLines.length }})
+              </UButton>
+              <ul
+                v-if="isExpanded(order.id)"
+                :id="`order-lines-${order.id}`"
+                class="mt-2 divide-y divide-default rounded-md bg-muted px-3"
+                role="list"
+              >
+                <li
+                  v-for="line in order.orderLines"
+                  :key="`${order.id}-${line.vaccineId}`"
+                  class="py-2"
+                >
+                  {{
+                    t('admin.orders.line', {
+                      name: line.vaccineName,
+                      count: line.quantity,
+                    })
+                  }}
+                </li>
+              </ul>
+            </div>
+          </li>
+        </ul>
+      </CommonPageSection>
+    </template>
+
+    <UAlert
+      v-if="actionError"
+      color="error"
+      variant="subtle"
+      :title="actionError"
+    />
   </div>
 </template>

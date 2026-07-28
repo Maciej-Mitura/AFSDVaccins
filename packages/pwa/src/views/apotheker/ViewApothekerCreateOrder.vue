@@ -7,6 +7,8 @@ import type { FormSubmitEvent } from '@nuxt/ui'
 import * as z from 'zod'
 
 import CommonLoadingSkeleton from '@/components/common/CommonLoadingSkeleton.vue'
+import CommonPageHeader from '@/components/common/CommonPageHeader.vue'
+import CommonPageSection from '@/components/common/CommonPageSection.vue'
 import { useApplicationSettings } from '@/composables/useApplicationSettings'
 import { useOnlineStatus } from '@/composables/useOnlineStatus'
 import { useOrders } from '@/composables/useOrders'
@@ -444,77 +446,94 @@ defineExpose({
 </script>
 
 <template>
-  <div class="space-y-6">
-    <UCard>
-      <template #header>
-        <h2 class="text-lg font-semibold">{{ t('apotheker.orders.new') }}</h2>
+  <div class="space-y-8" data-testid="apotheker-create-order">
+    <CommonPageHeader
+      :title="t('apotheker.orders.new')"
+      :subtitle="t('apotheker.orders.create.subtitle')"
+    >
+      <template #actions>
+        <UButton to="/apotheker/orders" size="sm" variant="ghost" color="neutral">
+          {{ t('apotheker.orders.title') }}
+        </UButton>
       </template>
+    </CommonPageHeader>
 
-      <CommonLoadingSkeleton v-if="loading && !weeklySummary" />
+    <UAlert
+      color="info"
+      variant="subtle"
+      :title="t('apotheker.orders.create.deliveryRules.title')"
+      :description="
+        t('apotheker.orders.create.deliveryRules.description', {
+          time: closingTime,
+        })
+      "
+    />
 
-      <div v-else class="space-y-4 text-sm">
-        <UAlert
-          color="info"
-          variant="subtle"
-          :title="t('apotheker.orders.create.deliveryRules.title')"
-          :description="
-            t('apotheker.orders.create.deliveryRules.description', {
-              time: closingTime,
-            })
-          "
-        />
+    <UAlert
+      v-if="weeklySummary?.warningReached"
+      color="warning"
+      variant="subtle"
+      :title="t('apotheker.orders.create.weekWarning.title')"
+      :description="
+        t('apotheker.orders.create.weekWarning.description', {
+          percentage: weeklySummary.percentageUsed,
+          limit: weeklySummary.weeklyLimit,
+        })
+      "
+    />
 
-        <UAlert
-          v-if="weeklySummary?.warningReached"
-          color="warning"
-          variant="subtle"
-          :title="t('apotheker.orders.create.weekWarning.title')"
-          :description="
-            t('apotheker.orders.create.weekWarning.description', {
-              percentage: weeklySummary.percentageUsed,
-              limit: weeklySummary.weeklyLimit,
-            })
-          "
-        />
-
-        <div class="grid gap-2 sm:grid-cols-2">
-          <p>
-            <span class="font-medium"
-              >{{ t('apotheker.orders.create.week') }}:</span
-            >
-            {{ weeklySummary?.isoWeek ?? '—' }} /
-            {{ weeklySummary?.isoYear ?? '—' }}
+    <div data-testid="create-order-allowance">
+      <CommonPageSection variant="inset">
+        <CommonLoadingSkeleton v-if="loading && !weeklySummary" />
+        <div
+          v-else
+          class="grid gap-x-6 gap-y-3 sm:grid-cols-2 lg:grid-cols-4"
+          data-testid="create-order-allowance-metrics"
+        >
+        <div class="min-w-0">
+          <p class="text-xs font-medium uppercase tracking-wide text-toned">
+            {{ t('apotheker.orders.create.remaining') }}
           </p>
-          <p>
-            <span class="font-medium"
-              >{{ t('apotheker.orders.create.orderedThisWeek') }}:</span
-            >
-            {{ weeklySummary?.orderedQuantity ?? 0 }} /
-            {{ weeklySummary?.weeklyLimit ?? weeklyLimit }}
-          </p>
-          <p>
-            <span class="font-medium"
-              >{{ t('apotheker.orders.create.remaining') }}:</span
-            >
+          <p class="mt-1 text-2xl font-semibold tabular-nums text-highlighted">
             {{ weeklySummary?.remainingQuantity ?? weeklyLimit }}
           </p>
-          <p>
-            <span class="font-medium"
-              >{{ t('apotheker.orders.create.closingTime') }}:</span
-            >
-            {{ closingTime }} ({{ settings?.timezone ?? 'Europe/Brussels' }})
+        </div>
+        <div class="min-w-0">
+          <p class="text-xs font-medium uppercase tracking-wide text-toned">
+            {{ t('apotheker.orders.create.orderedThisWeek') }}
+          </p>
+          <p class="mt-1 text-sm text-highlighted">
+            {{ weeklySummary?.orderedQuantity ?? 0 }}
+            /
+            {{ weeklySummary?.weeklyLimit ?? weeklyLimit }}
+          </p>
+        </div>
+        <div class="min-w-0">
+          <p class="text-xs font-medium uppercase tracking-wide text-toned">
+            {{ t('apotheker.orders.create.week') }}
+          </p>
+          <p class="mt-1 text-sm text-highlighted">
+            {{ weeklySummary?.isoWeek ?? t('common.emDash') }}
+            /
+            {{ weeklySummary?.isoYear ?? t('common.emDash') }}
+          </p>
+        </div>
+        <div class="min-w-0">
+          <p class="text-xs font-medium uppercase tracking-wide text-toned">
+            {{ t('apotheker.orders.create.closingTime') }}
+          </p>
+          <p class="mt-1 text-sm text-highlighted">
+            {{ closingTime }}
+            <span class="text-muted">
+              ({{ settings?.timezone ?? 'Europe/Brussels' }})
+            </span>
           </p>
         </div>
       </div>
-    </UCard>
+    </CommonPageSection>
+    </div>
 
-    <UCard>
-      <template #header>
-        <h3 class="font-semibold">
-          {{ t('apotheker.orders.create.addLines') }}
-        </h3>
-      </template>
-
+    <CommonPageSection :title="t('apotheker.orders.create.addLines')">
       <UForm
         :schema="schema"
         :state="state"
@@ -532,16 +551,16 @@ defineExpose({
 
         <div
           v-if="selectedAllowance"
-          class="space-y-1 text-sm"
+          class="space-y-1 rounded-md bg-muted px-3 py-3 text-sm"
           data-testid="selected-vaccine-allowance"
         >
           <p>
-            <span class="font-medium"
+            <span class="font-medium text-highlighted"
               >{{ t('apotheker.orders.create.dailyMaximum') }}:</span
             >
             {{ selectedAllowance.dailyMaximum }}
           </p>
-          <p :id="`remaining-add-${selectedAllowance.vaccineId}`">
+          <p :id="`remaining-add-${selectedAllowance.vaccineId}`" class="text-toned">
             {{
               t('apotheker.orders.create.remainingToday', {
                 remaining: addMaxQuantity,
@@ -573,6 +592,7 @@ defineExpose({
             type="number"
             min="1"
             :max="Math.max(addMaxQuantity, 1)"
+            class="max-w-40"
             :disabled="!state.vaccineId || addMaxQuantity <= 0"
             :aria-describedby="
               selectedAllowance
@@ -598,29 +618,23 @@ defineExpose({
           {{ t('apotheker.orders.create.addLine') }}
         </UButton>
       </UForm>
-    </UCard>
+    </CommonPageSection>
 
-    <UCard>
-      <template #header>
-        <h3 class="font-semibold">
-          {{ t('apotheker.orders.create.current') }}
-        </h3>
-      </template>
-
+    <CommonPageSection :title="t('apotheker.orders.create.current')">
       <p v-if="lines.length === 0" class="text-sm text-muted">
         {{ t('apotheker.orders.create.linesEmpty') }}
       </p>
 
-      <div v-else class="space-y-3">
-        <div
+      <ul v-else class="divide-y divide-default" role="list">
+        <li
           v-for="line in lines"
           :id="`order-line-${line.vaccineId}`"
           :key="line.vaccineId"
-          class="space-y-2 rounded border p-3 text-sm"
+          class="space-y-3 py-4 text-sm"
           :class="
             highlightedVaccineId === line.vaccineId
-              ? 'border-error ring-2 ring-error/40'
-              : 'border-default'
+              ? 'rounded-md bg-error/5 ring-2 ring-error/40'
+              : undefined
           "
           data-testid="order-line"
           :data-highlighted="
@@ -628,27 +642,29 @@ defineExpose({
           "
         >
           <div class="flex items-start justify-between gap-3">
-            <div class="space-y-1">
-              <p class="font-medium">{{ vaccineName(line.vaccineId) }}</p>
-              <p>
-                <span class="font-medium"
+            <div class="min-w-0 space-y-1">
+              <p class="font-medium text-highlighted">
+                {{ vaccineName(line.vaccineId) }}
+              </p>
+              <p class="text-toned">
+                <span class="font-medium text-highlighted"
                   >{{ t('apotheker.orders.create.dailyMaximum') }}:</span
                 >
-                {{ lineAllowance(line.vaccineId)?.dailyMaximum ?? '—' }}
+                {{
+                  lineAllowance(line.vaccineId)?.dailyMaximum ??
+                  t('common.emDash')
+                }}
               </p>
-              <p :id="`remaining-line-${line.vaccineId}`">
+              <p
+                :id="`remaining-line-${line.vaccineId}`"
+                class="text-toned"
+              >
                 {{
                   t('apotheker.orders.create.remainingToday', {
                     remaining:
                       lineAllowance(line.vaccineId)?.remainingToday ?? 0,
                   })
                 }}
-              </p>
-              <p>
-                <span class="font-medium"
-                  >{{ t('apotheker.orders.create.requestedQuantity') }}:</span
-                >
-                {{ Number.isFinite(line.quantity) ? line.quantity : '—' }}
               </p>
             </div>
             <UButton
@@ -671,6 +687,7 @@ defineExpose({
               :model-value="line.quantity"
               type="number"
               min="1"
+              class="max-w-40"
               :max="
                 Math.max(lineAllowance(line.vaccineId)?.remainingToday ?? 1, 1)
               "
@@ -682,8 +699,8 @@ defineExpose({
               "
             />
           </UFormField>
-        </div>
-      </div>
+        </li>
+      </ul>
 
       <UAlert
         v-if="formError"
@@ -708,9 +725,11 @@ defineExpose({
         :title="errorMessage"
       />
 
-      <div class="mt-4 flex gap-2">
+      <div class="mt-6 flex flex-wrap gap-2">
         <UButton
           data-testid="place-order"
+          color="primary"
+          size="lg"
           :loading="submitting"
           :disabled="!canSubmit"
           :title="
@@ -726,6 +745,6 @@ defineExpose({
           {{ t('apotheker.orders.title') }}
         </UButton>
       </div>
-    </UCard>
+    </CommonPageSection>
   </div>
 </template>

@@ -42,7 +42,10 @@ test.describe('APOTHEKER journey', () => {
 
   test('another pharmacist order list stays scoped', async ({ page }) => {
     await loginAs(page, E2E_ACCOUNTS.apotheker2)
-    await page.getByRole('link', { name: 'Mijn bestellingen' }).click()
+    await page
+      .getByTestId('app-shell-primary-nav')
+      .getByRole('link', { name: 'Mijn bestellingen' })
+      .click()
 
     await expect(
       page.getByRole('heading', { name: 'Mijn bestellingen' }),

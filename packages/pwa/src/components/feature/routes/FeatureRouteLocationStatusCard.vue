@@ -10,10 +10,13 @@ import {
   type RouteLocationStatusCardInput,
 } from '@/components/feature/routes/route-location-status'
 
-const props = withDefaults(defineProps<RouteLocationStatusCardInput>(), {
+const props = withDefaults(defineProps<RouteLocationStatusCardInput & {
+  variant?: 'card' | 'inset'
+}>(), {
   isHistorical: undefined,
   isOfflineSnapshot: false,
   locationUnavailable: false,
+  variant: 'card',
 })
 
 const { t } = useI18n()
@@ -89,11 +92,16 @@ const liveRegionMessage = computed(() => {
 
 <template>
   <section
-    class="rounded-lg border border-default bg-elevated/40 px-3 py-3 text-sm sm:px-4"
+    :class="
+      variant === 'inset'
+        ? 'rounded-md bg-muted px-3 py-3 text-sm sm:px-4'
+        : 'rounded-lg border border-default bg-elevated/40 px-3 py-3 text-sm sm:px-4'
+    "
     data-testid="route-location-status-card"
     :data-viewer-role="viewerRole"
     :data-historical="historical ? 'true' : 'false'"
     :data-offline-snapshot="isOfflineSnapshot ? 'true' : 'false'"
+    :data-variant="variant"
     :aria-label="heading"
   >
     <div

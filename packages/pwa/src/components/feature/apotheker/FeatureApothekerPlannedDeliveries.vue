@@ -197,12 +197,15 @@ async function onShowQr(
 </script>
 
 <template>
-  <UCard data-testid="planned-deliveries-section">
-    <template #header>
-      <h2 class="text-lg font-semibold">
+  <section
+    class="space-y-3"
+    data-testid="planned-deliveries-section"
+  >
+    <div class="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+      <h2 class="text-base font-semibold text-highlighted">
         {{ t('deliveryStopQr.planned.title') }}
       </h2>
-    </template>
+    </div>
 
     <CommonLoadingSkeleton
       v-if="loading && plannedDeliveries.length === 0"
@@ -221,154 +224,160 @@ async function onShowQr(
       :description="t('deliveryStopQr.planned.empty.description')"
     />
 
-    <ul v-else class="space-y-4" data-testid="planned-delivery-list">
+    <ul
+      v-else
+      class="divide-y divide-default"
+      role="list"
+      data-testid="planned-delivery-list"
+    >
       <li
         v-for="delivery in plannedDeliveries"
         :key="`${delivery.routeId}-${delivery.stopId ?? delivery.stopSequence}`"
+        class="space-y-3 py-4 text-sm"
+        :class="delivery.qrConsumed ? 'text-muted' : undefined"
+        data-testid="planned-delivery-card"
+        :data-route-id="delivery.routeId"
+        :data-stop-id="delivery.stopId ?? ''"
+        :data-delivery-state="delivery.qrConsumed ? 'completed' : 'upcoming'"
       >
-        <UCard
-          data-testid="planned-delivery-card"
-          :data-route-id="delivery.routeId"
-          :data-stop-id="delivery.stopId ?? ''"
-        >
-          <div class="space-y-3 text-sm">
-            <div class="flex flex-wrap items-center gap-2">
-              <h3 class="font-semibold">
-                {{ t('deliveryStopQr.planned.cardTitle') }}
-              </h3>
-              <UBadge variant="subtle">{{
-                routeStatusLabel(delivery.routeStatus)
-              }}</UBadge>
-              <UBadge
-                :color="delivery.qrConsumed ? 'success' : 'neutral'"
-                variant="subtle"
-                data-testid="planned-delivery-state"
-              >
-                {{ deliveryStateLabel(delivery) }}
-              </UBadge>
-            </div>
+        <div class="flex flex-wrap items-center gap-2">
+          <h3
+            class="font-semibold"
+            :class="delivery.qrConsumed ? undefined : 'text-highlighted'"
+          >
+            {{ formatDate(delivery.routeDate) }}
+          </h3>
+          <UBadge variant="subtle">{{
+            routeStatusLabel(delivery.routeStatus)
+          }}</UBadge>
+          <UBadge
+            :color="delivery.qrConsumed ? 'success' : 'neutral'"
+            variant="subtle"
+            data-testid="planned-delivery-state"
+          >
+            {{ deliveryStateLabel(delivery) }}
+          </UBadge>
+        </div>
 
-            <p data-testid="planned-delivery-date">
-              <span class="font-medium">{{ t('orders.deliveryDate') }}:</span>
-              {{ formatDate(delivery.routeDate) }}
-            </p>
+        <p data-testid="planned-delivery-date" class="sr-only">
+          <span class="font-medium">{{ t('orders.deliveryDate') }}:</span>
+          {{ formatDate(delivery.routeDate) }}
+        </p>
 
-            <FeatureRouteLocationStatusCard
-              v-if="shouldShowNextStopLocation(delivery)"
-              v-bind="
-                toPharmacistNextStopLocationProps({
-                  routeStatus: delivery.routeStatus,
-                  city: delivery.lastKnownCourierCity,
-                  recordedAt: delivery.lastKnownLocationRecordedAt,
-                  source: delivery.courierLocationSource,
-                })
-              "
-            />
+        <FeatureRouteLocationStatusCard
+          v-if="shouldShowNextStopLocation(delivery)"
+          variant="inset"
+          v-bind="
+            toPharmacistNextStopLocationProps({
+              routeStatus: delivery.routeStatus,
+              city: delivery.lastKnownCourierCity,
+              recordedAt: delivery.lastKnownLocationRecordedAt,
+              source: delivery.courierLocationSource,
+            })
+          "
+        />
 
-            <p>
-              <span class="font-medium"
-                >{{ t('deliveryStopQr.planned.pharmacy') }}:</span
-              >
-              {{ delivery.pharmacyName }}
-            </p>
+        <p :class="delivery.qrConsumed ? undefined : 'text-toned'">
+          <span class="font-medium text-highlighted"
+            >{{ t('deliveryStopQr.planned.pharmacy') }}:</span
+          >
+          {{ delivery.pharmacyName }}
+        </p>
 
-            <p>
-              {{ translatePlural('routes.stop.orders', delivery.orderCount) }}
-              ·
-              {{
-                t('deliveryStopQr.planned.totalLines', {
-                  count: delivery.totalLineCount,
-                })
-              }}
-              ·
-              {{
-                translatePlural(
-                  'admin.orders.totalDoses',
-                  delivery.totalQuantity,
-                )
-              }}
-            </p>
+        <p :class="delivery.qrConsumed ? undefined : 'text-toned'">
+          {{ translatePlural('routes.stop.orders', delivery.orderCount) }}
+          ·
+          {{
+            t('deliveryStopQr.planned.totalLines', {
+              count: delivery.totalLineCount,
+            })
+          }}
+          ·
+          {{
+            translatePlural(
+              'admin.orders.totalDoses',
+              delivery.totalQuantity,
+            )
+          }}
+        </p>
 
-            <div v-if="delivery.orders.length > 0" class="space-y-1">
-              <p class="font-medium">
-                {{ t('deliveryStopQr.modal.includedOrders') }}
-              </p>
-              <ul class="space-y-0.5 text-muted">
-                <li
-                  v-for="order in delivery.orders"
-                  :key="order.orderId"
-                  data-testid="planned-delivery-order-ref"
-                >
-                  {{ t('admin.orders.orderId', { id: order.orderId }) }}
-                </li>
-              </ul>
-            </div>
+        <div v-if="delivery.orders.length > 0" class="space-y-1">
+          <p class="font-medium text-highlighted">
+            {{ t('deliveryStopQr.modal.includedOrders') }}
+          </p>
+          <ul class="divide-y divide-default rounded-md bg-muted px-3 text-muted">
+            <li
+              v-for="order in delivery.orders"
+              :key="order.orderId"
+              class="py-1.5 text-xs"
+              data-testid="planned-delivery-order-ref"
+            >
+              {{ t('admin.orders.orderId', { id: order.orderId }) }}
+            </li>
+          </ul>
+        </div>
 
-            <div class="mt-2 flex flex-wrap items-center gap-2">
-              <UButton
-                v-if="delivery.stopId"
-                size="sm"
-                color="neutral"
-                variant="soft"
-                :loading="isManifestActing(delivery) && manifestLoading"
-                :disabled="manifestLoading || !delivery.stopId"
-                :aria-label="t('deliveryManifest.downloadStopAria')"
-                data-testid="apotheker-download-stop-manifest"
-                @click="onDownloadStopManifest(delivery)"
-              >
-                {{
-                  isManifestActing(delivery) && manifestLoading
-                    ? t('deliveryManifest.generating')
-                    : t('deliveryManifest.downloadStop')
-                }}
-              </UButton>
+        <div class="flex flex-wrap items-center gap-2">
+          <UButton
+            v-if="delivery.stopId"
+            size="sm"
+            color="neutral"
+            variant="soft"
+            :loading="isManifestActing(delivery) && manifestLoading"
+            :disabled="manifestLoading || !delivery.stopId"
+            :aria-label="t('deliveryManifest.downloadStopAria')"
+            data-testid="apotheker-download-stop-manifest"
+            @click="onDownloadStopManifest(delivery)"
+          >
+            {{
+              isManifestActing(delivery) && manifestLoading
+                ? t('deliveryManifest.generating')
+                : t('deliveryManifest.downloadStop')
+            }}
+          </UButton>
 
-              <UButton
-                v-if="canShowQr(delivery)"
-                size="sm"
-                color="primary"
-                :aria-label="t('deliveryStopQr.planned.showQrAria')"
-                data-testid="show-delivery-qr"
-                @click="onShowQr(delivery, $event)"
-              >
-                {{ t('deliveryStopQr.planned.showQr') }}
-              </UButton>
+          <UButton
+            v-if="canShowQr(delivery)"
+            size="sm"
+            color="primary"
+            :aria-label="t('deliveryStopQr.planned.showQrAria')"
+            data-testid="show-delivery-qr"
+            @click="onShowQr(delivery, $event)"
+          >
+            {{ t('deliveryStopQr.planned.showQr') }}
+          </UButton>
 
-              <p
-                v-else-if="delivery.qrConsumed"
-                class="text-sm text-muted"
-                data-testid="planned-delivery-confirmed"
-              >
-                {{ t('deliveryStopQr.state.confirmed') }}
-              </p>
+          <p
+            v-else-if="delivery.qrConsumed"
+            class="text-sm text-muted"
+            data-testid="planned-delivery-confirmed"
+          >
+            {{ t('deliveryStopQr.state.confirmed') }}
+          </p>
 
-              <p
-                v-else
-                class="text-sm text-muted"
-                data-testid="planned-delivery-unavailable"
-              >
-                {{ t('deliveryStopQr.state.unavailable') }}
-              </p>
-            </div>
+          <p
+            v-else
+            class="text-sm text-muted"
+            data-testid="planned-delivery-unavailable"
+          >
+            {{ t('deliveryStopQr.state.unavailable') }}
+          </p>
+        </div>
 
-            <UAlert
-              v-if="isManifestFeedback(delivery) && manifestError"
-              class="mt-2"
-              color="error"
-              variant="subtle"
-              :title="manifestError"
-              data-testid="apotheker-manifest-error"
-            />
-            <UAlert
-              v-else-if="isManifestFeedback(delivery) && manifestSuccess"
-              class="mt-2"
-              color="success"
-              variant="subtle"
-              :title="manifestSuccess"
-              data-testid="apotheker-manifest-success"
-            />
-          </div>
-        </UCard>
+        <UAlert
+          v-if="isManifestFeedback(delivery) && manifestError"
+          color="error"
+          variant="subtle"
+          :title="manifestError"
+          data-testid="apotheker-manifest-error"
+        />
+        <UAlert
+          v-else-if="isManifestFeedback(delivery) && manifestSuccess"
+          color="success"
+          variant="subtle"
+          :title="manifestSuccess"
+          data-testid="apotheker-manifest-success"
+        />
       </li>
     </ul>
 
@@ -386,5 +395,5 @@ async function onShowQr(
       @retry="retry"
       @download="downloadQr"
     />
-  </UCard>
+  </section>
 </template>

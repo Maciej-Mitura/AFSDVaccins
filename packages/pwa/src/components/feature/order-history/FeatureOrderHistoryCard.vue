@@ -59,7 +59,7 @@ function toggleLines() {
 <template>
   <article class="space-y-3 py-4 text-sm" data-testid="order-history-card">
     <div class="flex flex-wrap items-center gap-2">
-      <h3 class="font-semibold" :title="order.id">
+      <h3 class="font-semibold text-highlighted" :title="order.id">
         {{ t('orderHistory.orderId.short', { id: shortOrderId(order.id) }) }}
       </h3>
       <UBadge variant="subtle" :aria-label="orderStatusLabel(order.status)">
@@ -67,21 +67,21 @@ function toggleLines() {
       </UBadge>
     </div>
 
-    <dl class="grid gap-2">
+    <dl class="grid gap-2 text-toned">
       <div v-if="showPharmacy">
-        <dt class="font-medium">{{ t('orderHistory.field.pharmacy') }}</dt>
+        <dt class="font-medium text-highlighted">{{ t('orderHistory.field.pharmacy') }}</dt>
         <dd>{{ pharmacyLabel }}</dd>
       </div>
       <div>
-        <dt class="font-medium">{{ t('orderHistory.field.submittedAt') }}</dt>
+        <dt class="font-medium text-highlighted">{{ t('orderHistory.field.submittedAt') }}</dt>
         <dd>{{ formatDateTime(order.submittedAt) }}</dd>
       </div>
       <div>
-        <dt class="font-medium">{{ t('orderHistory.field.deliveryDate') }}</dt>
+        <dt class="font-medium text-highlighted">{{ t('orderHistory.field.deliveryDate') }}</dt>
         <dd>{{ formatDate(order.deliveryDate) }}</dd>
       </div>
       <div>
-        <dt class="font-medium">{{ t('orderHistory.field.deliveredAt') }}</dt>
+        <dt class="font-medium text-highlighted">{{ t('orderHistory.field.deliveredAt') }}</dt>
         <dd>
           {{
             order.deliveredAt
@@ -91,27 +91,27 @@ function toggleLines() {
         </dd>
       </div>
       <div v-if="order.cancelledAt">
-        <dt class="font-medium">{{ t('orderHistory.field.cancelledAt') }}</dt>
+        <dt class="font-medium text-highlighted">{{ t('orderHistory.field.cancelledAt') }}</dt>
         <dd>{{ formatDateTime(order.cancelledAt) }}</dd>
       </div>
       <div v-if="order.cancelledAt || order.cancellationReason">
-        <dt class="font-medium">
+        <dt class="font-medium text-highlighted">
           {{ t('orderHistory.field.cancellationReason') }}
         </dt>
         <dd>{{ displayOrUnavailable(order.cancellationReason) }}</dd>
       </div>
       <div>
-        <dt class="font-medium">{{ t('orderHistory.field.totalQuantity') }}</dt>
+        <dt class="font-medium text-highlighted">{{ t('orderHistory.field.totalQuantity') }}</dt>
         <dd>
           {{ translatePlural('admin.orders.totalDoses', order.totalQuantity) }}
         </dd>
       </div>
       <div>
-        <dt class="font-medium">{{ t('orderHistory.field.completedBy') }}</dt>
+        <dt class="font-medium text-highlighted">{{ t('orderHistory.field.completedBy') }}</dt>
         <dd>{{ completedByLabel }}</dd>
       </div>
       <div>
-        <dt class="font-medium">
+        <dt class="font-medium text-highlighted">
           {{ t('orderHistory.field.deliveryMethod') }}
         </dt>
         <dd>{{ deliveryMethodLabel(order.deliveryMethod) }}</dd>
@@ -121,7 +121,7 @@ function toggleLines() {
     <div>
       <button
         type="button"
-        class="inline-flex items-center gap-1 text-sm font-medium underline-offset-2 hover:underline"
+        class="inline-flex items-center gap-1 text-sm font-medium text-highlighted underline-offset-2 hover:underline"
         data-testid="order-history-lines-toggle"
         :aria-expanded="linesExpanded"
         :aria-controls="`order-history-lines-${order.id}`"
@@ -139,18 +139,19 @@ function toggleLines() {
             ? t('orderHistory.lines.collapse')
             : t('orderHistory.lines.expand')
         }}</span>
-        <span class="font-normal text-muted">— {{ linesSummary }}</span>
+        <span class="font-normal text-muted">{{ t('common.emDash') }} {{ linesSummary }}</span>
       </button>
 
       <ul
         v-if="linesExpanded"
         :id="`order-history-lines-${order.id}`"
-        class="mt-2 space-y-1 border-l border-default pl-3"
+        class="mt-2 divide-y divide-default rounded-md bg-muted px-3"
         data-testid="order-history-lines"
       >
         <li
           v-for="line in order.orderLines"
           :key="`${line.vaccineId}-${line.vaccineName}`"
+          class="py-2 text-toned"
         >
           {{
             t('orderHistory.lines.detail', {

@@ -6,6 +6,8 @@ import { useRouter } from 'vue-router'
 import CommonEmptyState from '@/components/common/CommonEmptyState.vue'
 import CommonErrorState from '@/components/common/CommonErrorState.vue'
 import CommonLoadingSkeleton from '@/components/common/CommonLoadingSkeleton.vue'
+import CommonPageHeader from '@/components/common/CommonPageHeader.vue'
+import CommonPageSection from '@/components/common/CommonPageSection.vue'
 import { useNotifications } from '@/composables/useNotifications'
 import { formatDateTime, mapUserFacingGraphQLError } from '@/i18n'
 import { sanitizeInternalActionPath } from '@/utils/notification-action-path'
@@ -29,6 +31,7 @@ const {
   refreshing,
   errorMessage,
   hasUnread,
+  unreadCount,
   notificationCachedAt,
   notificationRefreshError,
   notificationsAreReadOnly,
@@ -55,6 +58,13 @@ const displayItems = computed(() =>
     }
   }),
 )
+
+const headerMeta = computed(() => {
+  if (unreadCount.value > 0) {
+    return t('notifications.centre.unreadCount', { count: unreadCount.value })
+  }
+  return undefined
+})
 
 const cachedAtLabel = computed(() => {
   if (!notificationCachedAt.value) {
@@ -137,24 +147,25 @@ async function onOpenAction(
 </script>
 
 <template>
-  <div class="space-y-6">
-    <div class="flex flex-wrap items-center justify-between gap-3">
-      <h2 class="text-lg font-semibold">
-        {{ t('notifications.centre.title') }}
-      </h2>
-
-      <UButton
-        v-if="hasUnread && !notificationsAreReadOnly"
-        size="sm"
-        variant="soft"
-        color="primary"
-        :loading="markingAll"
-        data-testid="notifications-mark-all-read"
-        @click="onMarkAllRead"
-      >
-        {{ t('notifications.centre.markAllRead') }}
-      </UButton>
-    </div>
+  <div class="space-y-8" data-testid="notification-centre">
+    <CommonPageHeader
+      :title="t('notifications.centre.title')"
+      :meta="headerMeta"
+    >
+      <template #actions>
+        <UButton
+          v-if="hasUnread && !notificationsAreReadOnly"
+          size="sm"
+          variant="soft"
+          color="primary"
+          :loading="markingAll"
+          data-testid="notifications-mark-all-read"
+          @click="onMarkAllRead"
+        >
+          {{ t('notifications.centre.markAllRead') }}
+        </UButton>
+      </template>
+    </CommonPageHeader>
 
     <UAlert
       v-if="notificationsAreReadOnly"
@@ -226,92 +237,110 @@ async function onOpenAction(
       :description="t(props.emptyDescriptionKey)"
     />
 
-    <div v-else class="space-y-4">
+    <CommonPageSection v-else>
       <UAlert
         v-if="actionError"
         color="error"
         variant="subtle"
         :title="actionError"
         role="alert"
+        class="mb-4"
       />
 
       <ul
-        class="space-y-4"
+        class="divide-y divide-default"
         role="list"
         :aria-label="t('notifications.centre.title')"
       >
-        <li v-for="notification in displayItems" :key="notification.id">
-          <article
-            class="space-y-3 rounded-md border border-default p-4 text-sm"
-            :data-testid="`notification-item-${notification.id}`"
-            :aria-labelledby="`notification-title-${notification.id}`"
-          >
-            <div class="flex flex-wrap items-center gap-2">
-              <h3
-                :id="`notification-title-${notification.id}`"
-                class="font-semibold"
-              >
-                {{ notification.displayTitle }}
-              </h3>
-              <UBadge
-                :color="notification.read ? 'neutral' : 'warning'"
-                variant="subtle"
-              >
-                <span class="sr-only">
+        <li
+          v-for="notification in displayItems"
+          :key="notification.id"
+          class="py-4 text-sm"
+          :class="notification.read ? 'text-muted' : undefined"
+          :data-testid="`notification-item-${notification.id}`"
+          :data-read="notification.read ? 'true' : 'false'"
+          :aria-labelledby="`notification-title-${notification.id}`"
+        >
+          <div class="flex flex-wrap items-start gap-2">
+            <span
+              v-if="!notification.read"
+              class="mt-1.5 size-2 shrink-0 rounded-full bg-primary"
+              aria-hidden="true"
+              data-testid="notification-unread-dot"
+            />
+            <div class="min-w-0 flex-1 space-y-2">
+              <div class="flex flex-wrap items-center gap-2">
+                <h3
+                  :id="`notification-title-${notification.id}`"
+                  class="font-semibold"
+                  :class="
+                    notification.read ? undefined : 'text-highlighted'
+                  "
+                >
+                  {{ notification.displayTitle }}
+                </h3>
+                <UBadge
+                  :color="notification.read ? 'neutral' : 'warning'"
+                  variant="subtle"
+                >
+                  <span class="sr-only">
+                    {{
+                      notification.read
+                        ? t('status.notification.read')
+                        : t('status.notification.unread')
+                    }}
+                  </span>
                   {{
                     notification.read
                       ? t('status.notification.read')
                       : t('status.notification.unread')
                   }}
-                </span>
-                {{
-                  notification.read
-                    ? t('status.notification.read')
-                    : t('status.notification.unread')
-                }}
-              </UBadge>
+                </UBadge>
+              </div>
+
+              <p :class="notification.read ? undefined : 'text-toned'">
+                {{ notification.displayBody }}
+              </p>
+
+              <p class="text-muted">
+                <time :datetime="String(notification.createdAt)">
+                  {{ formatDateTime(notification.createdAt) }}
+                </time>
+              </p>
+
+              <div class="flex flex-wrap gap-2 pt-1">
+                <UButton
+                  v-if="notification.safeActionPath"
+                  size="xs"
+                  variant="outline"
+                  color="neutral"
+                  @click="
+                    onOpenAction(
+                      notification.safeActionPath,
+                      notification.id,
+                      notification.read,
+                    )
+                  "
+                >
+                  {{ t('notifications.centre.openDetails') }}
+                </UButton>
+
+                <UButton
+                  v-if="!notification.read && !notificationsAreReadOnly"
+                  size="xs"
+                  variant="soft"
+                  color="primary"
+                  :loading="markingId === notification.id"
+                  data-testid="notifications-mark-read"
+                  @click="onMarkRead(notification.id)"
+                >
+                  {{ t('notifications.centre.markRead') }}
+                </UButton>
+              </div>
             </div>
-
-            <p>{{ notification.displayBody }}</p>
-
-            <p class="text-muted">
-              <time :datetime="String(notification.createdAt)">
-                {{ formatDateTime(notification.createdAt) }}
-              </time>
-            </p>
-
-            <div class="flex flex-wrap gap-2">
-              <UButton
-                v-if="notification.safeActionPath"
-                size="xs"
-                variant="outline"
-                color="neutral"
-                @click="
-                  onOpenAction(
-                    notification.safeActionPath,
-                    notification.id,
-                    notification.read,
-                  )
-                "
-              >
-                {{ t('notifications.centre.openDetails') }}
-              </UButton>
-
-              <UButton
-                v-if="!notification.read && !notificationsAreReadOnly"
-                size="xs"
-                variant="soft"
-                color="primary"
-                :loading="markingId === notification.id"
-                data-testid="notifications-mark-read"
-                @click="onMarkRead(notification.id)"
-              >
-                {{ t('notifications.centre.markRead') }}
-              </UButton>
-            </div>
-          </article>
+          </div>
         </li>
       </ul>
-    </div>
+    </CommonPageSection>
   </div>
 </template>

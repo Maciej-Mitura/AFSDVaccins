@@ -172,6 +172,16 @@ function dailyLimitApolloError(remainingToday: number): ApolloError {
 
 const uiStubs = {
   CommonLoadingSkeleton: true,
+  CommonPageHeader: {
+    props: ['title', 'subtitle', 'meta'],
+    template:
+      '<header data-testid="common-page-header"><h1>{{ title }}</h1><slot name="actions" /></header>',
+  },
+  CommonPageSection: {
+    props: ['title', 'description', 'variant'],
+    template:
+      '<section data-testid="common-page-section"><h2 v-if="title">{{ title }}</h2><slot /><slot name="actions" /></section>',
+  },
   UCard: { template: '<div><slot name="header" /><slot /></div>' },
   Card: { template: '<div><slot name="header" /><slot /></div>' },
   UAlert: {
@@ -351,6 +361,10 @@ describe('ViewApothekerCreateOrder daily limit UX', () => {
   it('displays remaining allowance for the selected vaccine', async () => {
     const wrapper = mountView()
     await flushPromises()
+
+    expect(
+      wrapper.find('[data-testid="create-order-allowance-metrics"]').text(),
+    ).toContain('190')
 
     exposed(wrapper).state.vaccineId = 'flu'
     await nextTick()
