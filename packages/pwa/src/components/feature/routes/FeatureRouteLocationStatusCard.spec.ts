@@ -396,4 +396,25 @@ describe('FeatureRouteLocationStatusCard', () => {
     expect(label.length).toBeGreaterThan(0)
     expect(label).not.toMatch(/2026/)
   })
+
+  it('supports inset variant without bordered card chrome', () => {
+    const wrapper = mountCard({
+      hasLocation: true,
+      city: 'Gent',
+      recordedAt: '2026-07-27T12:00:00.000Z',
+      source: 'ARRIVAL',
+      stopSequence: 1,
+      hasNextStop: false,
+      nextStopName: null,
+      nextStopSequence: null,
+      nextStopCity: null,
+      routeStatus: RouteStatus.InProgress,
+      viewerRole: 'BEZORGER',
+      variant: 'inset',
+    })
+
+    expect(wrapper.attributes('data-variant')).toBe('inset')
+    expect(wrapper.classes()).toContain('bg-muted')
+    expect(wrapper.classes()).not.toContain('border')
+  })
 })

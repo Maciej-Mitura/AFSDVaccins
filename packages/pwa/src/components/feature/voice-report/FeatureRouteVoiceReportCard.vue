@@ -116,7 +116,7 @@ watch(
 
 <template>
   <article
-    class="space-y-3 rounded-lg border border-default px-4 py-3"
+    class="space-y-3"
     :data-testid="`route-voice-report-card-${report.sequenceNumber}`"
   >
     <header class="flex flex-wrap items-start justify-between gap-2">

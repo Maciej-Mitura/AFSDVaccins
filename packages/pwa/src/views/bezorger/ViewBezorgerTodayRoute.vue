@@ -5,18 +5,24 @@ import { useI18n } from 'vue-i18n'
 import CommonEmptyState from '@/components/common/CommonEmptyState.vue'
 import CommonErrorState from '@/components/common/CommonErrorState.vue'
 import CommonLoadingSkeleton from '@/components/common/CommonLoadingSkeleton.vue'
+import CommonPageHeader from '@/components/common/CommonPageHeader.vue'
+import CommonPageSection from '@/components/common/CommonPageSection.vue'
 import FeatureBezorgerDeliveryQrWorkflow from '@/components/feature/bezorger/FeatureBezorgerDeliveryQrWorkflow.vue'
+import FeatureBezorgerStopArrivalPanel from '@/components/feature/bezorger/FeatureBezorgerStopArrivalPanel.vue'
 import FeatureRouteLocationStatusCard from '@/components/feature/routes/FeatureRouteLocationStatusCard.vue'
 import FeatureRouteVoiceRecorder from '@/components/feature/voice-report/FeatureRouteVoiceRecorder.vue'
 import { toRouteLocationStatusCardProps } from '@/components/feature/routes/route-location-status'
 import { useCourierStopArrival } from '@/composables/useCourierStopArrival'
-import { RouteStatus, useDeliveryRoutes } from '@/composables/useDeliveryRoutes'
+import {
+  RouteStatus,
+  useDeliveryRoutes,
+  type DeliveryStopItem,
+} from '@/composables/useDeliveryRoutes'
 import { useDeliveryManifestDownload } from '@/composables/useDeliveryManifestDownload'
 import { useRealtimeConnection } from '@/composables/useRealtimeConnection'
 import { formatDateTime, routeStatusLabel, translatePlural } from '@/i18n'
 import { UserRole } from '@vaccin-delivery/types'
 import { useCurrentUser } from '@/composables/useCurrentUser'
-import { mapDeliveryArrivalErrorCode } from '@/api/delivery-arrival-errors'
 import { registerReconnectHandler } from '@/composables/useGraphQL'
 
 const { t } = useI18n()
@@ -61,6 +67,7 @@ async function onDownloadRouteManifest(): Promise<void> {
 const confirmStart = ref(false)
 const confirmComplete = ref(false)
 const confirmCancelArrivalStopId = ref<string | null>(null)
+const expandedStopKeys = ref<Set<string>>(new Set())
 
 const ownerUserId = computed(() => currentUser.value?.id ?? null)
 const ownerBezorgerProfileId = computed(
@@ -131,6 +138,61 @@ const cachedAtLabel = computed(() => {
   })
 })
 
+const routeStatusColor = computed(() => {
+  const status = myTodayRoute.value?.status
+  if (status === RouteStatus.InProgress) {
+    return 'primary'
+  }
+  if (status === RouteStatus.Completed) {
+    return 'success'
+  }
+  if (status === RouteStatus.Cancelled) {
+    return 'error'
+  }
+  if (status === RouteStatus.Assigned) {
+    return 'warning'
+  }
+  return 'neutral'
+})
+
+const headerMeta = computed(() => {
+  if (!myTodayRoute.value) {
+    return undefined
+  }
+  return t('bezorger.route.date', { date: myTodayRoute.value.deliveryDate })
+})
+
+function isStopDelivered(stop: DeliveryStopItem): boolean {
+  return Boolean(stop.qrConsumed || stop.deliveredAt)
+}
+
+function stopKey(stop: DeliveryStopItem): string {
+  return stop.stopId ?? `${stop.apothekerProfileId}-${stop.sequence}`
+}
+
+const currentStop = computed((): DeliveryStopItem | null => {
+  const route = myTodayRoute.value
+  if (!route || route.stops.length === 0) {
+    return null
+  }
+  if (
+    route.status === RouteStatus.Completed ||
+    route.status === RouteStatus.Cancelled
+  ) {
+    return null
+  }
+  return route.stops.find(stop => !isStopDelivered(stop)) ?? null
+})
+
+const remainingStops = computed((): DeliveryStopItem[] => {
+  const route = myTodayRoute.value
+  if (!route) {
+    return []
+  }
+  const currentKey = currentStop.value ? stopKey(currentStop.value) : null
+  return route.stops.filter(stop => stopKey(stop) !== currentKey)
+})
+
 function stopTotalLabel(totalQuantity: number): string {
   const doses = translatePlural('routes.stop.doses', totalQuantity)
   return t('bezorger.route.stop.total', { doses })
@@ -149,11 +211,52 @@ function orderReferencesLabel(orderIds: string[]): string {
   })
 }
 
-function arrivalErrorLabel(code: string | null): string {
-  if (!code) {
-    return t('arrival.unableToRecord')
+function isStopExpanded(key: string): boolean {
+  return expandedStopKeys.value.has(key)
+}
+
+function toggleStopDetails(key: string): void {
+  const next = new Set(expandedStopKeys.value)
+  if (next.has(key)) {
+    next.delete(key)
+  } else {
+    next.add(key)
   }
-  return mapDeliveryArrivalErrorCode(code)
+  expandedStopKeys.value = next
+}
+
+function stopRoleLabel(stop: DeliveryStopItem): string | null {
+  if (isStopDelivered(stop)) {
+    return t('bezorger.route.stop.completed')
+  }
+  if (currentStop.value && stopKey(stop) === stopKey(currentStop.value)) {
+    return myTodayRoute.value?.status === RouteStatus.Assigned
+      ? t('bezorger.route.stop.next')
+      : t('bezorger.route.stop.current')
+  }
+  if (
+    currentStop.value &&
+    !isStopDelivered(stop) &&
+    stop.sequence === (currentStop.value.sequence ?? 0) + 1
+  ) {
+    return t('bezorger.route.stop.next')
+  }
+  return null
+}
+
+function showArrivalForStop(stop: DeliveryStopItem): boolean {
+  if (!stop.stopId) {
+    return false
+  }
+  const vm = viewModelForStop(stop.stopId)
+  return (
+    myTodayRoute.value?.status === RouteStatus.InProgress ||
+    vm?.state === 'confirmed' ||
+    vm?.state === 'pending' ||
+    vm?.state === 'syncing' ||
+    vm?.state === 'failed' ||
+    vm?.state === 'conflict'
+  )
 }
 
 async function onStartRoute(): Promise<void> {
@@ -248,21 +351,29 @@ watch([ownerUserId, ownerBezorgerProfileId, isOnline], () => {
 </script>
 
 <template>
-  <div class="mx-auto max-w-lg space-y-4 px-1">
-    <div>
-      <h1 class="text-2xl font-semibold">
-        {{ t('bezorger.route.today.title') }}
-      </h1>
-      <p class="mt-1 text-sm text-muted">
-        {{ t('bezorger.route.today.description') }}
-      </p>
-      <p
-        v-if="connectionState === 'reconnecting'"
-        class="mt-1 text-xs text-warning"
-      >
-        {{ t('realtime.reconnecting') }}
-      </p>
-    </div>
+  <div
+    class="mx-auto max-w-xl space-y-6 px-1"
+    data-testid="bezorger-today-route"
+  >
+    <CommonPageHeader
+      :title="t('bezorger.route.today.title')"
+      :subtitle="t('bezorger.route.today.description')"
+      :meta="headerMeta"
+    >
+      <template v-if="myTodayRoute" #actions>
+        <UBadge variant="subtle" :color="routeStatusColor">
+          {{ routeStatusLabel(myTodayRoute.status) }}
+        </UBadge>
+      </template>
+    </CommonPageHeader>
+
+    <p
+      v-if="connectionState === 'reconnecting'"
+      class="text-xs text-warning"
+      role="status"
+    >
+      {{ t('realtime.reconnecting') }}
+    </p>
 
     <CommonLoadingSkeleton v-if="(!initialized || loading) && !myTodayRoute" />
 
@@ -283,153 +394,130 @@ watch([ownerUserId, ownerBezorgerProfileId, isOnline], () => {
     />
 
     <template v-else-if="myTodayRoute">
-      <UAlert
-        v-if="todayRouteIsReadOnly"
-        color="warning"
-        variant="subtle"
-        icon="i-lucide-wifi-off"
-        role="status"
-        data-testid="offline-route-banner"
-        :title="t('offline.copy.title')"
-        :description="t('offline.copy.description')"
-      />
-
-      <p
-        v-if="cachedAtLabel"
-        class="text-sm text-muted"
-        data-testid="offline-route-cached-at"
-      >
-        {{ cachedAtLabel }}
-      </p>
-
-      <p
-        v-if="refreshing"
-        class="text-sm text-muted"
-        role="status"
-        aria-live="polite"
-        data-testid="offline-route-refreshing"
-      >
-        {{ t('offline.route.refreshing') }}
-      </p>
-
-      <UAlert
-        v-if="todayRouteRefreshError"
-        color="warning"
-        variant="subtle"
-        role="status"
-        data-testid="offline-route-refresh-error"
-        :title="todayRouteRefreshError"
-      >
-        <template #actions>
-          <UButton
-            size="xs"
-            variant="soft"
-            data-testid="offline-route-retry"
-            :loading="refreshing"
-            @click="onRetryRefresh"
+      <!-- 1–2. Current state banner -->
+      <CommonPageSection variant="inset" data-testid="route-status-banner">
+        <div class="space-y-2">
+          <p class="text-xs font-medium uppercase tracking-wide text-toned">
+            {{ t('bezorger.route.status') }}
+          </p>
+          <p
+            class="text-lg font-semibold text-highlighted"
+            :class="{
+              'text-primary': myTodayRoute.status === RouteStatus.InProgress,
+              'text-success': myTodayRoute.status === RouteStatus.Completed,
+              'text-error': myTodayRoute.status === RouteStatus.Cancelled,
+              'text-warning': myTodayRoute.status === RouteStatus.Assigned,
+            }"
+            data-testid="route-status"
           >
-            {{ t('common.retry') }}
-          </UButton>
-        </template>
-      </UAlert>
-
-      <UAlert
-        v-if="arrivalFeedbackText"
-        :color="
-          feedbackTone === 'success'
-            ? 'success'
-            : feedbackTone === 'error'
-              ? 'error'
-              : 'warning'
-        "
-        variant="subtle"
-        role="status"
-        aria-live="polite"
-        data-testid="arrival-feedback"
-        :title="arrivalFeedbackText"
-      />
-
-      <div class="rounded-lg bg-elevated/50 px-4 py-3">
-        <p class="text-sm text-muted">{{ t('bezorger.route.status') }}</p>
-        <p class="text-lg font-semibold" data-testid="route-status">
-          {{ routeStatusLabel(myTodayRoute.status) }}
-        </p>
-        <p class="mt-1 text-sm text-muted">
-          {{ t('bezorger.route.date', { date: myTodayRoute.deliveryDate }) }}
-        </p>
-        <p
-          v-if="
-            myTodayRoute.status === RouteStatus.Cancelled && latestCancelReason
-          "
-          class="mt-2 text-sm"
-        >
-          {{ t('bezorger.route.cancelReason', { reason: latestCancelReason }) }}
-        </p>
-        <p
-          v-else-if="myTodayRoute.status === RouteStatus.Completed"
-          class="mt-2 text-sm text-muted"
-        >
-          {{ t('bezorger.route.today.completedNote') }}
-        </p>
-
-        <div class="mt-3 flex flex-wrap gap-2">
-          <UButton
-            size="sm"
-            color="neutral"
-            variant="soft"
-            :loading="manifestLoading"
-            :disabled="!isOnline || manifestLoading"
-            :aria-label="t('deliveryManifest.downloadRouteAria')"
-            data-testid="bezorger-download-route-manifest"
-            @click="onDownloadRouteManifest"
+            {{ routeStatusLabel(myTodayRoute.status) }}
+          </p>
+          <p class="text-sm text-muted">
+            {{ t('bezorger.route.date', { date: myTodayRoute.deliveryDate }) }}
+          </p>
+          <p
+            v-if="
+              myTodayRoute.status === RouteStatus.Cancelled &&
+              latestCancelReason
+            "
+            class="text-sm text-toned"
           >
             {{
-              manifestLoading
-                ? t('deliveryManifest.generating')
-                : t('deliveryManifest.downloadRoute')
+              t('bezorger.route.cancelReason', { reason: latestCancelReason })
             }}
-          </UButton>
+          </p>
+          <p
+            v-else-if="myTodayRoute.status === RouteStatus.Completed"
+            class="text-sm text-muted"
+          >
+            {{ t('bezorger.route.today.completedNote') }}
+          </p>
         </div>
-        <UAlert
-          v-if="manifestError"
-          class="mt-2"
-          color="error"
-          variant="subtle"
-          :title="manifestError"
-          data-testid="bezorger-manifest-error"
-        />
-        <UAlert
-          v-else-if="manifestSuccess"
-          class="mt-2"
-          color="success"
-          variant="subtle"
-          :title="manifestSuccess"
-          data-testid="bezorger-manifest-success"
-        />
-      </div>
+      </CommonPageSection>
 
-      <FeatureRouteLocationStatusCard
-        v-bind="
-          toRouteLocationStatusCardProps({
-            locationStatus: myTodayRoute.locationStatus,
-            routeStatus: myTodayRoute.status,
-            viewerRole: 'BEZORGER',
-            isOfflineSnapshot: todayRouteSource === 'CACHE',
-          })
+      <!-- Sync / offline coherent status area -->
+      <CommonPageSection
+        v-if="
+          todayRouteIsReadOnly ||
+          cachedAtLabel ||
+          refreshing ||
+          todayRouteRefreshError ||
+          arrivalFeedbackText ||
+          !isOnline
         "
-      />
+        :title="t('bezorger.route.sync.title')"
+        data-testid="route-sync-section"
+      >
+        <div class="space-y-3">
+          <UAlert
+            v-if="todayRouteIsReadOnly"
+            color="warning"
+            variant="subtle"
+            icon="i-lucide-wifi-off"
+            role="status"
+            data-testid="offline-route-banner"
+            :title="t('offline.copy.title')"
+            :description="t('offline.copy.description')"
+          />
 
-      <!-- Voice report in the live-route workflow (before start/QR/complete). -->
-      <FeatureRouteVoiceRecorder
-        :route-id="myTodayRoute.id"
-        :route-status="myTodayRoute.status"
-        :route-source="todayRouteSource"
-        :allow-recording="myTodayRoute.status === RouteStatus.InProgress"
-        :show-courier-name="false"
-        :can-retry-transcription="false"
-        title-key="routeVoiceReports.voiceReport"
-      />
+          <p
+            v-if="cachedAtLabel"
+            class="text-sm text-muted"
+            data-testid="offline-route-cached-at"
+          >
+            {{ cachedAtLabel }}
+          </p>
 
+          <p
+            v-if="refreshing"
+            class="text-sm text-muted"
+            role="status"
+            aria-live="polite"
+            data-testid="offline-route-refreshing"
+          >
+            {{ t('offline.route.refreshing') }}
+          </p>
+
+          <UAlert
+            v-if="todayRouteRefreshError"
+            color="warning"
+            variant="subtle"
+            role="status"
+            data-testid="offline-route-refresh-error"
+            :title="todayRouteRefreshError"
+          >
+            <template #actions>
+              <UButton
+                size="xs"
+                variant="soft"
+                data-testid="offline-route-retry"
+                :loading="refreshing"
+                @click="onRetryRefresh"
+              >
+                {{ t('common.retry') }}
+              </UButton>
+            </template>
+          </UAlert>
+
+          <UAlert
+            v-if="arrivalFeedbackText"
+            :color="
+              feedbackTone === 'success'
+                ? 'success'
+                : feedbackTone === 'error'
+                  ? 'error'
+                  : 'warning'
+            "
+            variant="subtle"
+            role="status"
+            aria-live="polite"
+            data-testid="arrival-feedback"
+            :title="arrivalFeedbackText"
+          />
+        </div>
+      </CommonPageSection>
+
+      <!-- 3. Dominant primary action -->
       <div
         v-if="
           myTodayRoute.status === RouteStatus.Assigned ||
@@ -453,19 +541,13 @@ watch([ownerUserId, ownerBezorgerProfileId, isOnline], () => {
           :title="t('bezorger.route.start.title')"
           :description="t('bezorger.route.start.description')"
         />
-        <UAlert
-          v-if="confirmComplete && actionsEnabled"
-          color="warning"
-          variant="subtle"
-          :title="t('bezorger.route.complete.title')"
-          :description="t('bezorger.route.complete.description')"
-        />
 
         <UButton
           v-if="myTodayRoute.status === RouteStatus.Assigned"
           block
           size="xl"
           class="min-h-14 text-base"
+          color="primary"
           data-testid="route-start"
           :loading="updatingStatus"
           :disabled="!actionsEnabled"
@@ -487,26 +569,342 @@ watch([ownerUserId, ownerBezorgerProfileId, isOnline], () => {
           v-if="confirmStart && actionsEnabled"
           block
           size="lg"
+          class="min-h-12"
           variant="ghost"
           :disabled="updatingStatus"
           @click="cancelStartConfirm"
         >
           {{ t('common.cancel') }}
         </UButton>
+      </div>
 
+      <CommonErrorState
+        v-if="statusError"
+        :title="t('routes.status.changeFailed')"
+        :description="statusError"
+      />
+
+      <!-- 4. Current / next stop -->
+      <CommonPageSection
+        v-if="currentStop"
+        :title="
+          myTodayRoute.status === RouteStatus.Assigned
+            ? t('bezorger.route.stop.next')
+            : t('bezorger.route.stop.current')
+        "
+        data-testid="route-current-stop-section"
+      >
+        <div
+          class="rounded-md bg-muted px-4 py-4 space-y-3"
+          data-testid="route-stop"
+          :data-delivered="
+            currentStop.qrConsumed || Boolean(currentStop.deliveredAt)
+          "
+          :data-current="true"
+        >
+          <div class="flex flex-wrap items-start justify-between gap-2">
+            <div class="min-w-0 space-y-1">
+              <p class="text-xs font-medium uppercase tracking-wide text-toned">
+                {{
+                  t('bezorger.route.stop.label', {
+                    sequence: currentStop.sequence,
+                  })
+                }}
+              </p>
+              <h3
+                class="text-lg font-semibold text-highlighted wrap-break-word"
+              >
+                {{ currentStop.pharmacyName }}
+              </h3>
+              <p class="text-sm text-toned wrap-break-word">
+                {{ currentStop.address.city }}
+              </p>
+            </div>
+            <UBadge
+              v-if="stopRoleLabel(currentStop)"
+              variant="subtle"
+              color="primary"
+              data-testid="route-stop-role"
+            >
+              <span class="inline-flex items-center gap-1">
+                <UIcon
+                  name="i-lucide-map-pin"
+                  class="size-3.5"
+                  aria-hidden="true"
+                />
+                {{ stopRoleLabel(currentStop) }}
+              </span>
+            </UBadge>
+          </div>
+
+          <p class="text-sm text-muted wrap-break-word">
+            {{ formatAddress(currentStop) }}
+          </p>
+
+          <p class="text-sm font-medium text-highlighted">
+            {{ stopTotalLabel(currentStop.totalQuantity) }}
+            <span class="font-normal text-muted">
+              ({{ stopOrdersLabel(currentStop.orderCount) }})
+            </span>
+          </p>
+
+          <p
+            v-if="currentStop.qrConsumed || currentStop.deliveredAt"
+            class="text-sm font-medium text-success"
+            data-testid="route-stop-delivered"
+          >
+            {{
+              currentStop.deliveredAt
+                ? t('bezorger.route.stop.deliveredAt', {
+                    deliveredAt: formatDateTime(currentStop.deliveredAt),
+                  })
+                : t('bezorger.route.stop.delivered')
+            }}
+          </p>
+
+          <FeatureBezorgerStopArrivalPanel
+            v-else-if="currentStop.stopId && showArrivalForStop(currentStop)"
+            :view-model="viewModelForStop(currentStop.stopId)!"
+            :confirm-cancel="confirmCancelArrivalStopId === currentStop.stopId"
+            @mark-arrived="onMarkArrived(currentStop.stopId!)"
+            @cancel-pending="onCancelPendingArrival(currentStop.stopId!)"
+            @dismiss-cancel="dismissCancelArrivalConfirm"
+            @retry="retrySync"
+            @discard="onDiscardPending(currentStop.stopId!)"
+          />
+
+          <div>
+            <button
+              type="button"
+              class="text-sm text-toned underline-offset-2 hover:underline min-h-11"
+              :aria-expanded="isStopExpanded(stopKey(currentStop))"
+              :aria-controls="`stop-details-${stopKey(currentStop)}`"
+              data-testid="route-stop-details-toggle"
+              @click="toggleStopDetails(stopKey(currentStop))"
+            >
+              {{ t('bezorger.route.stop.details') }}
+            </button>
+            <div
+              v-show="isStopExpanded(stopKey(currentStop))"
+              :id="`stop-details-${stopKey(currentStop)}`"
+              class="mt-2 space-y-2"
+            >
+              <p class="text-sm text-muted" data-testid="route-stop-orders">
+                {{ orderReferencesLabel(currentStop.orderIds) }}
+              </p>
+              <ul class="divide-y divide-default text-sm" role="list">
+                <li
+                  v-for="line in currentStop.lines"
+                  :key="line.vaccineId"
+                  class="flex justify-between gap-2 py-2"
+                >
+                  <span class="wrap-break-word">{{ line.vaccineName }}</span>
+                  <span class="font-medium tabular-nums">{{
+                    line.quantity
+                  }}</span>
+                </li>
+              </ul>
+            </div>
+          </div>
+        </div>
+      </CommonPageSection>
+
+      <!-- QR in stop / delivery context (always available while in progress) -->
+      <CommonPageSection
+        v-if="myTodayRoute.status === RouteStatus.InProgress"
+        :title="t('bezorger.route.qr.scan')"
+        data-testid="route-qr-section"
+      >
         <FeatureBezorgerDeliveryQrWorkflow
-          v-if="myTodayRoute.status === RouteStatus.InProgress"
           :enabled="canScanDeliveryQr"
           :read-only-offline="todayRouteIsReadOnly"
           :on-refresh-route="() => loadMyTodayRoute({ isRefresh: true })"
         />
+      </CommonPageSection>
+
+      <!-- 5. Remaining stops -->
+      <CommonPageSection
+        v-if="remainingStops.length > 0"
+        :title="t('bezorger.route.stop.remaining')"
+        data-testid="route-remaining-stops"
+      >
+        <ol class="divide-y divide-default" role="list">
+          <li
+            v-for="stop in remainingStops"
+            :key="stopKey(stop)"
+            class="py-4 space-y-2"
+            data-testid="route-stop"
+            :data-delivered="stop.qrConsumed || Boolean(stop.deliveredAt)"
+            :class="isStopDelivered(stop) ? 'opacity-70' : undefined"
+          >
+            <div class="flex flex-wrap items-start justify-between gap-2">
+              <div class="min-w-0 space-y-0.5">
+                <p
+                  class="text-xs font-medium uppercase tracking-wide text-toned"
+                >
+                  {{
+                    t('bezorger.route.stop.label', { sequence: stop.sequence })
+                  }}
+                </p>
+                <h3
+                  class="text-base font-semibold wrap-break-word"
+                  :class="
+                    isStopDelivered(stop) ? 'text-muted' : 'text-highlighted'
+                  "
+                >
+                  {{ stop.pharmacyName }}
+                </h3>
+                <p class="text-sm text-toned wrap-break-word">
+                  {{ stop.address.city }}
+                </p>
+              </div>
+              <div class="flex flex-wrap items-center gap-2">
+                <span
+                  v-if="stopRoleLabel(stop)"
+                  class="inline-flex items-center gap-1 text-xs font-medium text-toned"
+                  data-testid="route-stop-role"
+                >
+                  <UIcon
+                    name="i-lucide-map-pin"
+                    class="size-3.5"
+                    aria-hidden="true"
+                  />
+                  {{ stopRoleLabel(stop) }}
+                </span>
+                <span
+                  v-if="isStopDelivered(stop)"
+                  class="text-xs font-medium text-success"
+                  data-testid="route-stop-delivered"
+                >
+                  {{
+                    stop.deliveredAt
+                      ? t('bezorger.route.stop.deliveredAt', {
+                          deliveredAt: formatDateTime(stop.deliveredAt),
+                        })
+                      : t('bezorger.route.stop.delivered')
+                  }}
+                </span>
+              </div>
+            </div>
+
+            <p class="text-sm text-muted wrap-break-word">
+              {{ formatAddress(stop) }}
+            </p>
+
+            <p class="text-sm">
+              {{ stopTotalLabel(stop.totalQuantity) }}
+              <span class="text-muted">
+                ({{ stopOrdersLabel(stop.orderCount) }})
+              </span>
+            </p>
+
+            <FeatureBezorgerStopArrivalPanel
+              v-if="
+                stop.stopId &&
+                showArrivalForStop(stop) &&
+                !isStopDelivered(stop)
+              "
+              :view-model="viewModelForStop(stop.stopId)!"
+              :confirm-cancel="confirmCancelArrivalStopId === stop.stopId"
+              @mark-arrived="onMarkArrived(stop.stopId!)"
+              @cancel-pending="onCancelPendingArrival(stop.stopId!)"
+              @dismiss-cancel="dismissCancelArrivalConfirm"
+              @retry="retrySync"
+              @discard="onDiscardPending(stop.stopId!)"
+            />
+
+            <div>
+              <button
+                type="button"
+                class="text-sm text-toned underline-offset-2 hover:underline min-h-11"
+                :aria-expanded="isStopExpanded(stopKey(stop))"
+                :aria-controls="`stop-details-${stopKey(stop)}`"
+                data-testid="route-stop-details-toggle"
+                @click="toggleStopDetails(stopKey(stop))"
+              >
+                {{ t('bezorger.route.stop.details') }}
+              </button>
+              <div
+                v-show="isStopExpanded(stopKey(stop))"
+                :id="`stop-details-${stopKey(stop)}`"
+                class="mt-2 space-y-2"
+              >
+                <p class="text-sm text-muted" data-testid="route-stop-orders">
+                  {{ orderReferencesLabel(stop.orderIds) }}
+                </p>
+                <ul class="divide-y divide-default text-sm" role="list">
+                  <li
+                    v-for="line in stop.lines"
+                    :key="line.vaccineId"
+                    class="flex justify-between gap-2 py-2"
+                  >
+                    <span class="wrap-break-word">{{ line.vaccineName }}</span>
+                    <span class="font-medium tabular-nums">{{
+                      line.quantity
+                    }}</span>
+                  </li>
+                </ul>
+              </div>
+            </div>
+          </li>
+        </ol>
+      </CommonPageSection>
+
+      <CommonEmptyState
+        v-if="myTodayRoute.stops.length === 0"
+        :title="t('routes.stop.empty.title')"
+        :description="t('bezorger.route.today.emptyStops.description')"
+      />
+
+      <!-- 7. Secondary tools: location, voice; QR already in stop context -->
+      <CommonPageSection
+        :title="t('bezorger.route.tools.title')"
+        data-testid="route-tools-section"
+      >
+        <div class="grid gap-4 sm:grid-cols-2 sm:items-start">
+          <FeatureRouteLocationStatusCard
+            v-bind="
+              toRouteLocationStatusCardProps({
+                locationStatus: myTodayRoute.locationStatus,
+                routeStatus: myTodayRoute.status,
+                viewerRole: 'BEZORGER',
+                isOfflineSnapshot: todayRouteSource === 'CACHE',
+              })
+            "
+            variant="inset"
+          />
+
+          <FeatureRouteVoiceRecorder
+            :route-id="myTodayRoute.id"
+            :route-status="myTodayRoute.status"
+            :route-source="todayRouteSource"
+            :allow-recording="myTodayRoute.status === RouteStatus.InProgress"
+            :show-courier-name="false"
+            :can-retry-transcription="false"
+            title-key="routeVoiceReports.voiceReport"
+          />
+        </div>
+      </CommonPageSection>
+
+      <!-- Complete route (end of operational flow) -->
+      <div
+        v-if="myTodayRoute.status === RouteStatus.InProgress"
+        class="space-y-3"
+      >
+        <UAlert
+          v-if="confirmComplete && actionsEnabled"
+          color="warning"
+          variant="subtle"
+          :title="t('bezorger.route.complete.title')"
+          :description="t('bezorger.route.complete.description')"
+        />
 
         <UButton
-          v-if="myTodayRoute.status === RouteStatus.InProgress"
           block
           size="xl"
           class="min-h-14 text-base"
           color="primary"
+          variant="soft"
           data-testid="route-complete"
           :loading="updatingStatus"
           :disabled="!actionsEnabled"
@@ -528,6 +926,7 @@ watch([ownerUserId, ownerBezorgerProfileId, isOnline], () => {
           v-if="confirmComplete && actionsEnabled"
           block
           size="lg"
+          class="min-h-12"
           variant="ghost"
           :disabled="updatingStatus"
           @click="cancelCompleteConfirm"
@@ -536,230 +935,66 @@ watch([ownerUserId, ownerBezorgerProfileId, isOnline], () => {
         </UButton>
       </div>
 
-      <CommonErrorState
-        v-if="statusError"
-        :title="t('routes.status.changeFailed')"
-        :description="statusError"
-      />
-
-      <div
-        v-if="
-          todayRouteSource === 'SERVER' && myTodayRoute.statusHistory.length > 0
-        "
-        class="rounded-lg border border-default px-4 py-3"
+      <!-- 8. Completed / technical details -->
+      <CommonPageSection
+        :title="t('bezorger.route.technical.title')"
+        data-testid="route-technical-section"
       >
-        <p class="text-sm font-medium">{{ t('routes.statusHistory') }}</p>
-        <ul class="mt-2 space-y-1 text-sm text-muted">
-          <li
-            v-for="(entry, index) in myTodayRoute.statusHistory"
-            :key="`${entry.toStatus}-${index}-${entry.changedAt}`"
-          >
-            {{ formatStatusHistoryEntry(entry) }}
-          </li>
-        </ul>
-      </div>
-
-      <CommonEmptyState
-        v-if="myTodayRoute.stops.length === 0"
-        :title="t('routes.stop.empty.title')"
-        :description="t('bezorger.route.today.emptyStops.description')"
-      />
-
-      <ol v-else class="space-y-4" role="list">
-        <li
-          v-for="stop in myTodayRoute.stops"
-          :key="stop.stopId ?? `${stop.apothekerProfileId}-${stop.sequence}`"
-          class="rounded-lg border border-default px-4 py-4"
-          data-testid="route-stop"
-          :data-delivered="stop.qrConsumed || Boolean(stop.deliveredAt)"
-        >
-          <p class="text-xs font-medium uppercase tracking-wide text-muted">
-            {{ t('bezorger.route.stop.label', { sequence: stop.sequence }) }}
-          </p>
-          <h2 class="mt-1 text-lg font-semibold">{{ stop.pharmacyName }}</h2>
-          <p class="mt-1 text-sm">{{ formatAddress(stop) }}</p>
-          <p class="mt-1 text-sm text-muted" data-testid="route-stop-orders">
-            {{ orderReferencesLabel(stop.orderIds) }}
-          </p>
-          <p
-            v-if="stop.qrConsumed || stop.deliveredAt"
-            class="mt-2 text-sm font-medium text-success"
-            data-testid="route-stop-delivered"
+        <div class="space-y-3">
+          <UButton
+            size="sm"
+            color="neutral"
+            variant="soft"
+            class="min-h-11"
+            :loading="manifestLoading"
+            :disabled="!isOnline || manifestLoading"
+            :aria-label="t('deliveryManifest.downloadRouteAria')"
+            data-testid="bezorger-download-route-manifest"
+            @click="onDownloadRouteManifest"
           >
             {{
-              stop.deliveredAt
-                ? t('bezorger.route.stop.deliveredAt', {
-                    deliveredAt: formatDateTime(stop.deliveredAt),
-                  })
-                : t('bezorger.route.stop.delivered')
+              manifestLoading
+                ? t('deliveryManifest.generating')
+                : t('deliveryManifest.downloadRoute')
             }}
-          </p>
+          </UButton>
+          <UAlert
+            v-if="manifestError"
+            color="error"
+            variant="subtle"
+            :title="manifestError"
+            data-testid="bezorger-manifest-error"
+          />
+          <UAlert
+            v-else-if="manifestSuccess"
+            color="success"
+            variant="subtle"
+            :title="manifestSuccess"
+            data-testid="bezorger-manifest-success"
+          />
 
-          <template
-            v-else-if="
-              stop.stopId &&
-              (myTodayRoute.status === RouteStatus.InProgress ||
-                viewModelForStop(stop.stopId)?.state === 'confirmed' ||
-                viewModelForStop(stop.stopId)?.state === 'pending' ||
-                viewModelForStop(stop.stopId)?.state === 'syncing' ||
-                viewModelForStop(stop.stopId)?.state === 'failed' ||
-                viewModelForStop(stop.stopId)?.state === 'conflict')
+          <div
+            v-if="
+              todayRouteSource === 'SERVER' &&
+              myTodayRoute.statusHistory.length > 0
             "
+            class="space-y-2"
           >
-            <div
-              v-if="viewModelForStop(stop.stopId)"
-              class="mt-3 space-y-2"
-              data-testid="route-stop-arrival"
-            >
-              <p
-                v-if="viewModelForStop(stop.stopId)?.state === 'confirmed'"
-                class="text-sm font-medium"
-                data-testid="route-stop-arrived"
-                role="status"
+            <p class="text-sm font-medium text-highlighted">
+              {{ t('routes.statusHistory') }}
+            </p>
+            <ul class="divide-y divide-default text-sm text-muted">
+              <li
+                v-for="(entry, index) in myTodayRoute.statusHistory"
+                :key="`${entry.toStatus}-${index}-${entry.changedAt}`"
+                class="py-2"
               >
-                {{
-                  t('arrival.arrivedAt', {
-                    time: formatDateTime(
-                      viewModelForStop(stop.stopId)?.clientArrivedAt ??
-                        viewModelForStop(stop.stopId)?.recordedAt ??
-                        '',
-                    ),
-                  })
-                }}
-              </p>
-
-              <p
-                v-else-if="viewModelForStop(stop.stopId)?.state === 'syncing'"
-                class="text-sm"
-                role="status"
-                aria-live="polite"
-                data-testid="route-stop-arrival-syncing"
-              >
-                {{ t('arrival.synchronising') }}
-                <span class="text-muted">
-                  ({{
-                    formatDateTime(
-                      viewModelForStop(stop.stopId)?.clientArrivedAt ?? '',
-                    )
-                  }})
-                </span>
-              </p>
-
-              <template
-                v-else-if="viewModelForStop(stop.stopId)?.state === 'pending'"
-              >
-                <p
-                  class="text-sm font-medium"
-                  role="status"
-                  data-testid="route-stop-arrival-pending"
-                >
-                  {{ t('arrival.pending') }}
-                  <span class="font-normal text-muted">
-                    ({{
-                      formatDateTime(
-                        viewModelForStop(stop.stopId)?.clientArrivedAt ?? '',
-                      )
-                    }})
-                  </span>
-                </p>
-                <p class="text-xs text-muted">
-                  {{ t('arrival.willSyncWhenOnline') }}
-                </p>
-                <UButton
-                  v-if="viewModelForStop(stop.stopId)?.canCancelPending"
-                  size="sm"
-                  variant="ghost"
-                  data-testid="route-stop-arrival-cancel"
-                  @click="onCancelPendingArrival(stop.stopId!)"
-                >
-                  {{
-                    confirmCancelArrivalStopId === stop.stopId
-                      ? t('arrival.cancelPendingConfirm')
-                      : t('arrival.cancelPending')
-                  }}
-                </UButton>
-                <UButton
-                  v-if="confirmCancelArrivalStopId === stop.stopId"
-                  size="sm"
-                  variant="ghost"
-                  @click="dismissCancelArrivalConfirm"
-                >
-                  {{ t('common.cancel') }}
-                </UButton>
-              </template>
-
-              <template
-                v-else-if="
-                  viewModelForStop(stop.stopId)?.state === 'failed' ||
-                  viewModelForStop(stop.stopId)?.state === 'conflict'
-                "
-              >
-                <p
-                  class="text-sm"
-                  role="alert"
-                  data-testid="route-stop-arrival-error"
-                >
-                  {{
-                    viewModelForStop(stop.stopId)?.state === 'conflict'
-                      ? t('arrival.conflict')
-                      : arrivalErrorLabel(
-                          viewModelForStop(stop.stopId)?.errorCode ?? null,
-                        )
-                  }}
-                </p>
-                <div class="flex flex-wrap gap-2">
-                  <UButton
-                    v-if="viewModelForStop(stop.stopId)?.canRetry"
-                    size="sm"
-                    variant="soft"
-                    data-testid="route-stop-arrival-retry"
-                    @click="retrySync"
-                  >
-                    {{ t('arrival.retrySync') }}
-                  </UButton>
-                  <UButton
-                    v-if="viewModelForStop(stop.stopId)?.canDiscard"
-                    size="sm"
-                    variant="ghost"
-                    data-testid="route-stop-arrival-discard"
-                    @click="onDiscardPending(stop.stopId!)"
-                  >
-                    {{ t('arrival.discardPending') }}
-                  </UButton>
-                </div>
-              </template>
-
-              <UButton
-                v-else-if="viewModelForStop(stop.stopId)?.canMarkArrived"
-                size="md"
-                block
-                data-testid="route-stop-mark-arrived"
-                :aria-label="t('arrival.markArrived')"
-                @click="onMarkArrived(stop.stopId!)"
-              >
-                {{ t('arrival.markArrived') }}
-              </UButton>
-            </div>
-          </template>
-
-          <p class="mt-3 text-sm font-medium">
-            {{ stopTotalLabel(stop.totalQuantity) }}
-            <span class="font-normal text-muted">
-              ({{ stopOrdersLabel(stop.orderCount) }})
-            </span>
-          </p>
-          <ul class="mt-2 space-y-1 text-sm" role="list">
-            <li
-              v-for="line in stop.lines"
-              :key="line.vaccineId"
-              class="flex justify-between gap-2"
-            >
-              <span>{{ line.vaccineName }}</span>
-              <span class="font-medium">{{ line.quantity }}</span>
-            </li>
-          </ul>
-        </li>
-      </ol>
+                {{ formatStatusHistoryEntry(entry) }}
+              </li>
+            </ul>
+          </div>
+        </div>
+      </CommonPageSection>
     </template>
   </div>
 </template>

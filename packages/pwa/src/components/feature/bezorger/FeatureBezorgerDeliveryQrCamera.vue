@@ -268,12 +268,12 @@ defineExpose({
     </div>
 
     <details
-      class="rounded-lg border border-default px-3 py-2 text-sm"
+      class="rounded-md bg-elevated/60 px-3 py-2 text-sm"
       data-testid="delivery-qr-manual-details"
       :open="manualOpen"
       @toggle="manualOpen = ($event.target as HTMLDetailsElement).open"
     >
-      <summary class="cursor-pointer text-muted">
+      <summary class="cursor-pointer min-h-11 py-2 text-toned">
         {{ t('bezorger.route.qr.manual.toggle') }}
       </summary>
       <div class="mt-3 space-y-2">

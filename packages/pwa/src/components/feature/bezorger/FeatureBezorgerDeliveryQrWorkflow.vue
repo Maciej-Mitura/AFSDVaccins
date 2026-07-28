@@ -197,7 +197,7 @@ function onPreviewCancel(): void {
 
     <div
       v-if="showCameraPanel"
-      class="rounded-lg border border-default p-3"
+      class="rounded-md bg-muted p-3"
       data-testid="delivery-qr-scanner-panel"
     >
       <FeatureBezorgerDeliveryQrCamera

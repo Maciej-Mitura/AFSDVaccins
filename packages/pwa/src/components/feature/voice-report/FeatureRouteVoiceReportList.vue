@@ -51,8 +51,12 @@ const { t } = useI18n()
       :title="retryErrorMessage"
     />
 
-    <ul v-if="reports.length > 0" class="space-y-3" role="list">
-      <li v-for="report in reports" :key="report.id">
+    <ul v-if="reports.length > 0" class="divide-y divide-default" role="list">
+      <li
+        v-for="report in reports"
+        :key="report.id"
+        class="py-3 first:pt-0 last:pb-0"
+      >
         <FeatureRouteVoiceReportCard
           :report="report"
           :route-id="routeId"

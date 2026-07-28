@@ -34,6 +34,7 @@ declare module 'vue' {
     FeatureBezorgerDeliveryQrPreviewModal: typeof import('./src/components/feature/bezorger/FeatureBezorgerDeliveryQrPreviewModal.vue')['default']
     FeatureBezorgerDeliveryQrWorkflow: typeof import('./src/components/feature/bezorger/FeatureBezorgerDeliveryQrWorkflow.vue')['default']
     FeatureBezorgerLayout: typeof import('./src/components/feature/bezorger/FeatureBezorgerLayout.vue')['default']
+    FeatureBezorgerStopArrivalPanel: typeof import('./src/components/feature/bezorger/FeatureBezorgerStopArrivalPanel.vue')['default']
     FeatureCourierAnalyticsDetail: typeof import('./src/components/feature/admin/analytics/FeatureCourierAnalyticsDetail.vue')['default']
     FeatureCourierAnalyticsKpi: typeof import('./src/components/feature/admin/analytics/FeatureCourierAnalyticsKpi.vue')['default']
     FeatureCourierAnalyticsLeaderboard: typeof import('./src/components/feature/admin/analytics/FeatureCourierAnalyticsLeaderboard.vue')['default']

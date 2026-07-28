@@ -96,19 +96,21 @@ vi.mock('vue-router', async () => {
   }
 })
 
-vi.mock('@/components/feature/voice-report/FeatureRouteVoiceRecorder.vue', () => ({
-  default: {
-    name: 'FeatureRouteVoiceRecorder',
-    props: [
-      'routeId',
-      'routeStatus',
-      'routeSource',
-      'allowRecording',
-      'showCourierName',
-      'canRetryTranscription',
-      'titleKey',
-    ],
-    template: `
+vi.mock(
+  '@/components/feature/voice-report/FeatureRouteVoiceRecorder.vue',
+  () => ({
+    default: {
+      name: 'FeatureRouteVoiceRecorder',
+      props: [
+        'routeId',
+        'routeStatus',
+        'routeSource',
+        'allowRecording',
+        'showCourierName',
+        'canRetryTranscription',
+        'titleKey',
+      ],
+      template: `
       <section
         data-testid="route-voice-reports-section"
         :data-allow-recording="allowRecording"
@@ -120,26 +122,33 @@ vi.mock('@/components/feature/voice-report/FeatureRouteVoiceRecorder.vue', () =>
         <h2>{{ titleKey }}</h2>
       </section>
     `,
-  },
-}))
+    },
+  }),
+)
 
-vi.mock('@/components/feature/bezorger/FeatureBezorgerDeliveryQrWorkflow.vue', () => ({
-  default: {
-    name: 'FeatureBezorgerDeliveryQrWorkflow',
-    template: '<div data-testid="delivery-qr-stub" />',
-  },
-}))
+vi.mock(
+  '@/components/feature/bezorger/FeatureBezorgerDeliveryQrWorkflow.vue',
+  () => ({
+    default: {
+      name: 'FeatureBezorgerDeliveryQrWorkflow',
+      template: '<div data-testid="delivery-qr-stub" />',
+    },
+  }),
+)
 
-vi.mock('@/components/feature/routes/FeatureRouteLocationStatusCard.vue', () => ({
-  default: {
-    name: 'FeatureRouteLocationStatusCard',
-    template: '<div data-testid="route-location-status-card" />',
-  },
-}))
+vi.mock(
+  '@/components/feature/routes/FeatureRouteLocationStatusCard.vue',
+  () => ({
+    default: {
+      name: 'FeatureRouteLocationStatusCard',
+      template: '<div data-testid="route-location-status-card" />',
+    },
+  }),
+)
 
 const uiStubs = {
   UButton: {
-    props: ['loading', 'disabled', 'block', 'size', 'color', 'variant'],
+    props: ['loading', 'disabled', 'block', 'size', 'color', 'variant', 'to'],
     emits: ['click'],
     template:
       '<button type="button" :disabled="disabled" :data-testid="$attrs[\'data-testid\']" @click="$emit(\'click\')"><slot /></button>',
@@ -149,9 +158,23 @@ const uiStubs = {
     template:
       '<div :data-testid="$attrs[\'data-testid\']"><p>{{ title }}</p></div>',
   },
+  UBadge: {
+    template: '<span :data-testid="$attrs[\'data-testid\']"><slot /></span>',
+  },
+  UIcon: { template: '<span />' },
   CommonEmptyState: { template: '<div data-testid="empty-state" />' },
   CommonErrorState: { template: '<div data-testid="error-state" />' },
   CommonLoadingSkeleton: { template: '<div data-testid="loading" />' },
+  CommonPageHeader: {
+    props: ['title', 'subtitle', 'meta'],
+    template:
+      '<header data-testid="common-page-header"><h1>{{ title }}</h1><slot name="actions" /></header>',
+  },
+  CommonPageSection: {
+    props: ['title', 'variant'],
+    template:
+      '<section data-testid="common-page-section"><h2 v-if="title">{{ title }}</h2><slot /></section>',
+  },
 }
 
 function makeRoute(status: RouteStatus) {

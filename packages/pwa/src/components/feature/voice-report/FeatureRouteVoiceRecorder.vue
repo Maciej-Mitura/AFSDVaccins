@@ -258,15 +258,15 @@ onBeforeUnmount(() => {
 <template>
   <section
     v-if="enabled"
-    class="space-y-4 rounded-lg border border-default px-4 py-3"
+    class="space-y-4"
     data-testid="route-voice-reports-section"
     :aria-label="t(titleKey ?? 'routeVoiceReports.voiceReport')"
   >
-    <div>
-      <h2 class="text-lg font-semibold">
+    <div class="space-y-1">
+      <h2 class="text-base font-semibold text-highlighted">
         {{ t(titleKey ?? 'routeVoiceReports.voiceReport') }}
       </h2>
-      <p class="mt-1 text-sm text-muted">
+      <p class="text-sm text-toned">
         {{ t('routeVoiceReports.description') }}
       </p>
     </div>
@@ -405,7 +405,7 @@ onBeforeUnmount(() => {
             recorder.state.value === 'PAUSED' ||
             recorder.state.value === 'STOPPING'
           "
-          class="space-y-3 rounded-lg bg-elevated/50 px-4 py-3"
+          class="space-y-3 rounded-md bg-muted px-4 py-3"
         >
           <div class="flex items-center gap-2">
             <span
@@ -511,7 +511,7 @@ onBeforeUnmount(() => {
             recorder.state.value === 'PREVIEW' ||
             recorder.state.value === 'UPLOADING'
           "
-          class="space-y-3 rounded-lg bg-elevated/50 px-4 py-3"
+          class="space-y-3 rounded-md bg-muted px-4 py-3"
           data-testid="route-voice-preview"
         >
           <p class="font-medium">{{ t('routeVoiceReports.preview.title') }}</p>

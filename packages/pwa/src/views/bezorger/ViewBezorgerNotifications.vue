@@ -3,7 +3,9 @@ import FeatureNotificationCentre from '@/components/feature/notifications/Featur
 </script>
 
 <template>
-  <FeatureNotificationCentre
-    empty-description-key="bezorger.notifications.empty.description"
-  />
+  <div class="mx-auto max-w-xl" data-testid="bezorger-notifications">
+    <FeatureNotificationCentre
+      empty-description-key="bezorger.notifications.empty.description"
+    />
+  </div>
 </template>
