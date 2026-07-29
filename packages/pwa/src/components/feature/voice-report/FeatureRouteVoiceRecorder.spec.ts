@@ -36,6 +36,9 @@ const stopRecording = vi.fn()
 const cancelRecording = vi.fn()
 const discardPreview = vi.fn()
 const resetRecorder = vi.fn()
+const markUploadFailed = vi.fn()
+const markUploaded = vi.fn()
+const markUploading = vi.fn()
 
 vi.mock('@/composables/voice-report/useVoiceRecorder', () => ({
   useVoiceRecorder: () => ({
@@ -61,9 +64,9 @@ vi.mock('@/composables/voice-report/useVoiceRecorder', () => ({
     stopRecording,
     cancelRecording,
     discardPreview,
-    markUploading: vi.fn(),
-    markUploaded: vi.fn(),
-    markUploadFailed: vi.fn(),
+    markUploading,
+    markUploaded,
+    markUploadFailed,
     reset: resetRecorder,
     ensureClientUploadId: () => 'upload-1',
   }),
@@ -341,6 +344,67 @@ describe('FeatureRouteVoiceRecorder', () => {
     // previous holder cancelled via its cancel callback when stolen
     expect(cancelRecording).toHaveBeenCalled()
     expect(getActiveVoiceRecorderMutexKey()).toBe('stop-2')
+  })
+
+  it('keeps Stop A recording when Stop B acquire is declined by confirmLeave', async () => {
+    const wrapper = mountRecorder({ stopId: 'stop-1' })
+    await wrapper.find('[data-testid="route-voice-start"]').trigger('click')
+    await nextTick()
+    expect(getActiveVoiceRecorderMutexKey()).toBe('stop-1')
+
+    hasUnsentRecording.value = true
+    const cancelOther = vi.fn()
+    const acquired = acquireVoiceRecorderMutex({
+      key: 'stop-2',
+      cancel: cancelOther,
+      hasUnsent: () => true,
+      confirmLeave: () => false,
+    })
+    expect(acquired).toBe(false)
+    expect(cancelOther).not.toHaveBeenCalled()
+    expect(getActiveVoiceRecorderMutexKey()).toBe('stop-1')
+  })
+
+  it('releases mutex and cancels on unmount (navigation/logout teardown)', async () => {
+    const wrapper = mountRecorder({ stopId: 'stop-1' })
+    await wrapper.find('[data-testid="route-voice-start"]').trigger('click')
+    await nextTick()
+    expect(getActiveVoiceRecorderMutexKey()).toBe('stop-1')
+    hasUnsentRecording.value = true
+    wrapper.unmount()
+    expect(cancelRecording).toHaveBeenCalled()
+    expect(getActiveVoiceRecorderMutexKey()).toBeNull()
+  })
+
+  it('releases mutex when route leaves IN_PROGRESS (completion refresh)', async () => {
+    const wrapper = mountRecorder({ stopId: 'stop-1' })
+    await wrapper.find('[data-testid="route-voice-start"]').trigger('click')
+    await nextTick()
+    recorderState.value = 'RECORDING'
+    await wrapper.setProps({ routeStatus: 'COMPLETED' })
+    await nextTick()
+    expect(cancelRecording).toHaveBeenCalled()
+    expect(getActiveVoiceRecorderMutexKey()).toBeNull()
+  })
+
+  it('failed upload keeps preview session but does not start a second MediaRecorder', async () => {
+    const wrapper = mountRecorder({ stopId: 'stop-1' })
+    await wrapper.find('[data-testid="route-voice-start"]').trigger('click')
+    await nextTick()
+    expect(getActiveVoiceRecorderMutexKey()).toBe('stop-1')
+
+    recorderState.value = 'PREVIEW'
+    previewUrl.value = 'blob:preview'
+    previewBlob.value = new Blob(['x'], { type: 'audio/webm' })
+    hasUnsentRecording.value = true
+    uploadReport.mockResolvedValue(null)
+    await nextTick()
+
+    await wrapper.find('[data-testid="route-voice-upload"]').trigger('click')
+    await nextTick()
+    expect(markUploadFailed).toHaveBeenCalled()
+    expect(getActiveVoiceRecorderMutexKey()).toBe('stop-1')
+    expect(startRecording).toHaveBeenCalledTimes(1)
   })
 
   it('passes stopId on upload', async () => {

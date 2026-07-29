@@ -6,6 +6,7 @@ import { RouteStatus } from '../route-status.enum'
 import { FakeRouteVoiceReportStorageProvider } from './fake-route-voice-report-storage.provider'
 import {
   buildIdempotencyFingerprint,
+  generateLegacyRouteVoiceReportBlobName,
   generateRouteVoiceReportBlobName,
 } from './route-voice-report-audio.validation'
 import {
@@ -412,13 +413,17 @@ describe('RouteVoiceReportService', () => {
     expect(saved.blobName.toLowerCase()).not.toContain('apotheek')
     expect(storage.has(saved.blobName)).toBe(true)
     const storedMeta = storage.getMetadata?.(saved.blobName)
-    if (storedMeta) {
-      expect(storedMeta.routeid).toBe(routeId.toString())
-      expect(storedMeta.stopid).toBe(stopId)
-      expect(storedMeta.reportid).toBe(
-        typeof saved.id === 'string' ? saved.id : String(saved._id),
-      )
-    }
+    expect(storedMeta).toBeDefined()
+    expect(Object.keys(storedMeta!).sort()).toEqual(
+      ['reportid', 'routeid', 'sha256prefix', 'stopid'].sort(),
+    )
+    expect(storedMeta!.routeid).toBe(routeId.toString())
+    expect(storedMeta!.stopid).toBe(stopId)
+    expect(storedMeta!.reportid).toBe(
+      typeof saved.id === 'string' ? saved.id : String(saved._id),
+    )
+    expect(storedMeta!.sha256prefix).toBe(saved.sha256.slice(0, 16))
+    expect(storedMeta!.sha256prefix).toMatch(/^[a-f0-9]{16}$/)
     expect(auditRecordCreated).toHaveBeenCalledTimes(1)
     expect(publishCreated).toHaveBeenCalledTimes(1)
   })
@@ -477,6 +482,94 @@ describe('RouteVoiceReportService', () => {
     expect(listed[0].stopId).toBeNull()
     expect(listed[0].pharmacyDisplayName).toBeNull()
     expect(listed[0].stopSequence).toBeNull()
+  })
+
+  it('Phase 36E2 legacy fixture: list, stream, and stale cleanup use old blob path', async () => {
+    const legacyId = new ObjectId()
+    const bytes = webmFixture(96)
+    const legacyBlob = generateLegacyRouteVoiceReportBlobName({
+      routeId: routeId.toString(),
+      reportId: legacyId.toString(),
+      extension: 'webm',
+    })
+    const legacy = buildAvailableReport({
+      _id: legacyId,
+      stopId: null,
+      apothekerProfileId: null,
+      blobName: legacyBlob,
+      sizeBytes: bytes.length,
+      sha256: sha256Hex(bytes),
+      sequenceNumber: 7,
+    })
+
+    const listService = buildService({ reports: [legacy] }).service
+    const listed = await listService.listForActor(
+      adminActor,
+      routeId.toString(),
+    )
+    expect(listed).toHaveLength(1)
+    expect(listed[0].stopId).toBeNull()
+    expect(listed[0].isLegacyRouteReport).toBe(true)
+    expect(listed[0].pharmacyDisplayName).toBeNull()
+    expect(listed[0].stopSequence).toBeNull()
+    expect(listed[0]).not.toHaveProperty('blobName')
+    expect(listed[0]).not.toHaveProperty('containerName')
+    expect(JSON.stringify(listed[0])).not.toMatch(
+      /blob\.core\.windows\.net|sas=|sha256/i,
+    )
+
+    const { service: streamService, storage } = buildService({
+      reports: [legacy],
+    })
+    await storage.store({
+      bytes,
+      blobName: legacyBlob,
+      mimeType: 'audio/webm',
+    })
+    const stream = await streamService.streamAudioForActor(
+      adminActor,
+      routeId.toString(),
+      legacy.id,
+      undefined,
+    )
+    expect(stream.statusCode).toBe(200)
+    expect(stream.contentLength).toBe(bytes.length)
+    expect(stream).not.toHaveProperty('blobName')
+
+    const staleCreatedAt = new Date(
+      Date.now() - ROUTE_VOICE_REPORT_STALE_UPLOADING_MS - 60_000,
+    )
+    const staleLegacy = buildAvailableReport({
+      _id: new ObjectId(),
+      stopId: null,
+      apothekerProfileId: null,
+      status: RouteVoiceReportStatus.UPLOADING,
+      createdAt: staleCreatedAt,
+      updatedAt: staleCreatedAt,
+      clientUploadId: 'legacy-stale-upload-001',
+      blobName: generateLegacyRouteVoiceReportBlobName({
+        routeId: routeId.toString(),
+        reportId: new ObjectId().toString(),
+        extension: 'webm',
+      }),
+    })
+    const {
+      service: cleanupService,
+      storage: cleanupStorage,
+      reports,
+    } = buildService({ reports: [staleLegacy] })
+    await cleanupStorage.store({
+      bytes: webmFixture(32),
+      blobName: staleLegacy.blobName,
+      mimeType: 'audio/webm',
+    })
+    expect(cleanupStorage.has(staleLegacy.blobName)).toBe(true)
+    const cleaned = await cleanupService.recoverStaleUploadingReservations(
+      new Date(),
+    )
+    expect(cleaned).toBe(1)
+    expect(cleanupStorage.has(staleLegacy.blobName)).toBe(false)
+    expect(reports[0].status).toBe(RouteVoiceReportStatus.UPLOAD_FAILED)
   })
 
   it('groups stop context for ADMIN list without exposing private blob fields', async () => {
