@@ -665,13 +665,14 @@ export class OrderService {
   }
 
   /**
-   * Qualifying orders for route generation.
+   * All orders for a pharmacy user + delivery date (any status).
+   * Used by route-generation diagnostics; does not change eligibility rules.
    *
    * Orders persist `apothekerId` as MongoDB ObjectId (`user._id` on create).
    * ApothekerProfile stores `userId` as a string. GraphQL/profile IDs therefore
    * arrive as strings and must be converted before querying.
    */
-  async findQualifyingOrdersForRoute(params: {
+  async findOrdersForPharmacyAndDeliveryDate(params: {
     apothekerUserId: string
     deliveryDate: string
   }): Promise<Order[]> {
@@ -703,16 +704,28 @@ export class OrderService {
         unique.set(order.id.toString(), order)
       }
 
-      const qualifying = [...unique.values()].filter(
-        order =>
-          order.status === OrderStatus.PENDING ||
-          order.status === OrderStatus.PLANNED,
-      )
-
-      return this.orderNormalizationService.normalizeOrdersIfNeeded(qualifying)
+      return this.orderNormalizationService.normalizeOrdersIfNeeded([
+        ...unique.values(),
+      ])
     } catch {
       return []
     }
+  }
+
+  /**
+   * Qualifying orders for route generation (PENDING or PLANNED for the date).
+   */
+  async findQualifyingOrdersForRoute(params: {
+    apothekerUserId: string
+    deliveryDate: string
+  }): Promise<Order[]> {
+    const orders = await this.findOrdersForPharmacyAndDeliveryDate(params)
+
+    return orders.filter(
+      order =>
+        order.status === OrderStatus.PENDING ||
+        order.status === OrderStatus.PLANNED,
+    )
   }
 
   /** @deprecated Use findQualifyingOrdersForRoute — kept for call-site migration. */

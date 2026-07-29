@@ -10,13 +10,23 @@ import { OrderStatus } from '../src/order/order-status.enum'
 const GENERATE = `
   mutation Generate($routeTemplateId: ID!, $deliveryDate: String!) {
     generateDeliveryRoute(routeTemplateId: $routeTemplateId, deliveryDate: $deliveryDate) {
-      id
-      status
-      stops {
-        stopId
-        apothekerUserId
-        orderIds
-        orderCount
+      route {  id
+        status
+        stops {
+          stopId
+          apothekerUserId
+          orderIds
+          orderCount
+        }
+      }
+      diagnostics {
+        includedOrderCount
+        includedStopCount
+        skippedOrderCount
+        skippedPharmacyCount
+        regenerated
+        regenerationNeeded
+        skipGroups { code count pharmacyNames orderIds apothekerProfileIds }
       }
     }
   }
@@ -114,13 +124,15 @@ describe('myPlannedDeliveries (e2e)', () => {
 
     const generated = await graphqlRequest<{
       generateDeliveryRoute: {
-        id: string
-        stops: Array<{
-          stopId: string
-          apothekerUserId: string
-          orderIds: string[]
-          orderCount: number
-        }>
+        route: {
+          id: string
+          stops: Array<{
+            stopId: string
+            apothekerUserId: string
+            orderIds: string[]
+            orderCount: number
+          }>
+        }
       }
     }>(app, {
       query: GENERATE,
@@ -132,7 +144,7 @@ describe('myPlannedDeliveries (e2e)', () => {
     })
 
     expect(generated.errors).toBeUndefined()
-    const stops = generated.data!.generateDeliveryRoute.stops
+    const stops = generated.data!.generateDeliveryRoute.route.stops
     const ownStop = stops.find(
       stop => stop.apothekerUserId === String(pharmacy1.user.id),
     )

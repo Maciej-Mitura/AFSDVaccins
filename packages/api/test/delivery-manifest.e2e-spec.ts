@@ -17,13 +17,23 @@ import { RouteStatus } from '../src/routes/route-status.enum'
 const GENERATE = `
   mutation Generate($routeTemplateId: ID!, $deliveryDate: String!) {
     generateDeliveryRoute(routeTemplateId: $routeTemplateId, deliveryDate: $deliveryDate) {
-      id
-      status
-      stops {
-        stopId
-        sequence
-        pharmacyName
-        orderIds
+      route {  id
+        status
+        stops {
+          stopId
+          sequence
+          pharmacyName
+          orderIds
+        }
+      }
+      diagnostics {
+        includedOrderCount
+        includedStopCount
+        skippedOrderCount
+        skippedPharmacyCount
+        regenerated
+        regenerationNeeded
+        skipGroups { code count pharmacyNames orderIds apothekerProfileIds }
       }
     }
   }
@@ -82,8 +92,10 @@ describe('Delivery manifest PDF (e2e)', () => {
 
     const generated = await graphqlRequest<{
       generateDeliveryRoute: {
-        id: string
-        stops: Array<{ stopId: string; pharmacyName: string }>
+        route: {
+          id: string
+          stops: Array<{ stopId: string; pharmacyName: string }>
+        }
       }
     }>(app, {
       query: GENERATE,
@@ -95,8 +107,8 @@ describe('Delivery manifest PDF (e2e)', () => {
     })
 
     expect(generated.errors).toBeUndefined()
-    const routeId = generated.data!.generateDeliveryRoute.id
-    const stopId = generated.data!.generateDeliveryRoute.stops[0].stopId
+    const routeId = generated.data!.generateDeliveryRoute.route.id
+    const stopId = generated.data!.generateDeliveryRoute.route.stops[0].stopId
     expect(stopId).toEqual(expect.any(String))
 
     return {

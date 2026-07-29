@@ -5,11 +5,14 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { mount, flushPromises } from '@vue/test-utils'
 import { ref } from 'vue'
 
+import { routeSkipReasonLabelKey } from '@/composables/route-generation-diagnostics'
+
 const loadActiveTemplates = vi.fn()
 const loadDeliveryRoutes = vi.fn()
 const loadProfileOptions = vi.fn()
 const generateDeliveryRoute = vi.fn()
 const updateRouteStatus = vi.fn()
+const loadRoutePlanningDiagnostics = vi.fn().mockResolvedValue(null)
 
 function todayLocalDate(): string {
   const now = new Date()
@@ -21,6 +24,29 @@ function todayLocalDate(): string {
 
 const today = todayLocalDate()
 
+const lastGenerationDiagnostics = ref<{
+  includedOrderCount: number
+  includedStopCount: number
+  skippedOrderCount: number
+  skippedPharmacyCount: number
+  regenerated: boolean
+  regenerationNeeded: boolean
+  skipGroups: Array<{
+    code: string
+    count: number
+    pharmacyNames: string[]
+    orderIds: string[]
+    apothekerProfileIds: string[]
+  }>
+} | null>(null)
+
+const planningDiagnostics = ref<{
+  eligibleUnplannedOrderCount: number
+  regenerationNeeded: boolean
+} | null>(null)
+
+const successMessage = ref<string | null>(null)
+
 const deliveryRoutes = ref([
   {
     id: 'route-1',
@@ -30,13 +56,7 @@ const deliveryRoutes = ref([
     bezorgerProfileId: 'b1',
     skippedApothekerProfileIds: [],
     locationStatus: null,
-    statusHistory: [
-      {
-        fromStatus: null,
-        toStatus: 'ASSIGNED',
-        changedAt: `${today}T07:00:00.000Z`,
-      },
-    ],
+    statusHistory: [],
     stops: [
       {
         stopId: 's1',
@@ -44,9 +64,9 @@ const deliveryRoutes = ref([
         pharmacyName: 'City Pharmacy',
         address: { street: 'Main', city: 'Town' },
         orderCount: 1,
-        totalQuantity: 5,
+        totalQuantity: 1,
         orderIds: ['o1'],
-        lines: [{ vaccineId: 'v1', vaccineName: 'Flu', quantity: 5 }],
+        lines: [{ vaccineId: 'v1', vaccineName: 'Flu', quantity: 1 }],
         qrAvailable: true,
         qrConsumed: false,
       },
@@ -80,14 +100,14 @@ vi.mock('@/composables/useDeliveryRoutes', () => ({
     errorMessage: ref(null),
     generateError: ref(null),
     statusError: ref(null),
-    successMessage: ref(null),
-    lastGenerationDiagnostics: ref(null),
-    planningDiagnostics: ref(null),
+    successMessage,
+    lastGenerationDiagnostics,
+    planningDiagnostics,
     planningDiagnosticsLoading: ref(false),
     loadActiveTemplates,
     loadDeliveryRoutes,
     generateDeliveryRoute,
-    loadRoutePlanningDiagnostics: vi.fn().mockResolvedValue(null),
+    loadRoutePlanningDiagnostics,
     updateRouteStatus,
     formatAddress: () => 'Main, Town',
     formatStatusHistoryEntry: () => 'Assigned',
@@ -151,9 +171,12 @@ vi.mock('@/components/feature/routes/route-location-status', () => ({
 
 import ViewAdminRoutePlanning from '@/views/admin/ViewAdminRoutePlanning.vue'
 
-describe('ViewAdminRoutePlanning', () => {
+describe('ViewAdminRoutePlanning Phase 36C diagnostics', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    lastGenerationDiagnostics.value = null
+    planningDiagnostics.value = null
+    successMessage.value = null
   })
 
   function mountPage() {
@@ -162,23 +185,18 @@ describe('ViewAdminRoutePlanning', () => {
         stubs: {
           CommonPageHeader: {
             props: ['title', 'subtitle'],
-            template:
-              '<header data-testid="common-page-header"><h1>{{ title }}</h1></header>',
+            template: '<header><h1>{{ title }}</h1></header>',
           },
           CommonPageSection: {
-            props: ['title', 'description', 'variant'],
+            props: ['title', 'variant'],
             template:
-              '<section data-testid="common-page-section"><h2 v-if="title">{{ title }}</h2><slot /></section>',
+              '<section><h2 v-if="title">{{ title }}</h2><slot /></section>',
           },
           CommonLoadingSkeleton: true,
           CommonEmptyState: true,
           CommonErrorState: true,
-          FeatureRouteLocationStatusCard: {
-            template: '<div data-testid="route-location-status-card" />',
-          },
-          FeatureRouteVoiceRecorder: {
-            template: '<div data-testid="route-voice-recorder" />',
-          },
+          FeatureRouteLocationStatusCard: true,
+          FeatureRouteVoiceRecorder: true,
           FeatureDeliveryStopQrModal: true,
           UButton: {
             template:
@@ -193,7 +211,11 @@ describe('ViewAdminRoutePlanning', () => {
           },
           USelect: true,
           UFormField: { template: '<div><slot /></div>' },
-          UAlert: true,
+          UAlert: {
+            props: ['title', 'description', 'color'],
+            template:
+              '<div data-testid="alert" :data-color="color"><strong>{{ title }}</strong><p>{{ description }}</p><slot /></div>',
+          },
           UModal: {
             template: '<div><slot name="body" /><slot name="footer" /></div>',
           },
@@ -203,27 +225,69 @@ describe('ViewAdminRoutePlanning', () => {
     })
   }
 
-  it('uses page header and keeps route actions discoverable', async () => {
-    const wrapper = mountPage()
-    await flushPromises()
-
-    expect(wrapper.findAll('h1')).toHaveLength(1)
-    expect(
-      wrapper.find('[data-testid="admin-download-route-manifest"]').exists(),
-    ).toBe(true)
-    expect(wrapper.html()).not.toMatch(/UCard/)
+  it('maps skip reason codes to translation keys', () => {
+    expect(routeSkipReasonLabelKey('PHARMACY_NOT_IN_ACTIVE_TEMPLATE')).toBe(
+      'routes.diagnostics.reason.notInTemplate',
+    )
+    expect(routeSkipReasonLabelKey('UNKNOWN')).toBe(
+      'routes.diagnostics.reason.other',
+    )
   })
 
-  it('renders stops and voice reports', async () => {
+  it('shows partial generation summary and template link', async () => {
+    successMessage.value = 'success.routes.generatedPartial'
+    lastGenerationDiagnostics.value = {
+      includedOrderCount: 1,
+      includedStopCount: 1,
+      skippedOrderCount: 1,
+      skippedPharmacyCount: 1,
+      regenerated: false,
+      regenerationNeeded: false,
+      skipGroups: [
+        {
+          code: 'PHARMACY_NOT_IN_ACTIVE_TEMPLATE',
+          count: 1,
+          pharmacyNames: ['Off Template Pharmacy'],
+          orderIds: ['o2'],
+          apothekerProfileIds: ['p2'],
+        },
+      ],
+    }
+
     const wrapper = mountPage()
     await flushPromises()
 
-    expect(wrapper.find('[data-testid="admin-route-stop"]').exists()).toBe(true)
-    expect(wrapper.find('[data-testid="admin-stop-qr-state"]').exists()).toBe(
-      true,
-    )
-    expect(wrapper.find('[data-testid="route-voice-recorder"]').exists()).toBe(
-      true,
-    )
+    expect(
+      wrapper
+        .find('[data-testid="admin-route-planning-generation-summary"]')
+        .exists(),
+    ).toBe(true)
+    expect(
+      wrapper.find('[data-testid="admin-route-planning-skip-groups"]').text(),
+    ).toContain('Off Template Pharmacy')
+    expect(
+      wrapper
+        .find('[data-testid="admin-route-planning-template-link"]')
+        .exists(),
+    ).toBe(true)
+  })
+
+  it('shows freshness warning when unplanned eligible orders exist', async () => {
+    planningDiagnostics.value = {
+      eligibleUnplannedOrderCount: 2,
+      regenerationNeeded: true,
+    }
+
+    const wrapper = mountPage()
+    await flushPromises()
+
+    expect(
+      wrapper.find('[data-testid="admin-route-planning-freshness"]').exists(),
+    ).toBe(true)
+    expect(
+      wrapper
+        .find('[data-testid="admin-route-planning-snapshot-hint"]')
+        .exists(),
+    ).toBe(true)
   })
 })

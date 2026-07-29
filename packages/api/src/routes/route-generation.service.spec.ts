@@ -36,13 +36,19 @@ import { RouteStatus } from './route-status.enum'
 describe('RouteGenerationService', () => {
   let service: RouteGenerationService
   let routeRepository: jest.Mocked<
-    Pick<MongoRepository<DeliveryRoute>, 'findOne' | 'save' | 'create'>
+    Pick<MongoRepository<DeliveryRoute>, 'findOne' | 'save' | 'create' | 'find'>
   >
   let routeTemplatesService: jest.Mocked<
-    Pick<RouteTemplatesService, 'findRouteTemplateById'>
+    Pick<
+      RouteTemplatesService,
+      'findRouteTemplateById' | 'findRouteTemplates'
+    >
   >
   let apothekerProfileService: jest.Mocked<
-    Pick<ApothekerProfileService, 'findApothekerProfileById'>
+    Pick<
+      ApothekerProfileService,
+      'findApothekerProfileById' | 'listApothekerProfiles'
+    >
   >
   let bezorgerProfileService: jest.Mocked<
     Pick<BezorgerProfileService, 'findBezorgerProfileById'>
@@ -52,6 +58,8 @@ describe('RouteGenerationService', () => {
       OrderService,
       | 'findQualifyingOrdersForPharmacist'
       | 'findQualifyingOrdersForRoute'
+      | 'findOrdersForPharmacyAndDeliveryDate'
+      | 'findOrders'
       | 'planOrdersForGeneratedRoute'
       | 'publishPlannedOrderUpdates'
     >
@@ -174,6 +182,7 @@ describe('RouteGenerationService', () => {
 
     routeRepository = {
       findOne: jest.fn().mockResolvedValue(null),
+      find: jest.fn().mockResolvedValue([]),
       save: jest.fn().mockImplementation((route: DeliveryRoute) => {
         const rawId = route._id ?? '807f1f77bcf86cd799439099'
         const id =
@@ -198,6 +207,7 @@ describe('RouteGenerationService', () => {
 
     routeTemplatesService = {
       findRouteTemplateById: jest.fn().mockResolvedValue(makeTemplate()),
+      findRouteTemplates: jest.fn().mockResolvedValue([makeTemplate()]),
     }
 
     apothekerProfileService = {
@@ -216,6 +226,10 @@ describe('RouteGenerationService', () => {
 
         throw new Error('profile not found')
       }),
+      listApothekerProfiles: jest.fn().mockResolvedValue([
+        makeProfile(pharmacyAId, pharmacyAUserId, 'Apotheek A'),
+        makeProfile(pharmacyBId, pharmacyBUserId, 'Apotheek B'),
+      ]),
     }
 
     bezorgerProfileService = {
@@ -250,6 +264,20 @@ describe('RouteGenerationService', () => {
             return Promise.resolve([])
           },
         ),
+      findOrdersForPharmacyAndDeliveryDate: jest
+        .fn()
+        .mockImplementation(
+          (params: { apothekerUserId: string; deliveryDate: string }) => {
+            if (params.apothekerUserId === pharmacyAUserId) {
+              return Promise.resolve([
+                makeOrder(orderAId, pharmacyAUserId, OrderStatus.PENDING),
+              ])
+            }
+
+            return Promise.resolve([])
+          },
+        ),
+      findOrders: jest.fn().mockResolvedValue([]),
       planOrdersForGeneratedRoute: jest
         .fn()
         .mockResolvedValue([
@@ -314,11 +342,7 @@ describe('RouteGenerationService', () => {
   })
 
   it('creates a route from an active template with snapshotted stop data', async () => {
-    const route = await service.generateDeliveryRoute(
-      admin,
-      templateId,
-      deliveryDate,
-    )
+    const { route } = await service.generateDeliveryRoute(admin, templateId, deliveryDate)
 
     expect(route.bezorgerProfileId).toBe(bezorgerProfileId)
     expect(route.routeTemplateId).toBe(templateId)
@@ -376,18 +400,14 @@ describe('RouteGenerationService', () => {
   })
 
   it('skips pharmacies without qualifying orders and renormalizes sequence', async () => {
-    const route = await service.generateDeliveryRoute(
-      admin,
-      templateId,
-      deliveryDate,
-    )
+    const { route } = await service.generateDeliveryRoute(admin, templateId, deliveryDate)
 
     expect(route.stops.map(stop => stop.sequence)).toEqual([1])
     expect(route.skippedApothekerProfileIds).toContain(pharmacyBId)
   })
 
   it('preserves relative template order when both pharmacies qualify', async () => {
-    orderService.findQualifyingOrdersForRoute.mockImplementation(
+    orderService.findOrdersForPharmacyAndDeliveryDate.mockImplementation(
       (params: { apothekerUserId: string; deliveryDate: string }) => {
         if (params.apothekerUserId === pharmacyAUserId) {
           return Promise.resolve([
@@ -405,11 +425,7 @@ describe('RouteGenerationService', () => {
       },
     )
 
-    const route = await service.generateDeliveryRoute(
-      admin,
-      templateId,
-      deliveryDate,
-    )
+    const { route } = await service.generateDeliveryRoute(admin, templateId, deliveryDate)
 
     expect(route.stops.map(stop => stop.apothekerProfileId)).toEqual([
       pharmacyAId,
@@ -419,14 +435,11 @@ describe('RouteGenerationService', () => {
   })
 
   it('persists an empty route when no stops qualify', async () => {
+    orderService.findOrdersForPharmacyAndDeliveryDate.mockResolvedValue([])
     orderService.findQualifyingOrdersForRoute.mockResolvedValue([])
     orderService.planOrdersForGeneratedRoute.mockResolvedValue([])
 
-    const route = await service.generateDeliveryRoute(
-      admin,
-      templateId,
-      deliveryDate,
-    )
+    const { route } = await service.generateDeliveryRoute(admin, templateId, deliveryDate)
 
     expect(route.stops).toEqual([])
     expect(route.skippedApothekerProfileIds).toEqual([
@@ -494,11 +507,7 @@ describe('RouteGenerationService', () => {
 
     routeRepository.findOne.mockResolvedValue(existing)
 
-    const route = await service.generateDeliveryRoute(
-      admin,
-      templateId,
-      deliveryDate,
-    )
+    const { route } = await service.generateDeliveryRoute(admin, templateId, deliveryDate)
 
     expect(route.id).toBe(existingId)
     expect(route.stops).toHaveLength(1)
@@ -550,11 +559,7 @@ describe('RouteGenerationService', () => {
       updatedAt: new Date(),
     })
 
-    const route = await service.generateDeliveryRoute(
-      admin,
-      templateId,
-      deliveryDate,
-    )
+    const { route } = await service.generateDeliveryRoute(admin, templateId, deliveryDate)
 
     expect(route.status).toBe(RouteStatus.ASSIGNED)
     expect(route.id).toBe(existingId)
@@ -647,11 +652,7 @@ describe('RouteGenerationService', () => {
   })
 
   it('persists a newly generated route only after stops and QR metadata are complete', async () => {
-    const route = await service.generateDeliveryRoute(
-      admin,
-      templateId,
-      deliveryDate,
-    )
+    const { route } = await service.generateDeliveryRoute(admin, templateId, deliveryDate)
 
     expect(routeRepository.save).toHaveBeenCalledTimes(1)
     const persisted = routeRepository.save.mock.calls[0][0] as DeliveryRoute
@@ -695,7 +696,7 @@ describe('RouteGenerationService', () => {
   })
 
   it('assigns a unique stopId, nonceHash, and encodedToken to every generated stop', async () => {
-    orderService.findQualifyingOrdersForRoute.mockImplementation(
+    orderService.findOrdersForPharmacyAndDeliveryDate.mockImplementation(
       (params: { apothekerUserId: string; deliveryDate: string }) => {
         if (params.apothekerUserId === pharmacyAUserId) {
           return Promise.resolve([
@@ -713,11 +714,7 @@ describe('RouteGenerationService', () => {
       },
     )
 
-    const route = await service.generateDeliveryRoute(
-      admin,
-      templateId,
-      deliveryDate,
-    )
+    const { route } = await service.generateDeliveryRoute(admin, templateId, deliveryDate)
 
     expect(route.stops).toHaveLength(2)
     expect(route.stops[0].stopId).not.toBe(route.stops[1].stopId)
@@ -730,14 +727,10 @@ describe('RouteGenerationService', () => {
   })
 
   it('never reuses stop nonces or encoded tokens across separately generated routes', async () => {
-    const first = await service.generateDeliveryRoute(
-      admin,
-      templateId,
-      deliveryDate,
-    )
+    const { route: first } = await service.generateDeliveryRoute(admin, templateId, deliveryDate)
 
     routeRepository.findOne.mockResolvedValue(null)
-    const second = await service.generateDeliveryRoute(
+    const { route: second } = await service.generateDeliveryRoute(
       admin,
       templateId,
       '2026-07-17',

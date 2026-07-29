@@ -15,6 +15,7 @@ import {
 import {
   DeliveryManifestForbiddenException,
   DeliveryManifestOrderIntegrityException,
+  DeliveryManifestQuantityMismatchException,
   DeliveryManifestRouteNotFoundException,
   DeliveryManifestStopNotFoundException,
 } from './delivery-manifest.exceptions'
@@ -89,6 +90,7 @@ function makeStop(options: {
   pharmacyName: string
   city?: string
   orderIds: string[]
+  totalQuantity?: number
   encodedToken?: string | null
   omitQr?: boolean
   consumed?: boolean
@@ -112,7 +114,7 @@ function makeStop(options: {
     },
     orderIds: options.orderIds,
     orderCount: options.orderIds.length,
-    totalQuantity: 10,
+    totalQuantity: options.totalQuantity,
     lines: [],
     qrConfirmation: options.omitQr
       ? undefined
@@ -474,6 +476,52 @@ describe('DeliveryManifestDataService', () => {
     await expect(
       service.buildRouteManifest(adminUser(), route._id.toString()),
     ).rejects.toBeInstanceOf(DeliveryManifestOrderIntegrityException)
+  })
+
+  it('9b: stop totalQuantity mismatch fails with controlled error', async () => {
+    const order = makeOrder({
+      lines: [
+        {
+          vaccineId: new ObjectId().toString(),
+          vaccineName: 'Comirnaty',
+          quantity: 1,
+        },
+      ],
+    })
+    const route = makeRoute({
+      stops: [
+        makeStop({
+          stopId: 'stop-1',
+          sequence: 1,
+          apothekerUserId: new ObjectId().toString(),
+          pharmacyName: 'A',
+          orderIds: [order._id.toString()],
+          totalQuantity: 99,
+        }),
+      ],
+    })
+    routeRepo.findOne.mockResolvedValue(route)
+    stubOrders([order])
+    stubCourierProfile(new ObjectId(route.bezorgerProfileId), new ObjectId())
+
+    await expect(
+      service.buildRouteManifest(adminUser(), route._id.toString()),
+    ).rejects.toBeInstanceOf(DeliveryManifestQuantityMismatchException)
+  })
+
+  it('9c: empty route returns an empty manifest envelope', async () => {
+    const route = makeRoute({ stops: [] })
+    routeRepo.findOne.mockResolvedValue(route)
+    stubCourierProfile(new ObjectId(route.bezorgerProfileId), new ObjectId())
+
+    const manifest = await service.buildRouteManifest(
+      adminUser(),
+      route._id.toString(),
+    )
+    expect(manifest.stopCount).toBe(0)
+    expect(manifest.totalOrderCount).toBe(0)
+    expect(manifest.totalItemQuantity).toBe(0)
+    expect(manifest.stops).toEqual([])
   })
 
   it('10: stop sequence sorted ascending', async () => {

@@ -26,6 +26,7 @@ import {
 import {
   DeliveryManifestForbiddenException,
   DeliveryManifestOrderIntegrityException,
+  DeliveryManifestQuantityMismatchException,
   DeliveryManifestQrUnavailableException,
   DeliveryManifestRouteNotFoundException,
   DeliveryManifestRouteUnavailableException,
@@ -210,6 +211,8 @@ export class DeliveryManifestDataService {
       0,
     )
 
+    this.assertStopSnapshotConsistency(stop, orders, itemQuantity)
+
     const stopStatus = deriveStopStatus(stop)
     const arrival = this.mapArrival(stop, input.courierNameByUserId)
     const deliveryProof = this.mapDeliveryProof(stop, input.courierNameByUserId)
@@ -234,6 +237,53 @@ export class DeliveryManifestDataService {
       arrival,
       deliveryProof,
       qr,
+    }
+  }
+
+  /**
+   * Route stops remain the source of truth. Manifest must not silently omit an
+   * order the stop claims to contain, and quantity totals must match.
+   */
+  private assertStopSnapshotConsistency(
+    stop: DeliveryStop,
+    orders: ManifestOrderData[],
+    itemQuantity: number,
+  ): void {
+    const claimedOrderIds = [...(stop.orderIds ?? [])]
+    if (orders.length !== claimedOrderIds.length) {
+      this.logger.warn(
+        `Manifest order integrity failure: stop sequence ${stop.sequence} claims ${claimedOrderIds.length} order(s) but resolved ${orders.length}.`,
+      )
+      throw new DeliveryManifestOrderIntegrityException()
+    }
+
+    if (
+      typeof stop.orderCount === 'number' &&
+      stop.orderCount !== orders.length
+    ) {
+      this.logger.warn(
+        `Manifest order integrity failure: stop sequence ${stop.sequence} orderCount snapshot mismatch.`,
+      )
+      throw new DeliveryManifestOrderIntegrityException()
+    }
+
+    if (
+      typeof stop.totalQuantity === 'number' &&
+      stop.totalQuantity !== itemQuantity
+    ) {
+      this.logger.warn(
+        `Manifest quantity mismatch: stop sequence ${stop.sequence} snapshot=${stop.totalQuantity} live=${itemQuantity}.`,
+      )
+      throw new DeliveryManifestQuantityMismatchException()
+    }
+
+    for (const order of orders) {
+      if (!Array.isArray(order.lines) || order.lines.length === 0) {
+        this.logger.warn(
+          `Manifest order integrity failure: order on stop sequence ${stop.sequence} has no lines.`,
+        )
+        throw new DeliveryManifestOrderIntegrityException()
+      }
     }
   }
 

@@ -184,6 +184,8 @@ export class E2eFixtureBuilder {
     status?: OrderStatus
     /** Defaults to 08:00 UTC so Europe/Brussels is still before 14:00 closing. */
     submittedAt?: Date
+    /** Optional additional lines (same vaccine allowed; quantities are not merged here). */
+    extraLines?: Array<{ vaccine: Vaccine; quantity: number }>
   }): Promise<Order> {
     const repo = this.dataSource.getMongoRepository(Order)
     const status = input.status ?? OrderStatus.PENDING
@@ -193,19 +195,28 @@ export class E2eFixtureBuilder {
       return early
     })()
 
+    const orderLines = [
+      {
+        vaccineId: input.vaccine._id.toString(),
+        vaccineName: input.vaccine.name,
+        manufacturer: input.vaccine.manufacturer,
+        quantity: input.quantity,
+      },
+      ...(input.extraLines ?? []).map(line => ({
+        vaccineId: line.vaccine._id.toString(),
+        vaccineName: line.vaccine.name,
+        manufacturer: line.vaccine.manufacturer,
+        quantity: line.quantity,
+      })),
+    ]
+    const totalQuantity = orderLines.reduce((sum, line) => sum + line.quantity, 0)
+
     return repo.save(
       repo.create({
         apothekerId: input.apothekerUserId,
         status,
-        orderLines: [
-          {
-            vaccineId: input.vaccine._id.toString(),
-            vaccineName: input.vaccine.name,
-            manufacturer: input.vaccine.manufacturer,
-            quantity: input.quantity,
-          },
-        ],
-        totalQuantity: input.quantity,
+        orderLines,
+        totalQuantity,
         isoWeek: 1,
         isoYear: 2026,
         submittedAt,

@@ -31,12 +31,22 @@ const CREATE_TEMPLATE = `
 const GENERATE = `
   mutation Generate($routeTemplateId: ID!, $deliveryDate: String!) {
     generateDeliveryRoute(routeTemplateId: $routeTemplateId, deliveryDate: $deliveryDate) {
-      id
-      deliveryDate
-      bezorgerProfileId
-      status
-      stops { apothekerProfileId orderIds orderCount }
-      skippedApothekerProfileIds
+      route {  id
+        deliveryDate
+        bezorgerProfileId
+        status
+        stops { apothekerProfileId orderIds orderCount }
+        skippedApothekerProfileIds
+      }
+      diagnostics {
+        includedOrderCount
+        includedStopCount
+        skippedOrderCount
+        skippedPharmacyCount
+        regenerated
+        regenerationNeeded
+        skipGroups { code count pharmacyNames orderIds apothekerProfileIds }
+      }
     }
   }
 `
@@ -120,11 +130,13 @@ describe('GraphQL E2E — route templates and generation', () => {
 
     const generated = await graphqlRequest<{
       generateDeliveryRoute: {
-        id: string
-        deliveryDate: string
-        status: string
-        stops: Array<{ apothekerProfileId: string; orderCount: number }>
-        skippedApothekerProfileIds: string[]
+        route: {
+          id: string
+          deliveryDate: string
+          status: string
+          stops: Array<{ apothekerProfileId: string; orderCount: number }>
+          skippedApothekerProfileIds: string[]
+        }
       }
     }>(harness.app, {
       query: GENERATE,
@@ -136,14 +148,14 @@ describe('GraphQL E2E — route templates and generation', () => {
     })
 
     expect(generated.errors).toBeUndefined()
-    expect(generated.data?.generateDeliveryRoute.deliveryDate).toBe(today)
-    expect(generated.data?.generateDeliveryRoute.status).toBe('ASSIGNED')
-    expect(generated.data?.generateDeliveryRoute.stops).toHaveLength(1)
+    expect(generated.data?.generateDeliveryRoute.route.deliveryDate).toBe(today)
+    expect(generated.data?.generateDeliveryRoute.route.status).toBe('ASSIGNED')
+    expect(generated.data?.generateDeliveryRoute.route.stops).toHaveLength(1)
     expect(
-      String(generated.data?.generateDeliveryRoute.stops[0].apothekerProfileId),
+      String(generated.data?.generateDeliveryRoute.route.stops[0].apothekerProfileId),
     ).toBe(String(pharmacyWithOrder.profile.id))
     expect(
-      generated.data?.generateDeliveryRoute.skippedApothekerProfileIds.map(
+      generated.data?.generateDeliveryRoute.route.skippedApothekerProfileIds.map(
         String,
       ),
     ).toContain(String(emptyPharmacy.profile.id))
@@ -153,9 +165,9 @@ describe('GraphQL E2E — route templates and generation', () => {
     })
     expect(plannedOrders.length).toBe(1)
 
-    const firstId = generated.data!.generateDeliveryRoute.id
+    const firstId = generated.data!.generateDeliveryRoute.route.id
     const regenerated = await graphqlRequest<{
-      generateDeliveryRoute: { id: string }
+      generateDeliveryRoute: { route: { id: string } }
     }>(harness.app, {
       query: GENERATE,
       token: E2E_TOKENS.admin,
@@ -166,7 +178,7 @@ describe('GraphQL E2E — route templates and generation', () => {
     })
 
     expect(regenerated.errors).toBeUndefined()
-    expect(regenerated.data?.generateDeliveryRoute.id).toBe(firstId)
+    expect(regenerated.data?.generateDeliveryRoute.route.id).toBe(firstId)
     expect(await countCollection(harness.dataSource, DeliveryRoute)).toBe(1)
 
     const denied = await graphqlRequest(harness.app, {

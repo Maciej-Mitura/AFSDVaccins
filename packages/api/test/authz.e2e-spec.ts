@@ -30,7 +30,17 @@ const MY_ORDER = `
 const GENERATE_ROUTE = `
   mutation Generate($routeTemplateId: ID!, $deliveryDate: String!) {
     generateDeliveryRoute(routeTemplateId: $routeTemplateId, deliveryDate: $deliveryDate) {
-      id
+      route {  id
+      }
+      diagnostics {
+        includedOrderCount
+        includedStopCount
+        skippedOrderCount
+        skippedPharmacyCount
+        regenerated
+        regenerationNeeded
+        skipGroups { code count pharmacyNames orderIds apothekerProfileIds }
+      }
     }
   }
 `

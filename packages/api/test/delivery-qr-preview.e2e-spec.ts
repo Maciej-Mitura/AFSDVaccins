@@ -38,14 +38,24 @@ type ErrorBody = {
 const GENERATE = `
   mutation Generate($routeTemplateId: ID!, $deliveryDate: String!) {
     generateDeliveryRoute(routeTemplateId: $routeTemplateId, deliveryDate: $deliveryDate) {
-      id
-      status
-      stops {
-        stopId
-        sequence
-        pharmacyName
-        orderIds
-        orderCount
+      route {  id
+        status
+        stops {
+          stopId
+          sequence
+          pharmacyName
+          orderIds
+          orderCount
+        }
+      }
+      diagnostics {
+        includedOrderCount
+        includedStopCount
+        skippedOrderCount
+        skippedPharmacyCount
+        regenerated
+        regenerationNeeded
+        skipGroups { code count pharmacyNames orderIds apothekerProfileIds }
       }
     }
   }
@@ -148,13 +158,15 @@ describe('Delivery QR scan preview (e2e)', () => {
 
     const generated = await graphqlRequest<{
       generateDeliveryRoute: {
-        id: string
-        stops: Array<{
-          stopId: string
-          sequence: number
-          orderIds: string[]
-          orderCount: number
-        }>
+        route: {
+          id: string
+          stops: Array<{
+            stopId: string
+            sequence: number
+            orderIds: string[]
+            orderCount: number
+          }>
+        }
       }
     }>(app, {
       query: GENERATE,
@@ -166,8 +178,8 @@ describe('Delivery QR scan preview (e2e)', () => {
     })
 
     expect(generated.errors).toBeUndefined()
-    const routeId = generated.data!.generateDeliveryRoute.id
-    const stops = generated.data!.generateDeliveryRoute.stops
+    const routeId = generated.data!.generateDeliveryRoute.route.id
+    const stops = generated.data!.generateDeliveryRoute.route.stops
     const stop = stops[0]
 
     const repo = harness.dataSource.getMongoRepository(DeliveryRoute)

@@ -23,6 +23,10 @@ import { RolesGuard } from '../user/guards/roles.guard'
 import { User } from '../user/user.entity'
 import { UserRole } from '../user/user-role.enum'
 import { DeliveryRoute } from './delivery-route.entity'
+import {
+  DeliveryRouteGenerationResult,
+  RoutePlanningDiagnostics,
+} from './route-generation-diagnostics.type'
 import { RoutePreview } from './route-preview.type'
 import { RouteStatus } from './route-status.enum'
 import { RoutesService } from './routes.service'
@@ -34,9 +38,9 @@ export class RoutesResolver {
     @Inject(PUB_SUB) private readonly pubSub: PubSub,
   ) {}
 
-  @Mutation(() => DeliveryRoute, {
+  @Mutation(() => DeliveryRouteGenerationResult, {
     description:
-      'Generates or regenerates a delivery route from an active template',
+      'Generates or regenerates a delivery route from an active template, with ADMIN diagnostics for omissions',
   })
   @UseGuards(AuthorizationGuard, RolesGuard, StrictIdentityThrottlerGuard)
   @StrictThrottle()
@@ -45,12 +49,29 @@ export class RoutesResolver {
     @CurrentUser() user: User,
     @Args('routeTemplateId', { type: () => ID }) routeTemplateId: string,
     @Args('deliveryDate') deliveryDate: string,
-  ): Promise<DeliveryRoute> {
+  ): Promise<DeliveryRouteGenerationResult> {
     return this.routesService.generateDeliveryRoute(
       user,
       routeTemplateId,
       deliveryDate,
     )
+  }
+
+  @Query(() => RoutePlanningDiagnostics, {
+    description:
+      'ADMIN-only read diagnostics for route planning freshness and skipped orders/pharmacies',
+  })
+  @UseGuards(AuthorizationGuard, RolesGuard)
+  @Roles(UserRole.ADMIN)
+  routePlanningDiagnostics(
+    @Args('deliveryDate') deliveryDate: string,
+    @Args('routeTemplateId', { type: () => ID, nullable: true })
+    routeTemplateId?: string,
+  ): Promise<RoutePlanningDiagnostics> {
+    return this.routesService.getRoutePlanningDiagnostics({
+      deliveryDate,
+      routeTemplateId,
+    })
   }
 
   @Query(() => [DeliveryRoute], {

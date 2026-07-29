@@ -25,6 +25,10 @@ import {
   InvalidRouteStatusTransitionException,
   RouteCannotBeCancelledException,
 } from './exceptions/delivery-route.exceptions'
+import {
+  DeliveryRouteGenerationResult,
+  RoutePlanningDiagnostics,
+} from './route-generation-diagnostics.type'
 import { RouteGenerationService } from './route-generation.service'
 import { RoutePreviewService } from './route-preview.service'
 import { RoutePreview } from './route-preview.type'
@@ -54,12 +58,19 @@ export class RoutesService {
     admin: User,
     routeTemplateId: string,
     deliveryDate: string,
-  ): Promise<DeliveryRoute> {
+  ): Promise<DeliveryRouteGenerationResult> {
     return this.routeGenerationService.generateDeliveryRoute(
       admin,
       routeTemplateId,
       deliveryDate,
     )
+  }
+
+  async getRoutePlanningDiagnostics(params: {
+    deliveryDate: string
+    routeTemplateId?: string | null
+  }): Promise<RoutePlanningDiagnostics> {
+    return this.routeGenerationService.getRoutePlanningDiagnostics(params)
   }
 
   async findDeliveryRoutes(filter?: {

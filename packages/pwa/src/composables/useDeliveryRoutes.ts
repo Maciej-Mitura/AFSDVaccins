@@ -8,6 +8,7 @@ import {
   GENERATE_DELIVERY_ROUTE_MUTATION,
   MY_TODAY_ROUTE_QUERY,
   MY_TOMORROW_ROUTE_PREVIEW_QUERY,
+  ROUTE_PLANNING_DIAGNOSTICS_QUERY,
   UPDATE_ROUTE_STATUS_MUTATION,
   type BezorgerRouteUpdatesSubscription,
   type DeliveryRoutesQuery,
@@ -16,6 +17,8 @@ import {
   type GenerateDeliveryRouteMutationVariables,
   type MyTodayRouteQuery,
   type MyTomorrowRoutePreviewQuery,
+  type RoutePlanningDiagnosticsQuery,
+  type RoutePlanningDiagnosticsQueryVariables,
   type UpdateRouteStatusMutation,
   type UpdateRouteStatusMutationVariables,
 } from '@/assets/graphql/routes'
@@ -58,6 +61,13 @@ export type RoutePreviewStopItem = RoutePreviewItem['stops'][number]
 export type ActiveRouteTemplateOption =
   RouteTemplatesQuery['routeTemplates'][number]
 export type RouteStatusValue = RouteStatus
+export type RouteGenerationDiagnosticsItem = NonNullable<
+  GenerateDeliveryRouteMutation['generateDeliveryRoute']
+>['diagnostics']
+export type RoutePlanningDiagnosticsItem =
+  RoutePlanningDiagnosticsQuery['routePlanningDiagnostics']
+export type RouteGenerationSkipGroupItem =
+  RouteGenerationDiagnosticsItem['skipGroups'][number]
 export { RouteStatus }
 export type { OfflineUiErrorCategory, RouteDataSource }
 
@@ -77,6 +87,12 @@ const previewErrorCode = ref<string | null>(null)
 const generateError = ref<string | null>(null)
 const statusError = ref<string | null>(null)
 const successMessage = ref<string | null>(null)
+const lastGenerationDiagnostics = ref<RouteGenerationDiagnosticsItem | null>(
+  null,
+)
+const planningDiagnostics = ref<RoutePlanningDiagnosticsItem | null>(null)
+const planningDiagnosticsLoading = ref(false)
+const planningDiagnosticsError = ref<string | null>(null)
 
 const todayRouteSource = ref<RouteDataSource>('NONE')
 const todayRouteCachedAt = ref<string | null>(null)
@@ -106,9 +122,11 @@ function extractGraphQLErrorCode(error: unknown): string | null {
     }
 
     const originalError = graphQLError.extensions?.originalError as
-      | { error?: string }
-      | undefined
-    if (typeof originalError?.error === 'string' && originalError.error.length > 0) {
+      { error?: string } | undefined
+    if (
+      typeof originalError?.error === 'string' &&
+      originalError.error.length > 0
+    ) {
       return originalError.error
     }
   }
@@ -488,6 +506,7 @@ export function useDeliveryRoutes() {
     generating.value = true
     generateError.value = null
     successMessage.value = null
+    lastGenerationDiagnostics.value = null
 
     try {
       const result = await apolloClient.mutate<
@@ -498,18 +517,35 @@ export function useDeliveryRoutes() {
         variables: { routeTemplateId, deliveryDate },
       })
 
-      const route = result.data?.generateDeliveryRoute ?? null
+      const payload = result.data?.generateDeliveryRoute ?? null
+      const route = payload?.route ?? null
+      const diagnostics = payload?.diagnostics ?? null
 
       if (route) {
         upsertDeliveryRoute(route)
+        lastGenerationDiagnostics.value = diagnostics
 
-        successMessage.value =
-          route.stops.length === 0
-            ? translate('success.routes.generatedEmpty')
-            : translatePlural(
-                'success.routes.generatedStops',
-                route.stops.length,
-              )
+        const skippedOrders = diagnostics?.skippedOrderCount ?? 0
+        const skippedPharmacies = diagnostics?.skippedPharmacyCount ?? 0
+
+        if (
+          route.stops.length === 0 &&
+          skippedOrders === 0 &&
+          skippedPharmacies === 0
+        ) {
+          successMessage.value = translate('success.routes.generatedEmpty')
+        } else if (skippedOrders > 0 || skippedPharmacies > 0) {
+          successMessage.value = translate('success.routes.generatedPartial', {
+            stops: route.stops.length,
+            orders: diagnostics?.includedOrderCount ?? 0,
+            skipped: skippedOrders + skippedPharmacies,
+          })
+        } else {
+          successMessage.value = translatePlural(
+            'success.routes.generatedStops',
+            route.stops.length,
+          )
+        }
       }
 
       return route
@@ -518,6 +554,36 @@ export function useDeliveryRoutes() {
       return null
     } finally {
       generating.value = false
+    }
+  }
+
+  async function loadRoutePlanningDiagnostics(params: {
+    deliveryDate: string
+    routeTemplateId?: string | null
+  }): Promise<RoutePlanningDiagnosticsItem | null> {
+    planningDiagnosticsLoading.value = true
+    planningDiagnosticsError.value = null
+
+    try {
+      const result = await apolloClient.query<
+        RoutePlanningDiagnosticsQuery,
+        RoutePlanningDiagnosticsQueryVariables
+      >({
+        query: ROUTE_PLANNING_DIAGNOSTICS_QUERY,
+        variables: {
+          deliveryDate: params.deliveryDate,
+          routeTemplateId: params.routeTemplateId ?? null,
+        },
+        fetchPolicy: 'network-only',
+      })
+      planningDiagnostics.value = result.data.routePlanningDiagnostics
+      return planningDiagnostics.value
+    } catch (error) {
+      planningDiagnosticsError.value = mapGraphQLError(error)
+      planningDiagnostics.value = null
+      return null
+    } finally {
+      planningDiagnosticsLoading.value = false
     }
   }
 
@@ -725,6 +791,10 @@ export function useDeliveryRoutes() {
     generateError,
     statusError,
     successMessage,
+    lastGenerationDiagnostics,
+    planningDiagnostics,
+    planningDiagnosticsLoading,
+    planningDiagnosticsError,
     todayRouteSource,
     todayRouteCachedAt,
     todayRouteExpiresAt,
@@ -738,6 +808,7 @@ export function useDeliveryRoutes() {
     loadMyTodayRoute,
     loadMyTomorrowRoutePreview,
     generateDeliveryRoute,
+    loadRoutePlanningDiagnostics,
     updateRouteStatus,
     subscribeToTodayRouteUpdates,
     stopTodayRouteSubscription,

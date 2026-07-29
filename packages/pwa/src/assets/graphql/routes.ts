@@ -234,66 +234,83 @@ export const generateDeliveryRouteMutationSource = gql`
       routeTemplateId: $routeTemplateId
       deliveryDate: $deliveryDate
     ) {
-      id
-      routeTemplateId
-      bezorgerProfileId
-      deliveryDate
-      status
-      stops {
-        stopId
-        sequence
-        apothekerProfileId
-        apothekerUserId
-        pharmacyName
-        address {
-          street
-          houseNumber
-          postalCode
-          city
-          country
-        }
-        orderIds
-        orderCount
-        totalQuantity
-        lines {
-          vaccineId
-          vaccineName
-          manufacturer
-          quantity
-        }
-        qrAvailable
-        qrConsumed
-        deliveredAt
-        arrival {
-          clientArrivedAt
-          recordedAt
-          arrivedByUserId
-        }
-      }
-      skippedApothekerProfileIds
-      statusHistory {
-        fromStatus
-        toStatus
-        changedAt
-        changedByUserId
-        reason
-      }
-      generatedAt
-      generatedByUserId
-      createdAt
-      updatedAt
-      locationStatus {
-        hasLocation
-        city
-        recordedAt
-        source
-        stopSequence
-        hasNextStop
-        nextStop {
+      route {
+        id
+        routeTemplateId
+        bezorgerProfileId
+        deliveryDate
+        status
+        stops {
           stopId
           sequence
+          apothekerProfileId
+          apothekerUserId
           pharmacyName
+          address {
+            street
+            houseNumber
+            postalCode
+            city
+            country
+          }
+          orderIds
+          orderCount
+          totalQuantity
+          lines {
+            vaccineId
+            vaccineName
+            manufacturer
+            quantity
+          }
+          qrAvailable
+          qrConsumed
+          deliveredAt
+          arrival {
+            clientArrivedAt
+            recordedAt
+            arrivedByUserId
+          }
+        }
+        skippedApothekerProfileIds
+        statusHistory {
+          fromStatus
+          toStatus
+          changedAt
+          changedByUserId
+          reason
+        }
+        generatedAt
+        generatedByUserId
+        createdAt
+        updatedAt
+        locationStatus {
+          hasLocation
           city
+          recordedAt
+          source
+          stopSequence
+          hasNextStop
+          nextStop {
+            stopId
+            sequence
+            pharmacyName
+            city
+          }
+        }
+      }
+      diagnostics {
+        includedOrderCount
+        includedStopCount
+        skippedOrderCount
+        skippedPharmacyCount
+        regenerated
+        regenerationNeeded
+        skipGroups {
+          code
+          count
+          apothekerProfileIds
+          orderIds
+          pharmacyNames
         }
       }
     }
@@ -305,6 +322,40 @@ export type {
   GenerateDeliveryRouteMutationVariables,
 } from '@vaccin-delivery/types'
 export { GenerateDeliveryRouteDocument as GENERATE_DELIVERY_ROUTE_MUTATION } from '@vaccin-delivery/types'
+
+export const routePlanningDiagnosticsQuerySource = gql`
+  query RoutePlanningDiagnostics($deliveryDate: String!, $routeTemplateId: ID) {
+    routePlanningDiagnostics(
+      deliveryDate: $deliveryDate
+      routeTemplateId: $routeTemplateId
+    ) {
+      deliveryDate
+      routeTemplateId
+      routeId
+      routeGeneratedAt
+      eligibleUnplannedOrderCount
+      includedOrderCount
+      includedStopCount
+      skippedOrderCount
+      skippedPharmacyCount
+      regenerationNeeded
+      canRegenerate
+      skipGroups {
+        code
+        count
+        apothekerProfileIds
+        orderIds
+        pharmacyNames
+      }
+    }
+  }
+`
+
+export type {
+  RoutePlanningDiagnosticsQuery,
+  RoutePlanningDiagnosticsQueryVariables,
+} from '@vaccin-delivery/types'
+export { RoutePlanningDiagnosticsDocument as ROUTE_PLANNING_DIAGNOSTICS_QUERY } from '@vaccin-delivery/types'
 
 export const updateRouteStatusMutationSource = gql`
   mutation UpdateRouteStatus($id: ID!, $status: RouteStatus!, $reason: String) {

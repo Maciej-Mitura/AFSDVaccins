@@ -21,6 +21,7 @@ const routeGenerationServiceProvider = isSchemaGeneration
       provide: RouteGenerationService,
       useValue: {
         generateDeliveryRoute: () => Promise.resolve(null),
+        getRoutePlanningDiagnostics: () => Promise.resolve(null),
         getLocalTodayDeliveryDate: () => Promise.resolve('2026-01-01'),
         findByBezorgerAndDate: () => Promise.resolve(null),
       },

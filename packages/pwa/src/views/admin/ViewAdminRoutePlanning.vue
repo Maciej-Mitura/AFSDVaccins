@@ -11,6 +11,7 @@ import FeatureDeliveryStopQrModal from '@/components/feature/delivery-qr/Feature
 import FeatureRouteLocationStatusCard from '@/components/feature/routes/FeatureRouteLocationStatusCard.vue'
 import FeatureRouteVoiceRecorder from '@/components/feature/voice-report/FeatureRouteVoiceRecorder.vue'
 import { toRouteLocationStatusCardProps } from '@/components/feature/routes/route-location-status'
+import { routeSkipReasonLabelKey } from '@/composables/route-generation-diagnostics'
 import {
   RouteStatus,
   useDeliveryRoutes,
@@ -45,9 +46,12 @@ const {
   generateError,
   statusError,
   successMessage,
+  lastGenerationDiagnostics,
+  planningDiagnostics,
   loadActiveTemplates,
   loadDeliveryRoutes,
   generateDeliveryRoute,
+  loadRoutePlanningDiagnostics,
   updateRouteStatus,
   formatAddress,
   formatStatusHistoryEntry,
@@ -237,12 +241,53 @@ const confirmModalTitle = computed(() =>
     : '',
 )
 
+const generationSummaryTone = computed(() => {
+  const diagnostics = lastGenerationDiagnostics.value
+  if (!diagnostics) {
+    return 'success' as const
+  }
+  if (
+    diagnostics.includedStopCount === 0 &&
+    diagnostics.skippedOrderCount + diagnostics.skippedPharmacyCount > 0
+  ) {
+    return 'error' as const
+  }
+  if (
+    diagnostics.skippedOrderCount > 0 ||
+    diagnostics.skippedPharmacyCount > 0
+  ) {
+    return 'warning' as const
+  }
+  return 'success' as const
+})
+
+const templateMissingSkipGroup = computed(() =>
+  (lastGenerationDiagnostics.value?.skipGroups ?? []).find(
+    group => String(group.code) === 'PHARMACY_NOT_IN_ACTIVE_TEMPLATE',
+  ),
+)
+
+const showFreshnessWarning = computed(() => {
+  const diagnostics = planningDiagnostics.value
+  if (!diagnostics) {
+    return false
+  }
+  return (
+    diagnostics.eligibleUnplannedOrderCount > 0 &&
+    diagnostics.regenerationNeeded
+  )
+})
+
 async function refresh(): Promise<void> {
   await Promise.all([
     loadActiveTemplates(),
     loadProfileOptions(),
     loadDeliveryRoutes({ deliveryDate: deliveryDate.value }),
   ])
+  await loadRoutePlanningDiagnostics({
+    deliveryDate: deliveryDate.value,
+    routeTemplateId: selectedTemplateId.value,
+  })
 }
 
 async function onGenerate(): Promise<void> {
@@ -258,6 +303,10 @@ async function onGenerate(): Promise<void> {
   confirmRegenerate.value = false
   await generateDeliveryRoute(selectedTemplateId.value, deliveryDate.value)
   await loadDeliveryRoutes({ deliveryDate: deliveryDate.value })
+  await loadRoutePlanningDiagnostics({
+    deliveryDate: deliveryDate.value,
+    routeTemplateId: selectedTemplateId.value,
+  })
 }
 
 function cancelRegenerateConfirm(): void {
@@ -335,10 +384,18 @@ function stopSummary(orderCount: number, totalQuantity: number): string {
 watch(deliveryDate, () => {
   confirmRegenerate.value = false
   void loadDeliveryRoutes({ deliveryDate: deliveryDate.value })
+  void loadRoutePlanningDiagnostics({
+    deliveryDate: deliveryDate.value,
+    routeTemplateId: selectedTemplateId.value,
+  })
 })
 
 watch(selectedTemplateId, () => {
   confirmRegenerate.value = false
+  void loadRoutePlanningDiagnostics({
+    deliveryDate: deliveryDate.value,
+    routeTemplateId: selectedTemplateId.value,
+  })
 })
 
 onMounted(() => {
@@ -412,6 +469,30 @@ onMounted(() => {
         :description="t('routes.generate.existing.description')"
       />
 
+      <UAlert
+        v-if="showFreshnessWarning"
+        class="mt-4"
+        color="warning"
+        variant="subtle"
+        data-testid="admin-route-planning-freshness"
+        :title="t('routes.freshness.title')"
+        :description="
+          t('routes.freshness.description', {
+            count: planningDiagnostics?.eligibleUnplannedOrderCount ?? 0,
+            generatedAt: existingRouteForSelection
+              ? formatDateTime(existingRouteForSelection.generatedAt)
+              : t('routes.freshness.notGenerated'),
+          })
+        "
+      />
+
+      <p
+        class="mt-4 text-sm text-muted"
+        data-testid="admin-route-planning-snapshot-hint"
+      >
+        {{ t('routes.freshness.snapshotHint') }}
+      </p>
+
       <div class="mt-4 flex flex-wrap gap-2">
         <UButton
           color="primary"
@@ -443,12 +524,64 @@ onMounted(() => {
       </div>
 
       <UAlert
-        v-if="successMessage"
+        v-if="successMessage && lastGenerationDiagnostics"
+        class="mt-4"
+        :color="generationSummaryTone"
+        variant="subtle"
+        data-testid="admin-route-planning-generation-summary"
+        :title="successMessage"
+        :description="
+          t('routes.diagnostics.summary', {
+            stops: lastGenerationDiagnostics.includedStopCount,
+            orders: lastGenerationDiagnostics.includedOrderCount,
+            skippedOrders: lastGenerationDiagnostics.skippedOrderCount,
+            skippedPharmacies: lastGenerationDiagnostics.skippedPharmacyCount,
+          })
+        "
+      />
+      <UAlert
+        v-else-if="successMessage"
         class="mt-4"
         color="success"
         variant="subtle"
         :title="successMessage"
       />
+
+      <ul
+        v-if="
+          lastGenerationDiagnostics &&
+          lastGenerationDiagnostics.skipGroups.length > 0
+        "
+        class="mt-3 space-y-2 text-sm"
+        data-testid="admin-route-planning-skip-groups"
+      >
+        <li
+          v-for="group in lastGenerationDiagnostics.skipGroups"
+          :key="group.code"
+          class="rounded-md bg-default px-3 py-2"
+        >
+          <p class="font-medium text-highlighted">
+            {{ t(routeSkipReasonLabelKey(group.code), { count: group.count }) }}
+          </p>
+          <p v-if="group.pharmacyNames.length > 0" class="text-muted">
+            {{ group.pharmacyNames.join(', ') }}
+          </p>
+        </li>
+      </ul>
+
+      <div
+        v-if="templateMissingSkipGroup"
+        class="mt-3"
+        data-testid="admin-route-planning-template-link"
+      >
+        <a
+          href="/admin/route-templates"
+          class="text-sm font-medium text-primary underline-offset-2 hover:underline"
+        >
+          {{ t('routes.diagnostics.openTemplates') }}
+        </a>
+      </div>
+
       <CommonErrorState
         v-if="generateError"
         class="mt-4"

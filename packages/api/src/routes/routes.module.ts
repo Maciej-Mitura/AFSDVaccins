@@ -89,6 +89,7 @@ const routesServiceProvider = isSchemaGeneration
       provide: RoutesService,
       useValue: {
         generateDeliveryRoute: () => Promise.resolve(null),
+        getRoutePlanningDiagnostics: () => Promise.resolve(null),
         findDeliveryRoutes: () => Promise.resolve([]),
         findDeliveryRouteById: () => Promise.resolve(null),
         findMyTodayRoute: () => Promise.resolve(null),

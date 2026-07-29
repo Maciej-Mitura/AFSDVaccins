@@ -56,6 +56,15 @@ export class DeliveryManifestOrderIntegrityException extends BadRequestException
   }
 }
 
+export class DeliveryManifestQuantityMismatchException extends BadRequestException {
+  constructor() {
+    super({
+      message: 'Manifest quantity totals do not match the persisted route stop.',
+      error: 'DELIVERY_MANIFEST_QUANTITY_MISMATCH',
+    })
+  }
+}
+
 export class DeliveryManifestQrUnavailableException extends BadRequestException {
   constructor() {
     super({
