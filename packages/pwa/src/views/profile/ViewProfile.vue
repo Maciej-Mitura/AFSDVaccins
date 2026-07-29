@@ -8,6 +8,8 @@ import type * as z from 'zod'
 
 import CommonErrorState from '@/components/common/CommonErrorState.vue'
 import CommonLoadingSkeleton from '@/components/common/CommonLoadingSkeleton.vue'
+import CommonPageHeader from '@/components/common/CommonPageHeader.vue'
+import CommonPageSection from '@/components/common/CommonPageSection.vue'
 import CommonPushNotificationSettings from '@/components/common/CommonPushNotificationSettings.vue'
 import { useCurrentUser } from '@/composables/useCurrentUser'
 import { useOnlineStatus } from '@/composables/useOnlineStatus'
@@ -175,46 +177,48 @@ async function onSubmitBezorger(event: FormSubmitEvent<BezorgerForm>) {
 </script>
 
 <template>
-  <div class="space-y-6">
-    <UCard>
-      <template #header>
-        <h2 class="text-lg font-semibold">{{ t('title.profile') }}</h2>
-      </template>
+  <div class="space-y-8">
+    <CommonPageHeader :title="t('title.profile')" />
 
-      <CommonLoadingSkeleton v-if="loading" />
+    <CommonLoadingSkeleton v-if="loading" />
 
-      <template v-else-if="currentUser">
-        <UAlert
-          v-if="successMessage"
-          class="mb-4"
-          color="success"
-          variant="subtle"
-          :title="successMessage"
-        />
+    <template v-else-if="currentUser">
+      <UAlert
+        v-if="successMessage"
+        color="success"
+        variant="subtle"
+        :title="successMessage"
+      />
 
-        <UAlert
-          v-if="formError"
-          class="mb-4"
-          color="error"
-          variant="subtle"
-          :title="formError"
-        />
+      <UAlert
+        v-if="formError"
+        color="error"
+        variant="subtle"
+        :title="formError"
+      />
 
-        <div class="mb-4 space-y-2 text-sm">
+      <CommonPageSection variant="inset">
+        <div class="space-y-2 text-sm">
           <p>
-            <span class="font-medium">{{ t('profiles.email.label') }}:</span>
+            <span class="font-medium text-highlighted"
+              >{{ t('profiles.email.label') }}:</span
+            >
             {{ currentUser.email }}
           </p>
           <p>
-            <span class="font-medium">{{ t('profiles.role.label') }}:</span>
+            <span class="font-medium text-highlighted"
+              >{{ t('profiles.role.label') }}:</span
+            >
             {{ roleLabel }} ({{ currentUser.role }})
           </p>
         </div>
+      </CommonPageSection>
 
-        <div class="mb-6">
-          <CommonPushNotificationSettings />
-        </div>
+      <CommonPageSection>
+        <CommonPushNotificationSettings />
+      </CommonPageSection>
 
+      <CommonPageSection :title="t('title.profile.settings')">
         <UForm
           v-if="isApotheker"
           :schema="apothekerSchema"
@@ -274,7 +278,12 @@ async function onSubmitBezorger(event: FormSubmitEvent<BezorgerForm>) {
             <UInput v-model="apothekerState.country" class="w-full" />
           </UFormField>
 
-          <UButton :loading="saving" type="submit" :disabled="!isOnline">
+          <UButton
+            class="min-h-11"
+            :loading="saving"
+            type="submit"
+            :disabled="!isOnline"
+          >
             {{ t('common.save.changes') }}
           </UButton>
         </UForm>
@@ -309,7 +318,12 @@ async function onSubmitBezorger(event: FormSubmitEvent<BezorgerForm>) {
             <UInput v-model="bezorgerState.vehicleLabel" class="w-full" />
           </UFormField>
 
-          <UButton :loading="saving" type="submit" :disabled="!isOnline">
+          <UButton
+            class="min-h-11"
+            :loading="saving"
+            type="submit"
+            :disabled="!isOnline"
+          >
             {{ t('common.save.changes') }}
           </UButton>
         </UForm>
@@ -329,17 +343,22 @@ async function onSubmitBezorger(event: FormSubmitEvent<BezorgerForm>) {
             <UInput v-model="adminState.lastName" class="w-full" />
           </UFormField>
 
-          <UButton :loading="saving" type="submit" :disabled="!isOnline">
+          <UButton
+            class="min-h-11"
+            :loading="saving"
+            type="submit"
+            :disabled="!isOnline"
+          >
             {{ t('common.save.changes') }}
           </UButton>
         </UForm>
-      </template>
+      </CommonPageSection>
+    </template>
 
-      <CommonErrorState
-        v-else
-        :title="t('profiles.unavailable.title')"
-        :description="t('profiles.unavailable.description')"
-      />
-    </UCard>
+    <CommonErrorState
+      v-else
+      :title="t('profiles.unavailable.title')"
+      :description="t('profiles.unavailable.description')"
+    />
   </div>
 </template>

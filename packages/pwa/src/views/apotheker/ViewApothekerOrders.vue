@@ -262,6 +262,7 @@ async function onCancel(id: string) {
               size="sm"
               color="error"
               variant="outline"
+              class="min-h-11"
               :loading="cancellingId === order.id"
               :aria-label="t('common.cancel')"
               @click="onCancel(order.id)"

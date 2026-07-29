@@ -8,6 +8,8 @@ import * as z from 'zod'
 import CommonEmptyState from '@/components/common/CommonEmptyState.vue'
 import CommonErrorState from '@/components/common/CommonErrorState.vue'
 import CommonLoadingSkeleton from '@/components/common/CommonLoadingSkeleton.vue'
+import CommonPageHeader from '@/components/common/CommonPageHeader.vue'
+import CommonPageSection from '@/components/common/CommonPageSection.vue'
 import {
   useRouteTemplates,
   type RouteTemplateListItem,
@@ -297,10 +299,9 @@ function stopSummary(template: RouteTemplateListItem): string {
 </script>
 
 <template>
-  <div class="space-y-6">
-    <div class="flex flex-wrap items-center justify-between gap-3">
-      <h2 class="text-lg font-semibold">{{ t('routes.templates.title') }}</h2>
-      <div class="flex flex-wrap items-center gap-3">
+  <div class="space-y-8">
+    <CommonPageHeader :title="t('routes.templates.title')">
+      <template #actions>
         <UButton
           size="sm"
           :variant="includeInactive ? 'soft' : 'ghost'"
@@ -313,11 +314,16 @@ function stopSummary(template: RouteTemplateListItem): string {
               : t('routes.templates.filter.activeOnly')
           }}
         </UButton>
-        <UButton size="sm" :disabled="!isOnline" @click="openCreateForm">
+        <UButton
+          size="sm"
+          class="min-h-11 sm:min-h-0"
+          :disabled="!isOnline"
+          @click="openCreateForm"
+        >
           {{ t('routes.templates.create') }}
         </UButton>
-      </div>
-    </div>
+      </template>
+    </CommonPageHeader>
 
     <UAlert
       v-if="successMessage"
@@ -349,14 +355,16 @@ function stopSummary(template: RouteTemplateListItem): string {
       :description="t('routes.templates.empty.description')"
     />
 
-    <div v-else class="space-y-4">
-      <UCard v-for="template in templates" :key="template.id">
-        <div
-          class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between"
+    <CommonPageSection v-else>
+      <ul class="divide-y divide-default" role="list">
+        <li
+          v-for="template in templates"
+          :key="template.id"
+          class="flex flex-col gap-4 py-4 sm:flex-row sm:items-start sm:justify-between"
         >
-          <div class="space-y-2 text-sm">
+          <div class="min-w-0 space-y-2 text-sm">
             <div class="flex flex-wrap items-center gap-2">
-              <h3 class="font-semibold">{{ template.name }}</h3>
+              <h3 class="font-semibold text-highlighted">{{ template.name }}</h3>
               <UBadge
                 :color="template.active ? 'success' : 'neutral'"
                 variant="subtle"
@@ -364,13 +372,17 @@ function stopSummary(template: RouteTemplateListItem): string {
                 {{ activeInactiveLabel(template.active) }}
               </UBadge>
             </div>
-            <p>{{ template.description || t('common.noDescription') }}</p>
-            <p>
-              <span class="font-medium">{{ t('routes.courier') }}:</span>
+            <p class="text-toned">
+              {{ template.description || t('common.noDescription') }}
+            </p>
+            <p class="text-toned">
+              <span class="font-medium text-highlighted"
+                >{{ t('routes.courier') }}:</span
+              >
               {{ courierLabel(template.bezorgerProfileId) }}
             </p>
-            <p>
-              <span class="font-medium"
+            <p class="break-words text-toned">
+              <span class="font-medium text-highlighted"
                 >{{ t('routes.templates.stops') }}:</span
               >
               {{ stopSummary(template) }}
@@ -397,16 +409,16 @@ function stopSummary(template: RouteTemplateListItem): string {
               }}
             </UButton>
           </div>
-        </div>
-      </UCard>
-    </div>
+        </li>
+      </ul>
+    </CommonPageSection>
 
     <UModal v-model:open="showForm" :title="formTitle">
       <template #body>
         <UForm
           :schema="schema"
           :state="state"
-          class="space-y-4"
+          class="max-h-[min(80vh,40rem)] space-y-4 overflow-y-auto overscroll-contain pr-1"
           @submit="onSubmit"
         >
           <UFormField :label="t('common.name')" name="name">
@@ -427,7 +439,7 @@ function stopSummary(template: RouteTemplateListItem): string {
           </UFormField>
 
           <div class="space-y-3">
-            <p class="text-sm font-medium">
+            <p class="text-sm font-medium text-highlighted">
               {{ t('routes.templates.stops.label') }}
             </p>
 
@@ -436,11 +448,12 @@ function stopSummary(template: RouteTemplateListItem): string {
                 v-model="selectedPharmacyId"
                 :items="availablePharmacyOptions"
                 :placeholder="t('routes.templates.pharmacyPlaceholder')"
-                class="w-full"
+                class="w-full min-w-0"
               />
               <UButton
                 type="button"
                 variant="soft"
+                class="min-h-11 shrink-0 sm:min-h-0"
                 :disabled="!selectedPharmacyId"
                 @click="addStop"
               >
@@ -454,14 +467,16 @@ function stopSummary(template: RouteTemplateListItem): string {
               :description="t('routes.templates.stops.empty.description')"
             />
 
-            <ul v-else class="space-y-2">
+            <ul v-else class="divide-y divide-default" role="list">
               <li
                 v-for="(stop, index) in orderedStops"
                 :key="stop.id"
-                class="flex flex-col gap-2 rounded-md border border-default p-3 text-sm sm:flex-row sm:items-center sm:justify-between"
+                class="flex flex-col gap-2 py-3 text-sm sm:flex-row sm:items-center sm:justify-between"
               >
-                <div>
-                  <span class="font-medium">{{ stop.sequence }}.</span>
+                <div class="min-w-0 break-words">
+                  <span class="font-medium text-highlighted"
+                    >{{ stop.sequence }}.</span
+                  >
                   {{ stop.label }}
                 </div>
                 <div class="flex flex-wrap gap-2">
@@ -501,8 +516,13 @@ function stopSummary(template: RouteTemplateListItem): string {
             :title="formError"
           />
 
-          <div class="flex gap-2">
-            <UButton type="submit" :loading="saving" :disabled="!isOnline">
+          <div class="flex flex-wrap gap-2">
+            <UButton
+              type="submit"
+              class="min-h-11"
+              :loading="saving"
+              :disabled="!isOnline"
+            >
               {{ t('common.save') }}
             </UButton>
             <UButton color="neutral" variant="ghost" @click="closeForm">

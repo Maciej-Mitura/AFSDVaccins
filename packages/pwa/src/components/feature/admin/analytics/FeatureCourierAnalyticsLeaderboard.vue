@@ -40,7 +40,7 @@
         <tr
           v-for="row in rankings"
           :key="row.courierProfileId"
-          class="cursor-pointer border-b border-default transition-colors hover:bg-elevated/80"
+          class="cursor-pointer border-b border-default motion-safe:transition-colors hover:bg-elevated/80"
           :class="rowClass(row)"
           :aria-selected="row.courierProfileId === selectedId"
           tabindex="0"

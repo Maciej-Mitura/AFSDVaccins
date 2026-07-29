@@ -594,7 +594,7 @@ onMounted(() => {
               <span class="inline-flex items-center gap-2">
                 <UIcon
                   name="i-lucide-chevron-right"
-                  class="size-4 transition-transform group-open:rotate-90"
+                  class="size-4 motion-safe:transition-transform group-open:rotate-90"
                   aria-hidden="true"
                 />
                 {{ t('routes.statusHistory') }}

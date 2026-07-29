@@ -168,10 +168,13 @@ test.describe('Runtime i18n (Phase 23C Batch E)', () => {
       await expect(
         page.getByRole('heading', { name: 'Pharmacist dashboard' }),
       ).toBeVisible()
+      const primaryNav = page.getByTestId('app-shell-primary-nav')
       await expect(
-        page.getByRole('link', { name: 'New order' }),
+        primaryNav.getByRole('link', { name: 'New order' }),
       ).toBeVisible()
-      await expect(page.getByRole('link', { name: 'My orders' })).toBeVisible()
+      await expect(
+        primaryNav.getByRole('link', { name: 'My orders' }),
+      ).toBeVisible()
     })
   })
 
@@ -184,7 +187,9 @@ test.describe('Runtime i18n (Phase 23C Batch E)', () => {
         page.getByRole('heading', { name: 'Courier dashboard' }),
       ).toBeVisible()
       await expect(
-        page.getByRole('link', { name: "Today's route" }),
+        page
+          .getByTestId('app-shell-primary-nav')
+          .getByRole('link', { name: "Today's route" }),
       ).toBeVisible()
     })
   })

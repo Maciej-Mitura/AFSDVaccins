@@ -85,6 +85,7 @@ const UButtonStub = {
       :href="typeof to === 'string' ? to : '#'"
       :data-variant="variant"
       :aria-current="$attrs['aria-current']"
+      :class="$attrs.class"
       @click="$emit('click', $event)"
     ><slot /></a>
     <button
@@ -190,6 +191,34 @@ describe('CommonAppShell layout', () => {
     )
     expect(wrapper.find('[data-testid="logout-button-mobile"]').exists()).toBe(
       true,
+    )
+  })
+
+  it('sizes the mobile menu toggle for touch and wraps long nav labels', () => {
+    const wrapper = mountShell()
+    const toggle = wrapper.get('[data-testid="app-shell-menu-toggle"]')
+    expect(toggle.classes().join(' ')).toMatch(/min-h-11/)
+    expect(toggle.classes().join(' ')).toMatch(/min-w-11/)
+
+    const primaryLink = wrapper
+      .findAll('[data-testid="app-shell-primary-nav"] a')
+      .at(0)
+    expect(primaryLink?.classes().join(' ')).toMatch(/whitespace-normal/)
+    expect(primaryLink?.classes().join(' ')).not.toMatch(/truncate/)
+  })
+
+  it('closes the mobile menu after route navigation', async () => {
+    const wrapper = mountShell()
+    await wrapper.get('[data-testid="app-shell-menu-toggle"]').trigger('click')
+    await nextTick()
+    expect(wrapper.find('[data-testid="app-shell-mobile-nav"]').exists()).toBe(
+      true,
+    )
+
+    routePath.value = '/admin'
+    await nextTick()
+    expect(wrapper.find('[data-testid="app-shell-mobile-nav"]').exists()).toBe(
+      false,
     )
   })
 })

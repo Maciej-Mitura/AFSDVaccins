@@ -7,6 +7,8 @@ import * as z from 'zod'
 
 import CommonErrorState from '@/components/common/CommonErrorState.vue'
 import CommonLoadingSkeleton from '@/components/common/CommonLoadingSkeleton.vue'
+import CommonPageHeader from '@/components/common/CommonPageHeader.vue'
+import CommonPageSection from '@/components/common/CommonPageSection.vue'
 import { useApplicationSettings } from '@/composables/useApplicationSettings'
 import { useOnlineStatus } from '@/composables/useOnlineStatus'
 
@@ -96,24 +98,24 @@ async function onSubmit(event: FormSubmitEvent<SettingsForm>) {
 </script>
 
 <template>
-  <div class="space-y-6">
-    <UCard>
-      <template #header>
-        <h2 class="text-lg font-semibold">{{ t('settings.title') }}</h2>
-      </template>
+  <div class="space-y-8">
+    <CommonPageHeader :title="t('settings.title')" />
 
-      <CommonLoadingSkeleton v-if="loading && !settings" />
+    <CommonLoadingSkeleton v-if="loading && !settings" />
 
-      <CommonErrorState
-        v-else-if="errorMessage && !settings"
-        :title="t('settings.loadFailed')"
-        :description="errorMessage"
-      />
+    <CommonErrorState
+      v-else-if="errorMessage && !settings"
+      :title="t('settings.loadFailed')"
+      :description="errorMessage"
+    />
 
-      <div v-else-if="settings" class="space-y-6">
+    <CommonPageSection v-else-if="settings" variant="inset">
+      <div class="space-y-6">
         <div class="space-y-2 text-sm">
           <p>
-            <span class="font-medium">{{ t('settings.timezone') }}:</span>
+            <span class="font-medium text-highlighted"
+              >{{ t('settings.timezone') }}:</span
+            >
             {{ settings.timezone }}
           </p>
           <p class="text-muted">
@@ -185,11 +187,16 @@ async function onSubmit(event: FormSubmitEvent<SettingsForm>) {
             :title="successMessage"
           />
 
-          <UButton type="submit" :loading="saving" :disabled="!isOnline">
+          <UButton
+            type="submit"
+            class="min-h-11"
+            :loading="saving"
+            :disabled="!isOnline"
+          >
             {{ t('common.save') }}
           </UButton>
         </UForm>
       </div>
-    </UCard>
+    </CommonPageSection>
   </div>
 </template>

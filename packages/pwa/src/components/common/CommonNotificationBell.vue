@@ -5,7 +5,7 @@
     variant="ghost"
     color="neutral"
     :aria-label="ariaLabel"
-    class="relative"
+    class="relative min-h-11 min-w-11"
     data-testid="notification-bell"
   >
     {{ label }}

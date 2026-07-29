@@ -101,15 +101,15 @@ async function onRetry(): Promise<void> {
 
 <template>
   <section
-    class="space-y-3 rounded-md border border-default p-4"
+    class="space-y-3 rounded-md bg-muted px-4 py-4"
     data-testid="push-notification-settings"
     :aria-label="t('notifications.push.settings.title')"
   >
     <div class="space-y-1">
-      <h3 class="text-sm font-semibold">
+      <h2 class="text-base font-semibold text-highlighted">
         {{ t('notifications.push.settings.title') }}
-      </h3>
-      <p class="text-sm text-muted">
+      </h2>
+      <p class="text-sm text-toned">
         {{ t('notifications.push.settings.description') }}
       </p>
     </div>

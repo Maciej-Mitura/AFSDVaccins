@@ -119,7 +119,7 @@ function displayOrUnavailable(value: string | null | undefined): string {
             <td class="px-3 py-2.5">
               <button
                 type="button"
-                class="inline-flex items-center gap-1 text-left font-medium underline-offset-2 hover:underline"
+                class="inline-flex items-center gap-1 text-left font-medium underline-offset-2 hover:underline focus-visible:rounded-sm focus-visible:ring-2 focus-visible:ring-primary"
                 data-testid="order-history-lines-toggle"
                 :aria-expanded="isExpanded(order.id)"
                 :aria-controls="`order-history-table-lines-${order.id}`"

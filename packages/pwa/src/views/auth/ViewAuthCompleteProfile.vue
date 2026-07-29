@@ -260,7 +260,7 @@ async function onSubmitBezorger(event: FormSubmitEvent<BezorgerForm>) {
 <template>
   <UCard>
     <template #header>
-      <h2 class="text-lg font-semibold">
+      <h2 class="text-lg font-semibold text-highlighted">
         {{ t('auth.completeProfile.title') }}
       </h2>
     </template>
@@ -296,32 +296,38 @@ async function onSubmitBezorger(event: FormSubmitEvent<BezorgerForm>) {
           <div class="grid gap-3 sm:grid-cols-2">
             <button
               type="button"
-              class="rounded-lg border px-3 py-3 text-left transition"
+              class="rounded-lg border bg-default px-3 py-3 text-left text-default transition focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
               :class="
                 registrationState.role === SelfRegistrationRole.Apotheker
-                  ? 'border-primary bg-primary/5'
+                  ? 'border-primary bg-primary/10 ring-1 ring-primary'
                   : 'border-default hover:border-primary/40'
+              "
+              :aria-pressed="
+                registrationState.role === SelfRegistrationRole.Apotheker
               "
               @click="registrationState.role = SelfRegistrationRole.Apotheker"
             >
-              <p class="font-medium">{{ t('shell.apotheker.title') }}</p>
-              <p class="mt-1 text-sm text-muted">
+              <p class="font-medium text-highlighted">{{ t('shell.apotheker.title') }}</p>
+              <p class="mt-1 text-sm text-toned">
                 {{ t('auth.register.role.apotheker.description') }}
               </p>
             </button>
 
             <button
               type="button"
-              class="rounded-lg border px-3 py-3 text-left transition"
+              class="rounded-lg border bg-default px-3 py-3 text-left text-default transition focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
               :class="
                 registrationState.role === SelfRegistrationRole.Bezorger
-                  ? 'border-primary bg-primary/5'
+                  ? 'border-primary bg-primary/10 ring-1 ring-primary'
                   : 'border-default hover:border-primary/40'
+              "
+              :aria-pressed="
+                registrationState.role === SelfRegistrationRole.Bezorger
               "
               @click="registrationState.role = SelfRegistrationRole.Bezorger"
             >
-              <p class="font-medium">{{ t('shell.bezorger.title') }}</p>
-              <p class="mt-1 text-sm text-muted">
+              <p class="font-medium text-highlighted">{{ t('shell.bezorger.title') }}</p>
+              <p class="mt-1 text-sm text-toned">
                 {{ t('auth.register.role.bezorger.description') }}
               </p>
             </button>

@@ -431,17 +431,17 @@ async function onExportCsv(): Promise<void> {
                 }}
               </caption>
               <thead>
-                <tr class="border-b border-default bg-muted text-muted">
-                  <th class="px-2 py-1.5 font-medium">
+                <tr class="border-b border-default bg-muted text-toned">
+                  <th scope="col" class="px-2 py-1.5 font-medium">
                     {{ t('admin.courierAnalytics.column.month') }}
                   </th>
-                  <th class="px-2 py-1.5 font-medium">
+                  <th scope="col" class="px-2 py-1.5 font-medium">
                     {{ t('admin.courierAnalytics.series.deliveredStops') }}
                   </th>
-                  <th class="px-2 py-1.5 font-medium">
+                  <th scope="col" class="px-2 py-1.5 font-medium">
                     {{ t('admin.courierAnalytics.series.completedRoutes') }}
                   </th>
-                  <th class="px-2 py-1.5 font-medium">
+                  <th scope="col" class="px-2 py-1.5 font-medium">
                     {{ t('admin.courierAnalytics.series.deliveredOrders') }}
                   </th>
                 </tr>
@@ -551,53 +551,53 @@ async function onExportCsv(): Promise<void> {
               </caption>
               <thead>
                 <tr
-                  class="border-b border-default bg-muted text-xs uppercase tracking-wide text-muted"
+                  class="border-b border-default bg-muted text-xs uppercase tracking-wide text-toned"
                 >
-                  <th class="sticky left-0 bg-muted px-2 py-2">
+                  <th scope="col" class="sticky left-0 bg-muted px-2 py-2">
                     {{ t('admin.courierAnalytics.column.rank') }}
                   </th>
-                  <th class="sticky left-10 bg-muted px-2 py-2">
+                  <th scope="col" class="sticky left-10 bg-muted px-2 py-2">
                     {{ t('admin.courierAnalytics.column.courier') }}
                   </th>
-                  <th class="px-2 py-2">
+                  <th scope="col" class="px-2 py-2">
                     {{ t('admin.courierAnalytics.reliabilityScore') }}
                   </th>
-                  <th class="px-2 py-2">
+                  <th scope="col" class="px-2 py-2">
                     {{ t('admin.courierAnalytics.component.routeCompletion') }}
                   </th>
-                  <th class="px-2 py-2">
+                  <th scope="col" class="px-2 py-2">
                     {{
                       t('admin.courierAnalytics.component.deliveryCompletion')
                     }}
                   </th>
-                  <th class="px-2 py-2">
+                  <th scope="col" class="px-2 py-2">
                     {{ t('admin.courierAnalytics.component.onTime') }}
                   </th>
-                  <th class="px-2 py-2">
+                  <th scope="col" class="px-2 py-2">
                     {{ t('admin.courierAnalytics.component.qrConfirmation') }}
                   </th>
-                  <th class="px-2 py-2">
+                  <th scope="col" class="px-2 py-2">
                     {{ t('admin.courierAnalytics.component.consistency') }}
                   </th>
-                  <th class="px-2 py-2">
+                  <th scope="col" class="px-2 py-2">
                     {{ t('admin.courierAnalytics.column.assignedRoutes') }}
                   </th>
-                  <th class="px-2 py-2">
+                  <th scope="col" class="px-2 py-2">
                     {{ t('admin.courierAnalytics.column.completedRoutes') }}
                   </th>
-                  <th class="px-2 py-2">
+                  <th scope="col" class="px-2 py-2">
                     {{ t('admin.courierAnalytics.column.overdueRoutes') }}
                   </th>
-                  <th class="px-2 py-2">
+                  <th scope="col" class="px-2 py-2">
                     {{ t('admin.courierAnalytics.column.deliveredStops') }}
                   </th>
-                  <th class="px-2 py-2">
+                  <th scope="col" class="px-2 py-2">
                     {{ t('admin.courierAnalytics.detail.lateStops') }}
                   </th>
-                  <th class="px-2 py-2">
+                  <th scope="col" class="px-2 py-2">
                     {{ t('admin.courierAnalytics.detail.qrConfirmedStops') }}
                   </th>
-                  <th class="px-2 py-2">
+                  <th scope="col" class="px-2 py-2">
                     {{ t('admin.courierAnalytics.averageHandlingDuration') }}
                   </th>
                 </tr>

@@ -32,7 +32,7 @@
                 :variant="isActive(link.to) ? 'soft' : 'ghost'"
                 :color="isActive(link.to) ? 'primary' : 'neutral'"
                 :aria-current="isActive(link.to) ? 'page' : undefined"
-                class="max-w-40 truncate"
+                class="max-w-[11rem] !h-auto min-h-8 whitespace-normal py-1.5 text-left leading-snug"
               >
                 {{ link.label }}
               </UButton>
@@ -77,7 +77,7 @@
           </nav>
 
           <UButton
-            class="md:hidden"
+            class="min-h-11 min-w-11 md:hidden"
             color="neutral"
             variant="ghost"
             size="sm"
@@ -116,7 +116,7 @@
                   :variant="isActive(link.to) ? 'soft' : 'ghost'"
                   :color="isActive(link.to) ? 'primary' : 'neutral'"
                   :aria-current="isActive(link.to) ? 'page' : undefined"
-                  class="justify-start"
+                  class="min-h-11 justify-start whitespace-normal text-left"
                   @click="closeMobileMenu"
                 >
                   {{ link.label }}
@@ -142,7 +142,7 @@
                   :variant="isActive(link.to) ? 'soft' : 'ghost'"
                   :color="isActive(link.to) ? 'primary' : 'neutral'"
                   :aria-current="isActive(link.to) ? 'page' : undefined"
-                  class="justify-start"
+                  class="min-h-11 justify-start whitespace-normal text-left"
                   @click="closeMobileMenu"
                 >
                   {{ link.label }}
@@ -154,7 +154,7 @@
                   color="neutral"
                   size="md"
                   variant="outline"
-                  class="justify-start"
+                  class="min-h-11 justify-start"
                   :loading="loggingOut"
                   data-testid="logout-button-mobile"
                   @click="onLogout"

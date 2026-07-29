@@ -608,6 +608,7 @@ defineExpose({
         <UButton
           type="submit"
           variant="outline"
+          class="min-h-11"
           :disabled="!state.vaccineId || addMaxQuantity <= 0"
           :title="
             addMaxQuantity <= 0
@@ -730,6 +731,7 @@ defineExpose({
           data-testid="place-order"
           color="primary"
           size="lg"
+          class="min-h-11"
           :loading="submitting"
           :disabled="!canSubmit"
           :title="
