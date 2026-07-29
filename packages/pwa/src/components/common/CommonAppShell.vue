@@ -35,9 +35,7 @@
                 :variant="isActive(link.to) ? 'soft' : 'ghost'"
                 :color="isActive(link.to) ? 'primary' : 'neutral'"
                 :aria-current="isActive(link.to) ? 'page' : undefined"
-                :ui="{
-                  base: 'h-auto min-h-8 whitespace-normal px-2 py-1.5 text-left leading-snug',
-                }"
+                class="h-auto! min-h-8 whitespace-normal px-2 py-1.5 text-left leading-snug"
               >
                 {{ link.label }}
               </UButton>
