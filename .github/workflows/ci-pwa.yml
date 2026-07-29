@@ -84,7 +84,7 @@ jobs:
       - name: Unit tests PWA
         run: npm run test:pwa
 
-      - name: Check i18n audit artefacts
+      - name: Check i18n localisation
         run: npm run audit:i18n:check
 
       - name: Build PWA

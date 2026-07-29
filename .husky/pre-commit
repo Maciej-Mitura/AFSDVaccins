@@ -1,3 +1,4 @@
 #!/usr/bin/env sh
-# Lightweight pre-commit: staged-file format/lint only (Windows Git Bash compatible).
+# Lightweight pre-commit: staged-file format/lint + i18n check (never audit:update).
 npx lint-staged
+npm run audit:i18n:check

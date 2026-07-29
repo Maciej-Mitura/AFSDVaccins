@@ -1,7 +1,8 @@
 /**
- * Phase 35D2 / 35D5 — deterministic i18n audit script (check vs update).
+ * Phase 35D2 / 35D5 / 35G6-prep — deterministic i18n audit script (check vs update).
  *
- * Tests must never rewrite tracked repository artefacts.
+ * Check mode validates localisation in memory and must never rewrite tracked
+ * audit snapshots or require their freshness.
  *
  * @vitest-environment node
  */
@@ -127,9 +128,12 @@ describe('phase35d2 i18n audit', () => {
     expect(first.status).toBe(0)
     expect(second.status).toBe(0)
     expect(first.stdout).toContain('Phase 35D2 i18n audit check')
-    expect(second.stdout).toContain('Current artifacts/i18n-sheet-import.csv')
-    expect(second.stdout).toContain('Current docs/i18n-audit.md')
-    expect(second.stdout).toContain('Current artifacts/i18n-audit-summary.json')
+    expect(first.stdout).toContain('Localisation check passed')
+    expect(second.stdout).toContain('Localisation check passed')
+    expect(first.stdout).toContain(
+      'Validated localisation in memory (tracked audit snapshots not compared)',
+    )
+    expect(first.stdout).not.toContain('Stale i18n audit artefacts')
     expect(mid).toEqual(before)
     expect(after).toEqual(before)
   })
@@ -139,6 +143,44 @@ describe('phase35d2 i18n audit', () => {
     const result = runAudit([])
     expect(result.status).toBe(0)
     expect(result.stdout).toContain('Phase 35D2 i18n audit check')
+    expect(result.stdout).toContain('Localisation check passed')
+    expect(snapshotTracked()).toEqual(before)
+  })
+
+  it('check mode does not fail when tracked audit snapshots are stale', () => {
+    const before = snapshotTracked()
+    const outRoot = makeTempRoot()
+    // Intentionally "stale" files exist only to prove check ignores them.
+    fs.mkdirSync(path.join(outRoot, 'artifacts'), { recursive: true })
+    fs.mkdirSync(path.join(outRoot, 'docs'), { recursive: true })
+    fs.writeFileSync(
+      path.join(outRoot, 'artifacts/i18n-sheet-import.csv'),
+      'stale-csv\n',
+      'utf8',
+    )
+    fs.writeFileSync(
+      path.join(outRoot, 'artifacts/i18n-audit-summary.json'),
+      '{}\n',
+      'utf8',
+    )
+    fs.writeFileSync(
+      path.join(outRoot, 'docs/i18n-audit.md'),
+      '# stale\n',
+      'utf8',
+    )
+
+    const result = runAudit(['--check', '--out-dir', outRoot])
+    expect(result.status).toBe(0)
+    expect(result.stdout).toContain('Localisation check passed')
+    expect(result.stdout).toContain('--out-dir is ignored in --check')
+    expect(result.stdout).not.toContain('Stale i18n audit artefacts')
+    // Stale temp files must remain untouched (check never writes).
+    expect(
+      fs.readFileSync(
+        path.join(outRoot, 'artifacts/i18n-sheet-import.csv'),
+        'utf8',
+      ),
+    ).toBe('stale-csv\n')
     expect(snapshotTracked()).toEqual(before)
   })
 
@@ -187,6 +229,7 @@ describe('phase35d2 i18n audit', () => {
       placeholderMismatchCount: number
       missingKeyCount: number
       missingKeys: string[]
+      statusEnumKeysMissingCount: number
       sheetsCapability: {
         writeFullCatalog: boolean
         overwritesHumanTranslations: boolean
@@ -199,6 +242,7 @@ describe('phase35d2 i18n audit', () => {
     expect(summary.keyCounts.en).toBe(summary.keyCounts.es)
     expect(summary.keyCounts.es).toBe(summary.keyCounts.zh)
     expect(summary.placeholderMismatchCount).toBe(0)
+    expect(summary.statusEnumKeysMissingCount).toBe(0)
     expect(summary.sheetsCapability.writeFullCatalog).toBe(false)
     expect(summary.sheetsCapability.overwritesHumanTranslations).toBe(false)
     expect(summary.sheetsCapability.dryRun).toBe(true)
@@ -216,55 +260,15 @@ describe('phase35d2 i18n audit', () => {
     expect(artefacts.md).toContain('Phase 35D2')
     expect(artefacts.md).toContain('audit:i18n:update')
     expect(artefacts.md).toContain('audit:i18n:check')
+    expect(artefacts.md).toContain(
+      'does **not** fail merely because committed audit snapshots are older',
+    )
     expect(artefacts.md).not.toMatch(/AIza|private_key|BEGIN PRIVATE KEY/)
     expect(Object.prototype.hasOwnProperty.call(summary, 'generatedAt')).toBe(
       false,
     )
 
     // Tracked repo artefacts must remain untouched.
-    expect(snapshotTracked()).toEqual(before)
-  })
-
-  it('check mode detects stale artefacts under --out-dir', () => {
-    const before = snapshotTracked()
-    const outRoot = makeTempRoot()
-    fs.mkdirSync(path.join(outRoot, 'artifacts'), { recursive: true })
-    fs.mkdirSync(path.join(outRoot, 'docs'), { recursive: true })
-    fs.writeFileSync(
-      path.join(outRoot, 'artifacts/i18n-sheet-import.csv'),
-      'stale-csv\n',
-      'utf8',
-    )
-    fs.writeFileSync(
-      path.join(outRoot, 'artifacts/i18n-audit-summary.json'),
-      '{}\n',
-      'utf8',
-    )
-    fs.writeFileSync(
-      path.join(outRoot, 'docs/i18n-audit.md'),
-      '# stale\n',
-      'utf8',
-    )
-
-    const result = runAudit(['--check', '--out-dir', outRoot], {
-      expectError: true,
-    })
-    expect(result.status).not.toBe(0)
-    const combined = `${result.stdout}\n${result.stderr ?? ''}`
-    expect(combined).toContain('Stale i18n audit artefacts')
-    expect(combined).toContain('artifacts/i18n-sheet-import.csv')
-    expect(combined).toContain('docs/i18n-audit.md')
-    expect(combined).toContain('artifacts/i18n-audit-summary.json')
-    expect(snapshotTracked()).toEqual(before)
-  })
-
-  it('check mode passes against a freshly updated temp out-dir', () => {
-    const before = snapshotTracked()
-    const outRoot = makeTempRoot()
-    runAudit(['--update', '--out-dir', outRoot])
-    const check = runAudit(['--check', '--out-dir', outRoot])
-    expect(check.status).toBe(0)
-    expect(check.stdout).toContain('Current artifacts/i18n-sheet-import.csv')
     expect(snapshotTracked()).toEqual(before)
   })
 })

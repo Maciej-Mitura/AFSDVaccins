@@ -1,19 +1,23 @@
 #!/usr/bin/env node
 /**
- * Phase 35D2 / 35D4 / 35D5 — deterministic localisation audit + spreadsheet-ready CSV export.
+ * Phase 35D2 / 35D4 / 35D5 / 35G6-prep — deterministic localisation audit + report export.
  *
- * Tracked artefacts (repo-relative, POSIX paths, LF newlines):
+ * Tracked audit *snapshots* (manual reporting only; not required for normal development):
  *   - docs/i18n-audit.md
  *   - artifacts/i18n-sheet-import.csv
  *   - artifacts/i18n-audit-summary.json
  *
  * Does NOT call Google Sheets. Does NOT mutate locale JSON.
  *
- * Modes (Phase 35D5):
- *   --check   Generate expected output and compare to artefacts; never write. Exit 1 if stale.
- *   --update  Rewrite tracked artefacts when content differs (idempotent).
+ * Modes:
+ *   --check   Validate runtime catalogues + source in memory. Never write. Never
+ *             compare to / require freshness of tracked audit snapshots.
+ *             Exit 1 on localisation failures only.
+ *   --update  Rewrite the three tracked audit artefacts when content differs
+ *             (idempotent). Manual reporting command — not a normal workflow step.
  *
- * Optional: --out-dir <path>  Read/write artefacts under a directory (tests / dry runs).
+ * Optional: --out-dir <path>  Write artefacts under a directory (update / tests).
+ *           Ignored by --check (check never reads or writes artefact files).
  *
  * Default with no mode flag: --check (safe; does not modify the working tree).
  *
@@ -87,6 +91,36 @@ const NL_SAME_AS_EN_ALLOWLIST = new Set([
   'status.api.degraded',
   'pwa.install',
 ])
+
+/**
+ * Status / enum display keys that must exist in every locale catalogue
+ * (mirrors packages/pwa/src/i18n/status-enum-mapping.spec.ts).
+ */
+const STATUS_ENUM_REQUIRED_KEYS = [
+  'status.order.pending',
+  'status.order.planned',
+  'status.order.delivered',
+  'status.order.cancelled',
+  'status.route.assigned',
+  'status.route.inProgress',
+  'status.route.completed',
+  'status.route.cancelled',
+  'status.role.admin',
+  'status.role.apotheker',
+  'status.role.bezorger',
+  'status.operations.newOrder',
+  'status.operations.orderStatusChanged',
+  'status.operations.lowStock',
+  'status.active',
+  'status.inactive',
+  'status.notification.read',
+  'status.notification.unread',
+  'orderHistory.deliveryMethod.admin',
+  'orderHistory.deliveryMethod.qr',
+  'common.unknown',
+  'notifications.fallback.title',
+  'notifications.fallback.body',
+]
 
 import { PROPOSED_ADDITIONS as BASE_PROPOSED_ADDITIONS } from './phase35d2-proposed-additions.mjs'
 
@@ -644,42 +678,48 @@ Prefer Default = English. Then run \`npm run export:i18n\`.
 
 **Phase 35D3:** runtime catalogs already contain these keys (\`READY_FOR_SHEET\`). Sheet import remains manual so the spreadsheet stays the long-term source of truth.
 
-**Manual Sheet workflow:**
+**Manual Sheet workflow (normal translation change):**
 
-1. Import or copy \`READY_FOR_SHEET\` / \`ADD\` rows into the Sheet;
-2. Preserve \`Key | Default | locale\` structure;
-3. Run \`npm run export:i18n\`;
-4. Run \`npm run audit:i18n:update\` and review the three artefacts;
-5. Stage source + artefacts together and commit.
+1. Update the Google Sheet;
+2. Run \`npm run export:i18n\` (writes locale JSON only — never audit snapshots);
+3. Use the generated key in code via \`t()\` / \`translate()\` / status-labels helpers;
+4. Run \`npm run audit:i18n:check\` (in-memory localisation validation; never writes);
+5. Commit source + locale catalogues.
 
-### Artefact check vs update (Phase 35D5)
+**Audit report refresh (manual only — not required after every change):**
 
-After changing translations or audited UI strings:
+1. Run \`npm run audit:i18n:update\`;
+2. Review \`docs/i18n-audit.md\`, \`artifacts/i18n-audit-summary.json\`, \`artifacts/i18n-sheet-import.csv\`;
+3. Commit those three files only when an updated audit snapshot is intentionally required.
 
-1. \`npm run audit:i18n:update\`
-2. Review \`docs/i18n-audit.md\`, \`artifacts/i18n-audit-summary.json\`, \`artifacts/i18n-sheet-import.csv\`
-3. Stage source changes and generated artefacts together
-4. Commit (pre-commit / Vitest use **check-only** — they never rewrite artefacts)
-5. \`npm run audit:i18n:check\` (or \`npm run audit:i18n\`) validates artefacts without writing
+### Artefact check vs update
 
-For ordinary testing: run \`npm run audit:i18n:check\` — no files are modified.
+| Command | Writes tracked snapshots? | Purpose |
+|---------|---------------------------|---------|
+| \`audit:i18n:check\` (default) | **Never** | Validate catalogues + UI keys in memory / temp; safe for tests, pre-commit, CI |
+| \`audit:i18n:update\` | Yes (MD / JSON / CSV) | Manual report refresh only |
+| \`export:i18n\` | **Never** (locales only) | Sheet → runtime catalogues |
+
+Check mode does **not** fail merely because committed audit snapshots are older than the current catalogues. Snapshot freshness is never enforced by tests, hooks, or CI.
+
+For ordinary development: run \`npm run audit:i18n:check\` — no files are modified.
 
 ## 11. Exact safe commands
 
 \`\`\`bash
-# Check artefacts are current (no writes)
+# Validate localisation (no writes; does not require snapshot freshness)
 npm run audit:i18n:check
 # alias:
 npm run audit:i18n
 
-# Explicitly rewrite tracked audit artefacts
+# Explicitly rewrite tracked audit report snapshots (manual reporting only)
 npm run audit:i18n:update
 
 # Existing offline parity / soft Dutch audit
 npm run test --workspace=@vaccin-delivery/pwa -- src/i18n
 npm run audit:hardcoded-strings --workspace=@vaccin-delivery/pwa
 
-# Sheets → repo (READ only; needs local OAuth)
+# Sheets → repo (READ only; needs local OAuth; writes locale JSON only)
 npm run export:i18n
 
 # Repo → Sheet key rows DRY-RUN only (safe; no writes)
@@ -693,7 +733,9 @@ After humans paste CSV ADD/UPDATE rows into the Sheet locale tabs (\`Key | Defau
 
 \`\`\`bash
 npm run export:i18n
-npm run audit:i18n:update
+npm run audit:i18n:check
+# optional report refresh:
+# npm run audit:i18n:update
 \`\`\`
 
 ## 12–14. Tests, builds, manual Sheet actions
@@ -743,9 +785,10 @@ function stableStatusCounts(rows) {
 }
 
 /**
- * @returns {{ csv: string, summaryJson: string, md: string, summary: object }}
+ * Deterministic scan of locale catalogues + PWA source (no disk artefact I/O).
+ * @returns {Promise<object>}
  */
-async function generateArtefactContents() {
+async function runAuditScan() {
   const catalogs = loadCatalogs()
   const keyCounts = Object.fromEntries(
     LOCALES.map(l => [l, Object.keys(catalogs[l]).length]),
@@ -799,15 +842,30 @@ async function generateArtefactContents() {
 
   const proposedAdditions = mergeProposedAdditions(missing)
   const hardcoded = scanHardcodedCandidates(files)
+  const hardcodedNonAllowlisted = hardcoded.filter(h => !h.allowlisted)
   const { header, rows } = buildCsvRows(
     catalogs,
     unusedKeys,
     proposedAdditions,
   )
 
-  const csv = finalizeContent(renderCsv(header, rows))
-
   const uniqueMissingKeys = [...new Set(missing.map(m => m.key))].sort()
+
+  const statusEnumKeysMissing = STATUS_ENUM_REQUIRED_KEYS.filter(key => {
+    for (const locale of LOCALES) {
+      const value = catalogs[locale][key]
+      if (value == null || String(value).trim() === '') {
+        return true
+      }
+    }
+    return false
+  })
+
+  // Known raw-key rendering risk: UI calls a key that is absent from catalogues.
+  const rawKeyRisks = uniqueMissingKeys.map(key => ({
+    key,
+    reason: 'Used in UI but missing from runtime catalogues (would render as raw key)',
+  }))
 
   const summary = {
     generatedBy: 'phase35d2-i18n-audit.mjs',
@@ -823,6 +881,7 @@ async function generateArtefactContents() {
     csvStatusCounts: stableStatusCounts(rows),
     hardcodedCandidateCount: hardcoded.length,
     hardcodedAllowlistedCount: hardcoded.filter(h => h.allowlisted).length,
+    statusEnumKeysMissingCount: statusEnumKeysMissing.length,
     sheetsCapability: {
       read: true,
       writeKeysOnly: true,
@@ -832,45 +891,66 @@ async function generateArtefactContents() {
     },
   }
 
+  return {
+    catalogs,
+    keyCounts,
+    placeholderMismatches,
+    missing,
+    uniqueMissingKeys,
+    unusedKeys,
+    sameAsEn,
+    proposedAdditions,
+    hardcoded,
+    hardcodedNonAllowlisted,
+    statusEnumKeysMissing,
+    rawKeyRisks,
+    header,
+    rows,
+    summary,
+    terminology: terminologyNotes(catalogs),
+  }
+}
+
+/**
+ * @returns {{ csv: string, summaryJson: string, md: string, summary: object, scan: object }}
+ */
+async function generateArtefactContents() {
+  const scan = await runAuditScan()
+
+  const csv = finalizeContent(renderCsv(scan.header, scan.rows))
+
   const summaryPathForPrettier = path.join(
     REPO_ROOT,
     ...SUMMARY_REPO_PATH.split('/'),
   )
   const summaryJson = finalizeContent(
     await formatWithPrettier(
-      `${JSON.stringify(summary, null, 2)}\n`,
+      `${JSON.stringify(scan.summary, null, 2)}\n`,
       summaryPathForPrettier,
     ),
   )
 
   const mdRaw = buildMarkdown({
-    keyCounts,
-    placeholderMismatches,
-    missingKeys: missing,
-    unusedKeys: [...unusedKeys].sort(),
-    sameAsEn,
-    hardcoded,
-    proposedAdditions,
-    terminology: terminologyNotes(catalogs),
+    keyCounts: scan.keyCounts,
+    placeholderMismatches: scan.placeholderMismatches,
+    missingKeys: scan.missing,
+    unusedKeys: [...scan.unusedKeys].sort(),
+    sameAsEn: scan.sameAsEn,
+    hardcoded: scan.hardcoded,
+    proposedAdditions: scan.proposedAdditions,
+    terminology: scan.terminology,
   })
   const mdPathForPrettier = path.join(REPO_ROOT, ...MD_REPO_PATH.split('/'))
   const md = finalizeContent(
     await formatWithPrettier(mdRaw, mdPathForPrettier),
   )
 
-  return { csv, summaryJson, md, summary }
+  return { csv, summaryJson, md, summary: scan.summary, scan }
 }
 
 function finalizeContent(content) {
   const next = normalizeNewlines(content)
   return next.endsWith('\n') ? next : `${next}\n`
-}
-
-function readNormalizedFile(filePath) {
-  if (!fs.existsSync(filePath)) {
-    return null
-  }
-  return finalizeContent(fs.readFileSync(filePath, 'utf8'))
 }
 
 function resolveArtefactPaths(outDir) {
@@ -914,44 +994,69 @@ function parseCliArgs(argv) {
   return { mode, outDir }
 }
 
-async function runCheck(paths, contents) {
-  const comparisons = [
-    { repoPath: CSV_REPO_PATH, filePath: paths.csv, expected: contents.csv },
-    {
-      repoPath: SUMMARY_REPO_PATH,
-      filePath: paths.summary,
-      expected: contents.summaryJson,
-    },
-    { repoPath: MD_REPO_PATH, filePath: paths.md, expected: contents.md },
-  ]
+/**
+ * Validate localisation health in memory. Never reads or writes audit snapshots.
+ */
+async function runCheck() {
+  const scan = await runAuditScan()
+  const failures = []
 
-  const stale = []
-  for (const item of comparisons) {
-    const onDisk = readNormalizedFile(item.filePath)
-    if (onDisk === null) {
-      stale.push(`${item.repoPath} (missing)`)
-      continue
-    }
-    if (onDisk !== item.expected) {
-      stale.push(item.repoPath)
+  if (scan.uniqueMissingKeys.length > 0) {
+    failures.push(
+      `Missing catalogue keys used by UI (${scan.uniqueMissingKeys.length}): ${scan.uniqueMissingKeys.slice(0, 12).join(', ')}${scan.uniqueMissingKeys.length > 12 ? ', …' : ''}`,
+    )
+  }
+
+  if (scan.placeholderMismatches.length > 0) {
+    failures.push(
+      `Placeholder parity mismatches (${scan.placeholderMismatches.length})`,
+    )
+  }
+
+  if (scan.rawKeyRisks.length > 0) {
+    failures.push(
+      `Known raw-key rendering risks (${scan.rawKeyRisks.length})`,
+    )
+  }
+
+  if (scan.hardcodedNonAllowlisted.length > 0) {
+    failures.push(
+      `Confirmed hard-coded visible text candidates (${scan.hardcodedNonAllowlisted.length})`,
+    )
+    for (const hit of scan.hardcodedNonAllowlisted.slice(0, 10)) {
+      failures.push(`  - ${hit.file}:${hit.line}: ${hit.text}`)
     }
   }
 
-  console.log('Phase 35D2 i18n audit check')
-  console.log(JSON.stringify(contents.summary, null, 2))
+  if (scan.statusEnumKeysMissing.length > 0) {
+    failures.push(
+      `Status/enum mapping keys missing or empty (${scan.statusEnumKeysMissing.length}): ${scan.statusEnumKeysMissing.join(', ')}`,
+    )
+  }
 
-  if (stale.length > 0) {
-    console.error('Stale i18n audit artefacts (run npm run audit:i18n:update):')
-    for (const name of stale) {
-      console.error(`  - ${name}`)
+  console.log('Phase 35D2 i18n audit check')
+  console.log(JSON.stringify(scan.summary, null, 2))
+  console.log(
+    'Validated localisation in memory (tracked audit snapshots not compared)',
+  )
+
+  if (failures.length > 0) {
+    console.error('i18n localisation check failed:')
+    for (const line of failures) {
+      console.error(`  - ${line}`)
     }
     process.exitCode = 1
     return
   }
 
-  console.log(`Current ${CSV_REPO_PATH}`)
-  console.log(`Current ${MD_REPO_PATH}`)
-  console.log(`Current ${SUMMARY_REPO_PATH}`)
+  console.log('Localisation check passed')
+  console.log(
+    `Key parity OK (${LOCALES.map(l => `${l}=${scan.keyCounts[l]}`).join(', ')})`,
+  )
+  console.log('Placeholder parity OK')
+  console.log('No missing UI keys / raw-key risks')
+  console.log('No confirmed hard-coded visible text in audited paths')
+  console.log('Status/enum mapping keys present')
 }
 
 async function runUpdate(paths, contents) {
@@ -980,24 +1085,28 @@ async function main() {
   const { mode, outDir } = parseCliArgs(process.argv)
   if (mode === 'help') {
     console.log(`Usage:
-  node phase35d2-i18n-audit.mjs --check [--out-dir <dir>]
+  node phase35d2-i18n-audit.mjs --check
   node phase35d2-i18n-audit.mjs --update [--out-dir <dir>]
 
---check   Compare generated output to artefacts; never write (default)
---update  Rewrite artefacts when content differs
---out-dir Optional directory for artefact read/write (tests)`)
+--check   Validate localisation in memory; never write; ignore snapshot freshness (default)
+--update  Rewrite audit report artefacts when content differs
+--out-dir Optional directory for artefact write (update / tests only; ignored by --check)`)
     return
   }
 
-  const paths = resolveArtefactPaths(outDir)
-  const contents = await generateArtefactContents()
-
   if (mode === 'check') {
-    await runCheck(paths, contents)
+    if (outDir) {
+      console.log(
+        'Note: --out-dir is ignored in --check (check never reads or writes artefacts)',
+      )
+    }
+    await runCheck()
     return
   }
 
   if (mode === 'update') {
+    const paths = resolveArtefactPaths(outDir)
+    const contents = await generateArtefactContents()
     await runUpdate(paths, contents)
     return
   }

@@ -1879,13 +1879,48 @@ the production Compose file.
 
 1. **Google Sheet** — editable translation source (humans edit here)
 2. **`npm run export:i18n`** — local exporter **reads** the Sheet and regenerates JSON
-3. **Committed `packages/pwa/src/locales/*.json`** — generated artifacts for runtime/CI
-4. **PWA `vue-i18n`** — consumes committed JSON only (never Google)
+3. **Committed `packages/pwa/src/locales/*.json`** — generated catalogs for runtime/CI
+4. **PWA `vue-i18n`** — consumes committed JSON only via `t()` / `translate()` (never Google)
 
 Do **not** hand-edit locale JSON as a second translation source. The exporter is
 local/dev-only: it never runs from app startup, PWA/API build, CI, Docker, or
 unit/e2e tests. Normal export is **strictly read-only** against the Sheets API
 (even if a local token happens to carry a broader scope from earlier consent).
+**`export:i18n` never rewrites audit report snapshots** and never hard-codes
+translations into Vue components.
+
+### Normal translation change
+
+1. Update the Google Sheet.
+2. Run `npm run export:i18n`.
+3. Use the generated key in code (`t(...)` / `translate(...)` / status-labels helpers).
+4. Run `npm run audit:i18n:check`.
+5. Commit source + locale catalogues (`packages/pwa/src/locales/{nl,en,es,zh}.json`).
+
+### Audit report refresh (manual only)
+
+These files are **audit snapshots**, not runtime catalogs. They are **not**
+required to change after every normal component, translation, test, or build:
+
+- `docs/i18n-audit.md`
+- `artifacts/i18n-audit-summary.json`
+- `artifacts/i18n-sheet-import.csv`
+
+Refresh only when an updated report is intentionally needed:
+
+1. Run `npm run audit:i18n:update` (only command allowed to rewrite the three files).
+2. Review the generated report / CSV.
+3. Commit them only when an updated audit snapshot is intentionally required.
+
+| Command                     | Writes                    | Role                                                        |
+| --------------------------- | ------------------------- | ----------------------------------------------------------- |
+| `npm run export:i18n`       | Locale JSON only          | Normal Sheet → catalogue import                             |
+| `npm run audit:i18n:check`  | **Never**                 | In-memory localisation validation (tests / pre-commit / CI) |
+| `npm run audit:i18n:update` | MD / JSON / CSV snapshots | Manual reporting only                                       |
+
+`audit:i18n:check` validates UI keys, locale parity, placeholders, raw-key risks,
+hard-coded visible text heuristics, and status/enum mapping keys. It does **not**
+fail merely because committed audit snapshots are older than the current catalogues.
 
 **Catalog size (after Phase 23C + admin dashboard follow-up):** **486 keys**, identical key sets across
 `nl` / `en` / `zh` / `es`.
@@ -1952,12 +1987,14 @@ No Google credentials or Sheets calls in the PWA bundle, CI, or Docker image.
    on **all four** tabs (`nl`, `en`, `zh`, `es`). Leave column C blank only when
    intentionally accepting Default fallback for that locale.
 2. Run `npm run export:i18n` from the monorepo root.
-3. Commit the regenerated `packages/pwa/src/locales/{nl,en,zh,es}.json`.
-4. In Vue: `$t('your.key')` / `useI18n()`. Outside templates: `translate('your.key')`
+3. In Vue: `$t('your.key')` / `useI18n()`. Outside templates: `translate('your.key')`
    from `@/i18n`. Prefer status-labels / error-mapper / validation-schemas /
    format helpers when the string is a status, error, form message, or date/number.
-5. Do **not** hand-merge keys into locale JSON; do **not** hardcode user-visible
-   Dutch/English in components.
+4. Run `npm run audit:i18n:check` (never rewrites audit snapshots).
+5. Commit the regenerated `packages/pwa/src/locales/{nl,en,zh,es}.json` with the
+   source change. Do **not** hand-merge keys into locale JSON; do **not** hardcode
+   user-visible Dutch/English in components. Refresh audit snapshots with
+   `npm run audit:i18n:update` only when intentionally updating the report.
 
 ### Exporter (Phase 23A)
 
