@@ -381,7 +381,7 @@ function stopSummary(template: RouteTemplateListItem): string {
               >
               {{ courierLabel(template.bezorgerProfileId) }}
             </p>
-            <p class="break-words text-toned">
+            <p class="wrap-break-word text-toned">
               <span class="font-medium text-highlighted"
                 >{{ t('routes.templates.stops') }}:</span
               >
@@ -473,7 +473,7 @@ function stopSummary(template: RouteTemplateListItem): string {
                 :key="stop.id"
                 class="flex flex-col gap-2 py-3 text-sm sm:flex-row sm:items-center sm:justify-between"
               >
-                <div class="min-w-0 break-words">
+                <div class="min-w-0 wrap-break-word">
                   <span class="font-medium text-highlighted"
                     >{{ stop.sequence }}.</span
                   >

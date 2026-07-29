@@ -35,7 +35,9 @@
                 :variant="isActive(link.to) ? 'soft' : 'ghost'"
                 :color="isActive(link.to) ? 'primary' : 'neutral'"
                 :aria-current="isActive(link.to) ? 'page' : undefined"
-                class="!h-auto min-h-8 whitespace-normal px-2 py-1.5 text-left leading-snug"
+                :ui="{
+                  base: 'h-auto min-h-8 whitespace-normal px-2 py-1.5 text-left leading-snug',
+                }"
               >
                 {{ link.label }}
               </UButton>
@@ -82,7 +84,7 @@
                 {{ t('account.log.out') }}
               </UButton>
             </div>
-            <div class="hidden max-w-[9rem] self-end lg:block">
+            <div class="hidden max-w-36 self-end lg:block">
               <CommonLanguageSelector compact />
             </div>
           </nav>
