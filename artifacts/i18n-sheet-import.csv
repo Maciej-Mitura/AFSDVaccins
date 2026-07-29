@@ -219,6 +219,7 @@ admin.orders.totalDoses,{count} dosis | {count} dosissen,{count} dose | {count} 
 admin.stock.adjust,Aanpassen,Adjust,Adjust,Adjust,REVIEW,admin,"Untranslated or loanword clone (es=en, zh=en); human translation recommended"
 admin.stock.adjustment.correction,Correctie,Correction,Correction,Correction,REVIEW,admin,"Untranslated or loanword clone (es=en, zh=en); human translation recommended"
 admin.stock.adjustment.decrease,Verlagen,Decrease,Decrease,Decrease,REVIEW,admin,"Untranslated or loanword clone (es=en, zh=en); human translation recommended"
+admin.stock.adjustment.deliveryDeduction,Leveringsaftrek,Delivery deduction,Delivery deduction,Delivery deduction,REVIEW,admin,"Untranslated or loanword clone (es=en, zh=en); human translation recommended"
 admin.stock.adjustment.restock,Aanvullen,Restock,Restock,Restock,REVIEW,admin,"Untranslated or loanword clone (es=en, zh=en); human translation recommended"
 admin.stock.adjustmentType,Type aanpassing,Adjustment type,Adjustment type,Adjustment type,REVIEW,admin,"Untranslated or loanword clone (es=en, zh=en); human translation recommended"
 admin.stock.adjustTitle,Voorraad aanpassen,Adjust stock,Adjust stock,Adjust stock,REVIEW,admin,"Untranslated or loanword clone (es=en, zh=en); human translation recommended"

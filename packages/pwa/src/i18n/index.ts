@@ -95,6 +95,7 @@ export {
   activeInactiveLabel,
   notificationReadLabel,
   deliveryMethodLabel,
+  stockAdjustmentTypeLabel,
 } from './status-labels'
 export {
   isVaccineImageBrowseable,

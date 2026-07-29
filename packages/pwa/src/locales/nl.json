@@ -190,6 +190,7 @@
     "admin.stock.adjust": "Aanpassen",
     "admin.stock.adjustment.correction": "Correctie",
     "admin.stock.adjustment.decrease": "Verlagen",
+    "admin.stock.adjustment.deliveryDeduction": "Leveringsaftrek",
     "admin.stock.adjustment.restock": "Aanvullen",
     "admin.stock.adjustmentType": "Type aanpassing",
     "admin.stock.adjustTitle": "Voorraad aanpassen",

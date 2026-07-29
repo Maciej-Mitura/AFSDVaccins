@@ -136,13 +136,13 @@ _No heuristic hits._
 
 ## 6. Untranslated or suspicious values
 
-Key counts: nl=1126, en=1126, es=1126, zh=1126
+Key counts: nl=1127, en=1127, es=1127, zh=1127
 
 | Locale | Values identical to EN (≥6 chars) |
 | ------ | --------------------------------- |
 | nl     | 38                                |
-| es     | 834                               |
-| zh     | 832                               |
+| es     | 835                               |
+| zh     | 833                               |
 
 Most `es`/`zh` catalog entries still mirror English Default. Treat as **REVIEW** in the CSV (do not auto-rewrite style of already-localised NL).
 
@@ -191,42 +191,48 @@ Prefer Default = English. Then run `npm run export:i18n`.
 
 **Phase 35D3:** runtime catalogs already contain these keys (`READY_FOR_SHEET`). Sheet import remains manual so the spreadsheet stays the long-term source of truth.
 
-**Manual Sheet workflow:**
+**Manual Sheet workflow (normal translation change):**
 
-1. Import or copy `READY_FOR_SHEET` / `ADD` rows into the Sheet;
-2. Preserve `Key | Default | locale` structure;
-3. Run `npm run export:i18n`;
-4. Run `npm run audit:i18n:update` and review the three artefacts;
-5. Stage source + artefacts together and commit.
+1. Update the Google Sheet;
+2. Run `npm run export:i18n` (writes locale JSON only — never audit snapshots);
+3. Use the generated key in code via `t()` / `translate()` / status-labels helpers;
+4. Run `npm run audit:i18n:check` (in-memory localisation validation; never writes);
+5. Commit source + locale catalogues.
 
-### Artefact check vs update (Phase 35D5)
+**Audit report refresh (manual only — not required after every change):**
 
-After changing translations or audited UI strings:
+1. Run `npm run audit:i18n:update`;
+2. Review `docs/i18n-audit.md`, `artifacts/i18n-audit-summary.json`, `artifacts/i18n-sheet-import.csv`;
+3. Commit those three files only when an updated audit snapshot is intentionally required.
 
-1. `npm run audit:i18n:update`
-2. Review `docs/i18n-audit.md`, `artifacts/i18n-audit-summary.json`, `artifacts/i18n-sheet-import.csv`
-3. Stage source changes and generated artefacts together
-4. Commit (pre-commit / Vitest use **check-only** — they never rewrite artefacts)
-5. `npm run audit:i18n:check` (or `npm run audit:i18n`) validates artefacts without writing
+### Artefact check vs update
 
-For ordinary testing: run `npm run audit:i18n:check` — no files are modified.
+| Command                      | Writes tracked snapshots? | Purpose                                                                 |
+| ---------------------------- | ------------------------- | ----------------------------------------------------------------------- |
+| `audit:i18n:check` (default) | **Never**                 | Validate catalogues + UI keys in memory; safe for tests, pre-commit, CI |
+| `audit:i18n:update`          | Yes (MD / JSON / CSV)     | Manual report refresh only                                              |
+| `export:i18n`                | **Never** (locales only)  | Sheet → runtime catalogues                                              |
+
+Check mode does **not** fail merely because committed audit snapshots are older than the current catalogues. Snapshot freshness is never enforced by tests, hooks, or CI.
+
+For ordinary development: run `npm run audit:i18n:check` — no files are modified.
 
 ## 11. Exact safe commands
 
 ```bash
-# Check artefacts are current (no writes)
+# Validate localisation (no writes; does not require snapshot freshness)
 npm run audit:i18n:check
 # alias:
 npm run audit:i18n
 
-# Explicitly rewrite tracked audit artefacts
+# Explicitly rewrite tracked audit report snapshots (manual reporting only)
 npm run audit:i18n:update
 
 # Existing offline parity / soft Dutch audit
 npm run test --workspace=@vaccin-delivery/pwa -- src/i18n
 npm run audit:hardcoded-strings --workspace=@vaccin-delivery/pwa
 
-# Sheets → repo (READ only; needs local OAuth)
+# Sheets → repo (READ only; needs local OAuth; writes locale JSON only)
 npm run export:i18n
 
 # Repo → Sheet key rows DRY-RUN only (safe; no writes)
@@ -240,7 +246,9 @@ After humans paste CSV ADD/UPDATE rows into the Sheet locale tabs (`Key | Defaul
 
 ```bash
 npm run export:i18n
-npm run audit:i18n:update
+npm run audit:i18n:check
+# optional report refresh:
+# npm run audit:i18n:update
 ```
 
 ## 12–14. Tests, builds, manual Sheet actions

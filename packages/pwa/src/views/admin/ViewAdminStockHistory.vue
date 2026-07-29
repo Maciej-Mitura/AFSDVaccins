@@ -10,7 +10,7 @@ import CommonPageHeader from '@/components/common/CommonPageHeader.vue'
 import CommonPageSection from '@/components/common/CommonPageSection.vue'
 import { useStock } from '@/composables/useStock'
 import { useVaccines } from '@/composables/useVaccines'
-import { formatDateTime } from '@/i18n'
+import { formatDateTime, stockAdjustmentTypeLabel } from '@/i18n'
 
 const { t } = useI18n()
 const route = useRoute()
@@ -76,7 +76,9 @@ function performerName(entry: (typeof history.value)[number]): string {
           class="space-y-1.5 py-4 text-sm"
         >
           <div class="flex flex-wrap items-center gap-2">
-            <h3 class="font-semibold text-highlighted">{{ entry.type }}</h3>
+            <h3 class="font-semibold text-highlighted">
+              {{ stockAdjustmentTypeLabel(entry.type) }}
+            </h3>
             <UBadge
               :color="entry.quantityDelta > 0 ? 'success' : 'neutral'"
               variant="subtle"

@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Phase 35D2 / 35D4 / 35D5 / 35G6-prep — deterministic localisation audit + report export.
+ * Phase 35D2 / 35D4 / 35D5 — deterministic localisation audit + report export.
  *
  * Tracked audit *snapshots* (manual reporting only; not required for normal development):
  *   - docs/i18n-audit.md
@@ -10,8 +10,8 @@
  * Does NOT call Google Sheets. Does NOT mutate locale JSON.
  *
  * Modes:
- *   --check   Validate runtime catalogues + source in memory. Never write. Never
- *             compare to / require freshness of tracked audit snapshots.
+ *   --check   Validate runtime catalogues + source in memory. Never write.
+ *             Never compare to / require freshness of tracked audit snapshots.
  *             Exit 1 on localisation failures only.
  *   --update  Rewrite the three tracked audit artefacts when content differs
  *             (idempotent). Manual reporting command — not a normal workflow step.
@@ -25,11 +25,23 @@
  *   npm run audit:i18n:check
  *   npm run audit:i18n:update
  *   npm run audit:i18n   # alias of check
+ *
+ * Test-only helpers live in phase35d2-i18n-audit-helpers.mjs:
+ *   validateLocalisation, compareSnapshots (not used by --check)
  */
 import fs from 'node:fs'
 import path from 'node:path'
 import { createRequire } from 'node:module'
 import { fileURLToPath } from 'node:url'
+import {
+  CSV_REPO_PATH,
+  SUMMARY_REPO_PATH,
+  MD_REPO_PATH,
+  normalizeNewlines,
+  finalizeContent,
+  resolveArtefactPaths,
+  validateLocalisation,
+} from './phase35d2-i18n-audit-helpers.mjs'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const require = createRequire(import.meta.url)
@@ -57,10 +69,7 @@ async function formatWithPrettier(source, filepath) {
 const LOCALES = ['nl', 'en', 'es', 'zh']
 const PLACEHOLDER_RE = /\{[^}]+\}/g
 
-/** Tracked artefact paths (repo-relative, POSIX). */
-const CSV_REPO_PATH = 'artifacts/i18n-sheet-import.csv'
-const SUMMARY_REPO_PATH = 'artifacts/i18n-audit-summary.json'
-const MD_REPO_PATH = 'docs/i18n-audit.md'
+/** Tracked artefact paths imported from helpers (repo-relative, POSIX). */
 
 /** Directories skipped while walking source (never audit generated/ephemeral trees). */
 const SKIP_DIR_NAMES = new Set([
@@ -117,6 +126,10 @@ const STATUS_ENUM_REQUIRED_KEYS = [
   'status.notification.unread',
   'orderHistory.deliveryMethod.admin',
   'orderHistory.deliveryMethod.qr',
+  'admin.stock.adjustment.restock',
+  'admin.stock.adjustment.decrease',
+  'admin.stock.adjustment.correction',
+  'admin.stock.adjustment.deliveryDeduction',
   'common.unknown',
   'notifications.fallback.title',
   'notifications.fallback.body',
@@ -374,10 +387,6 @@ function buildCsvRows(catalogs, unusedKeys, proposedAdditions) {
   })
 
   return { header, rows }
-}
-
-function normalizeNewlines(text) {
-  return String(text).replaceAll('\r\n', '\n').replaceAll('\r', '\n')
 }
 
 /**
@@ -696,7 +705,7 @@ Prefer Default = English. Then run \`npm run export:i18n\`.
 
 | Command | Writes tracked snapshots? | Purpose |
 |---------|---------------------------|---------|
-| \`audit:i18n:check\` (default) | **Never** | Validate catalogues + UI keys in memory / temp; safe for tests, pre-commit, CI |
+| \`audit:i18n:check\` (default) | **Never** | Validate catalogues + UI keys in memory; safe for tests, pre-commit, CI |
 | \`audit:i18n:update\` | Yes (MD / JSON / CSV) | Manual report refresh only |
 | \`export:i18n\` | **Never** (locales only) | Sheet → runtime catalogues |
 
@@ -948,21 +957,6 @@ async function generateArtefactContents() {
   return { csv, summaryJson, md, summary: scan.summary, scan }
 }
 
-function finalizeContent(content) {
-  const next = normalizeNewlines(content)
-  return next.endsWith('\n') ? next : `${next}\n`
-}
-
-function resolveArtefactPaths(outDir) {
-  const root = outDir ? path.resolve(outDir) : REPO_ROOT
-  return {
-    root,
-    csv: path.join(root, ...CSV_REPO_PATH.split('/')),
-    summary: path.join(root, ...SUMMARY_REPO_PATH.split('/')),
-    md: path.join(root, ...MD_REPO_PATH.split('/')),
-  }
-}
-
 function parseCliArgs(argv) {
   let mode = 'check'
   let outDir = null
@@ -999,40 +993,7 @@ function parseCliArgs(argv) {
  */
 async function runCheck() {
   const scan = await runAuditScan()
-  const failures = []
-
-  if (scan.uniqueMissingKeys.length > 0) {
-    failures.push(
-      `Missing catalogue keys used by UI (${scan.uniqueMissingKeys.length}): ${scan.uniqueMissingKeys.slice(0, 12).join(', ')}${scan.uniqueMissingKeys.length > 12 ? ', …' : ''}`,
-    )
-  }
-
-  if (scan.placeholderMismatches.length > 0) {
-    failures.push(
-      `Placeholder parity mismatches (${scan.placeholderMismatches.length})`,
-    )
-  }
-
-  if (scan.rawKeyRisks.length > 0) {
-    failures.push(
-      `Known raw-key rendering risks (${scan.rawKeyRisks.length})`,
-    )
-  }
-
-  if (scan.hardcodedNonAllowlisted.length > 0) {
-    failures.push(
-      `Confirmed hard-coded visible text candidates (${scan.hardcodedNonAllowlisted.length})`,
-    )
-    for (const hit of scan.hardcodedNonAllowlisted.slice(0, 10)) {
-      failures.push(`  - ${hit.file}:${hit.line}: ${hit.text}`)
-    }
-  }
-
-  if (scan.statusEnumKeysMissing.length > 0) {
-    failures.push(
-      `Status/enum mapping keys missing or empty (${scan.statusEnumKeysMissing.length}): ${scan.statusEnumKeysMissing.join(', ')}`,
-    )
-  }
+  const failures = validateLocalisation(scan)
 
   console.log('Phase 35D2 i18n audit check')
   console.log(JSON.stringify(scan.summary, null, 2))

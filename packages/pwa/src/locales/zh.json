@@ -190,6 +190,7 @@
     "admin.stock.adjust": "Adjust",
     "admin.stock.adjustment.correction": "Correction",
     "admin.stock.adjustment.decrease": "Decrease",
+    "admin.stock.adjustment.deliveryDeduction": "Delivery deduction",
     "admin.stock.adjustment.restock": "Restock",
     "admin.stock.adjustmentType": "Adjustment type",
     "admin.stock.adjustTitle": "Adjust stock",

@@ -10,6 +10,7 @@ import {
   operationsFeedEventTypeLabel,
   orderStatusLabel,
   routeStatusLabel,
+  stockAdjustmentTypeLabel,
   userRoleLabel,
   type SupportedLocale,
 } from '@/i18n'
@@ -68,6 +69,22 @@ describe('status labels', () => {
         },
         { key: 'status.active', value: activeInactiveLabel(true) },
         { key: 'status.inactive', value: activeInactiveLabel(false) },
+        {
+          key: 'admin.stock.adjustment.restock',
+          value: stockAdjustmentTypeLabel('RESTOCK'),
+        },
+        {
+          key: 'admin.stock.adjustment.decrease',
+          value: stockAdjustmentTypeLabel('MANUAL_DECREASE'),
+        },
+        {
+          key: 'admin.stock.adjustment.correction',
+          value: stockAdjustmentTypeLabel('MANUAL_CORRECTION'),
+        },
+        {
+          key: 'admin.stock.adjustment.deliveryDeduction',
+          value: stockAdjustmentTypeLabel('DELIVERY_DEDUCTION'),
+        },
       ]
 
       for (const sample of samples) {
@@ -89,5 +106,23 @@ describe('status labels', () => {
     expect(operationsFeedEventTypeLabel('LOW_STOCK')).not.toBe('LOW_STOCK')
     expect(orderStatusLabel('PLANNED')).not.toBe('PLANNED')
     expect(userRoleLabel('ADMIN')).not.toBe('ADMIN')
+    expect(stockAdjustmentTypeLabel('RESTOCK')).not.toBe('RESTOCK')
+    expect(stockAdjustmentTypeLabel('MANUAL_DECREASE')).not.toBe(
+      'MANUAL_DECREASE',
+    )
+    expect(stockAdjustmentTypeLabel('MANUAL_CORRECTION')).not.toBe(
+      'MANUAL_CORRECTION',
+    )
+    expect(stockAdjustmentTypeLabel('DELIVERY_DEDUCTION')).not.toBe(
+      'DELIVERY_DEDUCTION',
+    )
+  })
+
+  it('falls back to common.unknown for unmapped stock adjustment types', async () => {
+    const { setLocale } = useLanguage()
+    await setLocale('nl')
+    const unknown = stockAdjustmentTypeLabel('NOT_A_REAL_TYPE')
+    expect(unknown).not.toBe('NOT_A_REAL_TYPE')
+    expect(unknown.trim().length).toBeGreaterThan(0)
   })
 })

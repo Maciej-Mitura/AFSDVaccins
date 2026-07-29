@@ -99,3 +99,24 @@ export function deliveryMethodLabel(method: string | null | undefined): string {
   }
   return translate('common.unknown')
 }
+
+/**
+ * Stock adjustment type display labels (history / audit rows).
+ * Maps API enum tokens to catalogue keys — never formats the enum string.
+ */
+export function stockAdjustmentTypeLabel(type: string | null | undefined): string {
+  const value = String(type ?? '')
+  if (value === 'RESTOCK') {
+    return translate('admin.stock.adjustment.restock')
+  }
+  if (value === 'MANUAL_DECREASE') {
+    return translate('admin.stock.adjustment.decrease')
+  }
+  if (value === 'MANUAL_CORRECTION') {
+    return translate('admin.stock.adjustment.correction')
+  }
+  if (value === 'DELIVERY_DEDUCTION') {
+    return translate('admin.stock.adjustment.deliveryDeduction')
+  }
+  return translate('common.unknown')
+}

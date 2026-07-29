@@ -1,8 +1,10 @@
 /**
- * Phase 35D2 / 35D5 / 35G6-prep — deterministic i18n audit script (check vs update).
+ * Phase 35D2 / 35D5 — deterministic i18n audit (check vs update).
  *
- * Check mode validates localisation in memory and must never rewrite tracked
+ * Check validates localisation in memory and must never rewrite tracked
  * audit snapshots or require their freshness.
+ *
+ * Snapshot comparison is tested only via helpers + temp dirs (not --check).
  *
  * @vitest-environment node
  */
@@ -12,11 +14,12 @@ import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 import { createHash } from 'node:crypto'
-import { fileURLToPath } from 'node:url'
+import { fileURLToPath, pathToFileURL } from 'node:url'
 
 const pwaRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..')
 const repoRoot = path.resolve(pwaRoot, '../..')
 const script = path.join(pwaRoot, 'scripts/phase35d2-i18n-audit.mjs')
+const helpers = path.join(pwaRoot, 'scripts/phase35d2-i18n-audit-helpers.mjs')
 const trackedCsv = path.join(repoRoot, 'artifacts/i18n-sheet-import.csv')
 const trackedSummary = path.join(repoRoot, 'artifacts/i18n-audit-summary.json')
 const trackedMd = path.join(repoRoot, 'docs/i18n-audit.md')
@@ -65,6 +68,21 @@ function runAudit(args: string[], options?: { expectError?: boolean }) {
     }
     throw error
   }
+}
+
+/** Run a small ESM snippet that imports audit helpers (keeps vue-tsc off .mjs). */
+function runHelpersEval(source: string): string {
+  const helpersUrl = pathToFileURL(helpers).href
+  const wrapped = `import {
+  compareSnapshots,
+  resolveArtefactPaths,
+  validateLocalisation,
+} from ${JSON.stringify(helpersUrl)};
+${source}`
+  return execFileSync(process.execPath, ['--input-type=module', '-e', wrapped], {
+    encoding: 'utf8',
+    cwd: pwaRoot,
+  })
 }
 
 function parseCsvStatusColumn(line: string): string {
@@ -150,7 +168,6 @@ describe('phase35d2 i18n audit', () => {
   it('check mode does not fail when tracked audit snapshots are stale', () => {
     const before = snapshotTracked()
     const outRoot = makeTempRoot()
-    // Intentionally "stale" files exist only to prove check ignores them.
     fs.mkdirSync(path.join(outRoot, 'artifacts'), { recursive: true })
     fs.mkdirSync(path.join(outRoot, 'docs'), { recursive: true })
     fs.writeFileSync(
@@ -174,7 +191,6 @@ describe('phase35d2 i18n audit', () => {
     expect(result.stdout).toContain('Localisation check passed')
     expect(result.stdout).toContain('--out-dir is ignored in --check')
     expect(result.stdout).not.toContain('Stale i18n audit artefacts')
-    // Stale temp files must remain untouched (check never writes).
     expect(
       fs.readFileSync(
         path.join(outRoot, 'artifacts/i18n-sheet-import.csv'),
@@ -268,7 +284,80 @@ describe('phase35d2 i18n audit', () => {
       false,
     )
 
-    // Tracked repo artefacts must remain untouched.
     expect(snapshotTracked()).toEqual(before)
+  })
+
+  it('compareSnapshots helper detects stale temp artefacts (not used by --check)', () => {
+    const before = snapshotTracked()
+    const outRoot = makeTempRoot()
+    fs.mkdirSync(path.join(outRoot, 'artifacts'), { recursive: true })
+    fs.mkdirSync(path.join(outRoot, 'docs'), { recursive: true })
+    fs.writeFileSync(
+      path.join(outRoot, 'artifacts/i18n-sheet-import.csv'),
+      'stale\n',
+      'utf8',
+    )
+    fs.writeFileSync(
+      path.join(outRoot, 'artifacts/i18n-audit-summary.json'),
+      '{}\n',
+      'utf8',
+    )
+    fs.writeFileSync(path.join(outRoot, 'docs/i18n-audit.md'), '# stale\n', 'utf8')
+
+    const outRootJson = JSON.stringify(outRoot)
+    const stdout = runHelpersEval(`
+      const paths = resolveArtefactPaths(${outRootJson})
+      const stale = compareSnapshots(paths, {
+        csv: 'expected-csv\\n',
+        summaryJson: '{"ok":true}\\n',
+        md: '# expected\\n',
+      })
+      process.stdout.write(JSON.stringify(stale))
+    `)
+    const stale = JSON.parse(stdout) as string[]
+    expect(stale).toEqual(
+      expect.arrayContaining([
+        'artifacts/i18n-sheet-import.csv',
+        'artifacts/i18n-audit-summary.json',
+        'docs/i18n-audit.md',
+      ]),
+    )
+
+    const check = runAudit(['--check'])
+    expect(check.status).toBe(0)
+    expect(check.stdout).not.toContain('Stale i18n audit artefacts')
+    expect(snapshotTracked()).toEqual(before)
+  })
+
+  it('validateLocalisation fails on missing keys and placeholder mismatches', () => {
+    const stdout = runHelpersEval(`
+      const missing = validateLocalisation({
+        uniqueMissingKeys: ['phase35d5.test.missing.key'],
+        placeholderMismatches: [],
+        rawKeyRisks: [{ key: 'phase35d5.test.missing.key', reason: 'missing' }],
+        hardcodedNonAllowlisted: [],
+        statusEnumKeysMissing: [],
+      })
+      const placeholders = validateLocalisation({
+        uniqueMissingKeys: [],
+        placeholderMismatches: [{ key: 'example.key', locale: 'es' }],
+        rawKeyRisks: [],
+        hardcodedNonAllowlisted: [],
+        statusEnumKeysMissing: [],
+      })
+      process.stdout.write(JSON.stringify({ missing, placeholders }))
+    `)
+    const result = JSON.parse(stdout) as {
+      missing: string[]
+      placeholders: string[]
+    }
+    expect(
+      result.missing.some(line => line.includes('Missing catalogue keys')),
+    ).toBe(true)
+    expect(
+      result.placeholders.some(line =>
+        line.includes('Placeholder parity mismatches'),
+      ),
+    ).toBe(true)
   })
 })

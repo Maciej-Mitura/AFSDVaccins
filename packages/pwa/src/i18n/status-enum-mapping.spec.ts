@@ -18,6 +18,7 @@ import {
   operationsFeedEventTypeLabel,
   orderStatusLabel,
   routeStatusLabel,
+  stockAdjustmentTypeLabel,
   userRoleLabel,
 } from '@/i18n'
 import { createTestI18n } from '@/i18n/test-utils'
@@ -63,6 +64,19 @@ describe('status/enum label mapping coverage', () => {
       { label: notificationReadLabel(false), raw: 'unread' },
       { label: deliveryMethodLabel('ADMIN'), raw: 'ADMIN' },
       { label: deliveryMethodLabel('QR'), raw: 'QR' },
+      { label: stockAdjustmentTypeLabel('RESTOCK'), raw: 'RESTOCK' },
+      {
+        label: stockAdjustmentTypeLabel('MANUAL_DECREASE'),
+        raw: 'MANUAL_DECREASE',
+      },
+      {
+        label: stockAdjustmentTypeLabel('MANUAL_CORRECTION'),
+        raw: 'MANUAL_CORRECTION',
+      },
+      {
+        label: stockAdjustmentTypeLabel('DELIVERY_DEDUCTION'),
+        raw: 'DELIVERY_DEDUCTION',
+      },
     ]
 
     for (const item of cases) {
@@ -70,6 +84,7 @@ describe('status/enum label mapping coverage', () => {
       expect(item.label.trim().length).toBeGreaterThan(0)
       expect(item.label.startsWith('status.')).toBe(false)
       expect(item.label.startsWith('orderHistory.')).toBe(false)
+      expect(item.label.startsWith('admin.stock.')).toBe(false)
     }
 
     const requiredKeys = [
@@ -93,6 +108,10 @@ describe('status/enum label mapping coverage', () => {
       'status.notification.unread',
       'orderHistory.deliveryMethod.admin',
       'orderHistory.deliveryMethod.qr',
+      'admin.stock.adjustment.restock',
+      'admin.stock.adjustment.decrease',
+      'admin.stock.adjustment.correction',
+      'admin.stock.adjustment.deliveryDeduction',
       'common.unknown',
     ]
     for (const key of requiredKeys) {
