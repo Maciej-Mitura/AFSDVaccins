@@ -1,5 +1,5 @@
 <template>
-  <div class="flex items-center gap-2">
+  <div class="flex items-center gap-2" :class="block ? 'w-full' : undefined">
     <label :id="labelId" class="sr-only">{{ languageLabel }}</label>
     <USelect
       v-model="selected"
@@ -7,7 +7,7 @@
       :disabled="loading"
       :aria-labelledby="labelId"
       size="sm"
-      class="min-w-36"
+      :class="selectClass"
       data-testid="language-selector"
     />
   </div>
@@ -19,6 +19,19 @@ import { useI18n } from 'vue-i18n'
 
 import { useLanguage } from '@/composables/useLanguage'
 import type { SupportedLocale } from '@/i18n'
+
+const props = withDefaults(
+  defineProps<{
+    /** Narrow control for desktop header utility row. */
+    compact?: boolean
+    /** Stretch to full available width (mobile drawer). */
+    block?: boolean
+  }>(),
+  {
+    compact: false,
+    block: false,
+  },
+)
 
 const { t } = useI18n()
 const {
@@ -32,6 +45,16 @@ const {
 const labelId = useId()
 
 const languageLabel = computed(() => t('label.language'))
+
+const selectClass = computed(() => {
+  if (props.compact) {
+    return 'min-w-[7.5rem] max-w-[9rem] w-full'
+  }
+  if (props.block) {
+    return 'min-w-0 w-full'
+  }
+  return 'min-w-36'
+})
 
 const items = computed(() =>
   supportedLocaleCodes.map(code => ({

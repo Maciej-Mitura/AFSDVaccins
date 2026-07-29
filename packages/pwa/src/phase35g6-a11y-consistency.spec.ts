@@ -157,6 +157,8 @@ describe('Phase 35G6 heading hierarchy', () => {
         stubs: {
           UButton: UButtonStub,
           UIcon: true,
+          USlideover: true,
+          Slideover: true,
           CommonLanguageSelector: true,
           CommonPushPermissionBanner: true,
         },
@@ -178,6 +180,7 @@ describe('Phase 35G6 mobile navigation accessibility', () => {
         navLinks: [{ label: 'Dashboard', to: '/admin' }],
         accountLinks: [{ label: 'Profile', to: '/profile' }],
       },
+      attachTo: document.body,
       global: {
         stubs: {
           UButton: UButtonStub,
@@ -194,16 +197,31 @@ describe('Phase 35G6 mobile navigation accessibility', () => {
 
     await toggle.trigger('click')
     await nextTick()
-    expect(toggle.attributes('aria-expanded')).toBe('true')
-    expect(wrapper.find('[data-testid="app-shell-mobile-nav"]').exists()).toBe(
-      true,
-    )
+    expect(
+      wrapper
+        .get('[data-testid="app-shell-menu-toggle"]')
+        .attributes('aria-expanded'),
+    ).toBe('true')
+    expect(
+      document.querySelector('[data-testid="app-shell-mobile-nav"]'),
+    ).not.toBeNull()
 
     routePath.value = '/admin'
     await nextTick()
-    expect(wrapper.find('[data-testid="app-shell-mobile-nav"]').exists()).toBe(
-      false,
+    expect(
+      wrapper
+        .get('[data-testid="app-shell-menu-toggle"]')
+        .attributes('aria-expanded'),
+    ).toBe('false')
+    const drawer = document.querySelector(
+      '[data-testid="app-shell-mobile-nav"]',
     )
+    // USlideover may keep the node briefly during leave; it must not stay open.
+    expect(
+      drawer === null || drawer.getAttribute('data-state') === 'closed',
+    ).toBe(true)
+
+    wrapper.unmount()
   })
 })
 
@@ -283,7 +301,7 @@ describe('Phase 35G6 status text accompanies colour', () => {
 describe('Phase 35G6 critical action sizing classes', () => {
   it('keeps min-h-11 on shell, notifications, and key operational actions', () => {
     const shellSrc = readSrc('components/common/CommonAppShell.vue')
-    expect(shellSrc).toMatch(/min-h-11 min-w-11 md:hidden/)
+    expect(shellSrc).toMatch(/min-h-11 min-w-11 lg:hidden/)
     expect(shellSrc).toMatch(/min-h-11 justify-start/)
 
     expect(readSrc('components/common/CommonNotificationBell.vue')).toMatch(
@@ -296,10 +314,14 @@ describe('Phase 35G6 critical action sizing classes', () => {
       /canCancel\(order\.status\)[\s\S]*class="min-h-11"/,
     )
     expect(
-      readSrc('components/feature/bezorger/FeatureBezorgerStopArrivalPanel.vue'),
+      readSrc(
+        'components/feature/bezorger/FeatureBezorgerStopArrivalPanel.vue',
+      ),
     ).toMatch(/min-h-11/)
     expect(
-      readSrc('components/feature/voice-report/FeatureRouteVoiceReportCard.vue'),
+      readSrc(
+        'components/feature/voice-report/FeatureRouteVoiceReportCard.vue',
+      ),
     ).toMatch(/min-h-11/)
   })
 })
@@ -317,7 +339,9 @@ describe('Phase 35G6 horizontal overflow patterns', () => {
     expect(readSrc('views/admin/ViewAdminCourierAnalytics.vue')).toMatch(
       /overflow-x-auto/,
     )
-    expect(readSrc('views/admin/ViewAdminOrders.vue')).toMatch(/overflow-x-auto/)
+    expect(readSrc('views/admin/ViewAdminOrders.vue')).toMatch(
+      /overflow-x-auto/,
+    )
   })
 })
 
@@ -399,7 +423,7 @@ describe('Phase 35G6 unchanged role navigation and permissions', () => {
         stubs: {
           RouterView: true,
           CommonAppShell: {
-            props: ['title', 'navLinks', 'accountLinks'],
+            props: ['title', 'navLinks', 'accountLinks', 'notificationLink'],
             template: `
               <nav data-testid="primary-nav">
                 <a v-for="link in navLinks" :key="link.to" :href="link.to">{{ link.label }}</a>
@@ -412,8 +436,7 @@ describe('Phase 35G6 unchanged role navigation and permissions', () => {
           },
           CommonNotificationBell: {
             props: ['to'],
-            template:
-              '<a data-testid="notification-bell" :href="to">bell</a>',
+            template: '<a data-testid="notification-bell" :href="to">bell</a>',
           },
         },
       },
@@ -443,7 +466,7 @@ describe('Phase 35G6 unchanged role navigation and permissions', () => {
         stubs: {
           RouterView: true,
           CommonAppShell: {
-            props: ['navLinks', 'accountLinks'],
+            props: ['title', 'navLinks', 'accountLinks', 'notificationLink'],
             template: `
               <nav data-testid="primary-nav">
                 <a v-for="link in navLinks" :key="link.to" :href="link.to">{{ link.label }}</a>
@@ -453,8 +476,7 @@ describe('Phase 35G6 unchanged role navigation and permissions', () => {
           },
           CommonNotificationBell: {
             props: ['to'],
-            template:
-              '<a data-testid="notification-bell" :href="to">bell</a>',
+            template: '<a data-testid="notification-bell" :href="to">bell</a>',
           },
         },
       },
@@ -476,7 +498,7 @@ describe('Phase 35G6 unchanged role navigation and permissions', () => {
         stubs: {
           RouterView: true,
           CommonAppShell: {
-            props: ['navLinks'],
+            props: ['title', 'navLinks', 'accountLinks', 'notificationLink'],
             template: `
               <nav data-testid="primary-nav">
                 <a v-for="link in navLinks" :key="link.to" :href="link.to">{{ link.label }}</a>
@@ -486,8 +508,7 @@ describe('Phase 35G6 unchanged role navigation and permissions', () => {
           },
           CommonNotificationBell: {
             props: ['to'],
-            template:
-              '<a data-testid="notification-bell" :href="to">bell</a>',
+            template: '<a data-testid="notification-bell" :href="to">bell</a>',
           },
         },
       },

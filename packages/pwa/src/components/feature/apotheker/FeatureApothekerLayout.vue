@@ -3,6 +3,7 @@
     :title="t('shell.apotheker.title')"
     :nav-links="apothekerNavLinks"
     :account-links="apothekerAccountLinks"
+    :notification-link="apothekerNotificationLink"
   >
     <template #header-actions>
       <CommonNotificationBell
@@ -38,6 +39,11 @@ const apothekerNavLinks = computed<AppShellLink[]>(() => [
 const apothekerAccountLinks = computed<AppShellLink[]>(() => [
   { label: t('navigation.apotheker.profile'), to: '/profile' },
 ])
+
+const apothekerNotificationLink = computed<AppShellLink>(() => ({
+  label: t('navigation.apotheker.notifications'),
+  to: '/apotheker/notifications',
+}))
 
 const {
   loadUnreadCount,

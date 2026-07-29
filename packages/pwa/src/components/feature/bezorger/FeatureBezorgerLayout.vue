@@ -3,6 +3,7 @@
     :title="t('shell.bezorger.title')"
     :nav-links="bezorgerNavLinks"
     :account-links="bezorgerAccountLinks"
+    :notification-link="bezorgerNotificationLink"
   >
     <template #header-actions>
       <CommonNotificationBell
@@ -35,6 +36,11 @@ const bezorgerNavLinks = computed<AppShellLink[]>(() => [
 const bezorgerAccountLinks = computed<AppShellLink[]>(() => [
   { label: t('navigation.bezorger.profile'), to: '/profile' },
 ])
+
+const bezorgerNotificationLink = computed<AppShellLink>(() => ({
+  label: t('navigation.bezorger.notifications'),
+  to: '/bezorger/notifications',
+}))
 
 const {
   loadUnreadCount,

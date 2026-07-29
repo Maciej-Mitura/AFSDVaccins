@@ -3,6 +3,7 @@
     :title="t('shell.admin.title')"
     :nav-links="adminNavLinks"
     :account-links="adminAccountLinks"
+    :notification-link="adminNotificationLink"
   >
     <template #header-actions>
       <CommonNotificationBell
@@ -44,6 +45,11 @@ const adminNavLinks = computed<AppShellLink[]>(() => [
 const adminAccountLinks = computed<AppShellLink[]>(() => [
   { label: t('navigation.admin.profile'), to: '/profile' },
 ])
+
+const adminNotificationLink = computed<AppShellLink>(() => ({
+  label: t('navigation.admin.notifications'),
+  to: '/admin/notifications',
+}))
 
 const {
   loadUnreadCount,

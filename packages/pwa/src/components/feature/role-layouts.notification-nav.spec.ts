@@ -29,7 +29,7 @@ vi.mock('@/composables/useOrders', () => ({
 vi.mock('@/components/common/CommonAppShell.vue', () => ({
   default: {
     name: 'CommonAppShell',
-    props: ['title', 'navLinks', 'accountLinks'],
+    props: ['title', 'navLinks', 'accountLinks', 'notificationLink'],
     template: `
       <nav data-testid="primary-nav">
         <a v-for="link in navLinks" :key="link.to" :href="link.to">{{ link.label }}</a>
