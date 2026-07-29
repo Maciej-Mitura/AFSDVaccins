@@ -91,7 +91,7 @@ function onOpenChange(value: boolean): void {
 
       <div
         v-else-if="preview"
-        class="max-h-[min(70vh,32rem)] space-y-4 overflow-y-auto overscroll-contain pr-1"
+        class="space-y-4"
         data-testid="delivery-qr-preview-body"
       >
         <UAlert

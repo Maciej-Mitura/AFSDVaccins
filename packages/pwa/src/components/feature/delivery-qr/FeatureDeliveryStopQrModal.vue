@@ -69,7 +69,7 @@ function formatAddressBlock(): string {
     <template #body>
       <div
         v-if="context"
-        class="max-h-[min(80vh,40rem)] space-y-4 overflow-y-auto overscroll-contain pr-1"
+        class="space-y-4"
         data-testid="delivery-stop-qr-modal-body"
       >
         <UAlert

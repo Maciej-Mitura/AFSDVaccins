@@ -191,6 +191,15 @@ describe('useDeliveryStopQrDisplay + FeatureDeliveryStopQrModal', () => {
         ),
     ).toBe(true)
 
+    const modalBodyEl = document.querySelector(
+      '[data-testid="delivery-stop-qr-modal-body"]',
+    )
+    expect(modalBodyEl).not.toBeNull()
+    const modalBodyClass = modalBodyEl?.className ?? ''
+    expect(modalBodyClass).toContain('space-y-4')
+    expect(modalBodyClass).not.toMatch(/overflow-y-auto/)
+    expect(modalBodyClass).not.toMatch(/max-h-/)
+
     display.closeModal()
     expect(revokeObjectURLMock).toHaveBeenCalledWith('blob:qr-modal')
     expect(display.objectUrl.value).toBeNull()

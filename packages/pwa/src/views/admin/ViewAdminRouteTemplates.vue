@@ -418,7 +418,7 @@ function stopSummary(template: RouteTemplateListItem): string {
         <UForm
           :schema="schema"
           :state="state"
-          class="max-h-[min(80vh,40rem)] space-y-4 overflow-y-auto overscroll-contain pr-1"
+          class="space-y-4"
           @submit="onSubmit"
         >
           <UFormField :label="t('common.name')" name="name">

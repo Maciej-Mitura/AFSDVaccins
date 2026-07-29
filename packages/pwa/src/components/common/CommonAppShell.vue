@@ -340,14 +340,15 @@ function toggleMobileMenu() {
   mobileMenuOpen.value = !mobileMenuOpen.value
 }
 
+/**
+ * Body scroll locking is owned by USlideover → Reka Dialog (modal=true).
+ * Do not apply a competing document body overflow lock here — overlapping
+ * locks can leave scroll disabled after close/navigation races on mobile.
+ */
 function onDocumentKeydown(event: KeyboardEvent) {
   if (event.key === 'Escape' && mobileMenuOpen.value) {
     closeMobileMenu()
   }
-}
-
-function syncBodyScrollLock(locked: boolean) {
-  document.body.style.overflow = locked ? 'hidden' : ''
 }
 
 watch(
@@ -358,7 +359,6 @@ watch(
 )
 
 watch(mobileMenuOpen, (open, wasOpen) => {
-  syncBodyScrollLock(open)
   if (open) {
     document.addEventListener('keydown', onDocumentKeydown)
   } else {
@@ -388,7 +388,7 @@ onMounted(() => {
 
 onUnmounted(() => {
   document.removeEventListener('keydown', onDocumentKeydown)
-  syncBodyScrollLock(false)
+  closeMobileMenu()
   if (motionMedia && onMotionChange) {
     motionMedia.removeEventListener('change', onMotionChange)
   }

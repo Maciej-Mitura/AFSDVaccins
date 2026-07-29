@@ -468,14 +468,17 @@ describe('CommonAppShell layout', () => {
     ).toBeNull()
   })
 
-  it('returns focus to the hamburger after closing and locks body scroll while open', async () => {
+  it('returns focus to the hamburger after closing without owning body scroll lock', async () => {
     const shell = mountShell()
     const toggle = shell.get('[data-testid="app-shell-menu-toggle"]')
     const toggleEl = toggle.element as HTMLButtonElement
     toggleEl.focus = vi.fn()
 
+    // Body scroll locking is owned by USlideover/Reka Dialog — the shell must
+    // not set document.body.style.overflow (avoids competing lock races).
+    document.body.style.overflow = 'visible'
     await openDrawer(shell)
-    expect(document.body.style.overflow).toBe('hidden')
+    expect(document.body.style.overflow).toBe('visible')
 
     document
       .querySelector<HTMLButtonElement>(
@@ -485,9 +488,25 @@ describe('CommonAppShell layout', () => {
     await nextTick()
     await nextTick()
 
-    expect(document.body.style.overflow).toBe('')
+    expect(document.body.style.overflow).toBe('visible')
     // eslint-disable-next-line @typescript-eslint/unbound-method
     expect(toggleEl.focus).toHaveBeenCalled()
+  })
+
+  it('does not write body.style.overflow when opening or closing the drawer', async () => {
+    const shell = mountShell()
+    document.body.style.overflow = ''
+
+    await openDrawer(shell)
+    expect(document.body.style.overflow).toBe('')
+
+    document
+      .querySelector<HTMLButtonElement>(
+        '[data-testid="app-shell-mobile-nav-close"]',
+      )
+      ?.click()
+    await nextTick()
+    expect(document.body.style.overflow).toBe('')
   })
 
   it('marks active mobile routes with aria-current and keeps logout working', async () => {
