@@ -391,6 +391,14 @@ export class BusinessNotificationProducerService {
       return
     }
 
+    this.logger.log({
+      event: 'business_notification_persisted',
+      type: input.type,
+      notificationId: notification.id,
+      recipientUserId: input.recipientUserId,
+      sourceEntityId: input.sourceEntityId,
+    })
+
     try {
       await this.deliveryPolicy.requestPushDelivery(notification)
     } catch (error) {

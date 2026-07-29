@@ -232,12 +232,35 @@ export class OrderService {
   }
 
   private async findOrdersForApotheker(apothekerId: string): Promise<Order[]> {
-    const orders = await this.orderRepository.find({
-      where: { apothekerId },
-      order: { submittedAt: 'DESC' },
-    })
+    const parsed = tryParseGraphqlObjectId(apothekerId.toString())
 
-    return this.orderNormalizationService.normalizeOrdersIfNeeded(orders)
+    if (!parsed) {
+      return []
+    }
+
+    const [byObjectId, byString] = await Promise.all([
+      this.orderRepository.find({
+        where: {
+          apothekerId: parsed.objectId as unknown as string,
+        },
+        order: { submittedAt: 'DESC' },
+      }),
+      this.orderRepository.find({
+        where: {
+          apothekerId: parsed.stringValue,
+        },
+        order: { submittedAt: 'DESC' },
+      }),
+    ])
+
+    const unique = new Map<string, Order>()
+    for (const order of [...byObjectId, ...byString]) {
+      unique.set(order.id.toString(), order)
+    }
+
+    return this.orderNormalizationService.normalizeOrdersIfNeeded([
+      ...unique.values(),
+    ])
   }
 
   private buildWeeklySummary(

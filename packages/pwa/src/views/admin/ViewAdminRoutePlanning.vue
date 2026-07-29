@@ -13,6 +13,11 @@ import FeatureRouteVoiceRecorder from '@/components/feature/voice-report/Feature
 import { toRouteLocationStatusCardProps } from '@/components/feature/routes/route-location-status'
 import { routeSkipReasonLabelKey } from '@/composables/route-generation-diagnostics'
 import {
+  deriveStopLifecycleStatus,
+  evaluateRouteCompletionEligibility,
+  listIncompleteDeliverableStops,
+} from '@/composables/delivery-stop-lifecycle'
+import {
   RouteStatus,
   useDeliveryRoutes,
   type DeliveryRouteItem,
@@ -117,6 +122,28 @@ function stopQrStateLabel(stop: DeliveryStopItem): string {
     return t('deliveryStopQr.state.available')
   }
   return t('deliveryStopQr.state.unavailable')
+}
+
+function stopLifecycleLabel(stop: DeliveryStopItem): string {
+  const status = deriveStopLifecycleStatus(stop)
+  if (status === 'delivery_confirmed') {
+    return t('routes.stop.lifecycle.confirmed')
+  }
+  if (status === 'arrived') {
+    return t('routes.stop.lifecycle.arrived')
+  }
+  return t('routes.stop.lifecycle.pending')
+}
+
+function routeCompletionBlocked(route: DeliveryRouteItem): boolean {
+  return (
+    route.status === RouteStatus.InProgress &&
+    !evaluateRouteCompletionEligibility(route.stops).ok
+  )
+}
+
+function routeIncompleteStopCount(route: DeliveryRouteItem): number {
+  return listIncompleteDeliverableStops(route.stops).length
 }
 
 function canViewStopQr(
@@ -349,7 +376,13 @@ async function confirmStatusChange(): Promise<void> {
 
 function availableAdminActions(
   status: RouteStatusValue,
-): Array<{ status: RouteStatusValue; label: string; color?: 'error' }> {
+): Array<{
+  status: RouteStatusValue
+  label: string
+  color?: 'error'
+  disabled?: boolean
+  disabledReason?: string
+}> {
   if (status === RouteStatus.Assigned) {
     return [
       { status: RouteStatus.InProgress, label: t('routes.status.start') },
@@ -373,6 +406,16 @@ function availableAdminActions(
   }
 
   return []
+}
+
+function isAdminActionDisabled(
+  route: DeliveryRouteItem,
+  action: { status: RouteStatusValue },
+): boolean {
+  if (action.status !== RouteStatus.Completed) {
+    return false
+  }
+  return routeCompletionBlocked(route)
 }
 
 function stopSummary(orderCount: number, totalQuantity: number): string {
@@ -641,6 +684,21 @@ onMounted(() => {
                     )
                   }}
                 </UBadge>
+                <UBadge
+                  v-if="routeCompletionBlocked(route)"
+                  color="warning"
+                  variant="subtle"
+                  data-testid="admin-route-completion-blocked"
+                >
+                  {{ t('routes.completion.blocked') }}
+                  —
+                  {{
+                    translatePlural(
+                      'routes.completion.incompleteStops',
+                      routeIncompleteStopCount(route),
+                    )
+                  }}
+                </UBadge>
               </div>
             </div>
 
@@ -674,7 +732,21 @@ onMounted(() => {
                 :color="action.color === 'error' ? 'error' : 'primary'"
                 :variant="action.color === 'error' ? 'outline' : 'solid'"
                 :loading="actingRouteId === route.id && updatingStatus"
-                :disabled="!isOnline || updatingStatus"
+                :disabled="
+                  !isOnline ||
+                  updatingStatus ||
+                  isAdminActionDisabled(route, action)
+                "
+                :title="
+                  isAdminActionDisabled(route, action)
+                    ? t('routes.completion.completeDeliveriesFirst')
+                    : undefined
+                "
+                :data-testid="
+                  action.status === RouteStatus.Completed
+                    ? 'admin-route-complete'
+                    : undefined
+                "
                 @click="requestStatusChange(route, action.status, action.label)"
               >
                 {{ action.label }}
@@ -773,6 +845,19 @@ onMounted(() => {
                 </li>
               </ul>
               <div class="flex flex-wrap items-center gap-2">
+                <UBadge
+                  variant="subtle"
+                  :color="
+                    deriveStopLifecycleStatus(stop) === 'delivery_confirmed'
+                      ? 'success'
+                      : deriveStopLifecycleStatus(stop) === 'arrived'
+                        ? 'warning'
+                        : 'neutral'
+                  "
+                  data-testid="admin-stop-lifecycle"
+                >
+                  {{ stopLifecycleLabel(stop) }}
+                </UBadge>
                 <UBadge variant="subtle" data-testid="admin-stop-qr-state">
                   {{ stopQrStateLabel(stop) }}
                 </UBadge>

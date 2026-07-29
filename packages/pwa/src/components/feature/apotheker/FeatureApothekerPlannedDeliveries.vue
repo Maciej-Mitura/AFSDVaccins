@@ -98,6 +98,7 @@ function isManifestFeedback(delivery: PlannedDeliveryItem): boolean {
 
 let reconnectCleanup: (() => void) | null = null
 let notificationHandlerCleanup: (() => void) | null = null
+let visibilityCleanup: (() => void) | null = null
 
 const PLANNED_DELIVERY_REFRESH_TYPES = new Set<NotificationType>([
   NotificationType.ApothekerNextStop,
@@ -130,11 +131,21 @@ onMounted(() => {
   notificationHandlerCleanup = registerNotificationReceivedHandler(
     onPlannedDeliveryNotification,
   )
+  const onVisible = () => {
+    if (document.visibilityState === 'visible') {
+      void loadMyPlannedDeliveries()
+    }
+  }
+  document.addEventListener('visibilitychange', onVisible)
+  visibilityCleanup = () => {
+    document.removeEventListener('visibilitychange', onVisible)
+  }
 })
 
 onUnmounted(() => {
   reconnectCleanup?.()
   notificationHandlerCleanup?.()
+  visibilityCleanup?.()
 })
 
 function deliveryStateLabel(delivery: PlannedDeliveryItem): string {

@@ -13,6 +13,8 @@ const props = defineProps<{
   enabled: boolean
   /** Cached/offline read-only mode — never request camera. */
   readOnlyOffline?: boolean
+  /** Visually elevate the scan CTA after arrival. */
+  dominant?: boolean
   onRefreshRoute: () => Promise<void> | void
 }>()
 
@@ -176,16 +178,24 @@ function onPreviewCancel(): void {
       v-if="enabled && !readOnlyOffline"
       ref="scanButtonRef"
       block
-      size="xl"
+      :size="dominant ? 'xl' : 'lg'"
       class="min-h-14 text-base"
       color="primary"
-      variant="soft"
+      :variant="dominant ? 'solid' : 'soft'"
       data-testid="delivery-qr-scan-action"
       :disabled="!canShowScanAction"
-      :aria-label="t('bezorger.route.qr.scan')"
+      :aria-label="
+        dominant
+          ? t('bezorger.route.qr.confirmDelivery')
+          : t('bezorger.route.qr.scan')
+      "
       @click="openScanner()"
     >
-      {{ t('bezorger.route.qr.scan') }}
+      {{
+        dominant
+          ? t('bezorger.route.qr.confirmDelivery')
+          : t('bezorger.route.qr.scan')
+      }}
     </UButton>
 
     <p

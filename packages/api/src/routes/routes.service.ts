@@ -1,4 +1,4 @@
-import { Inject, Injectable } from '@nestjs/common'
+import { Inject, Injectable, Logger } from '@nestjs/common'
 import { InjectRepository } from '@nestjs/typeorm'
 import { MongoRepository } from 'typeorm'
 
@@ -16,6 +16,7 @@ import { User } from '../user/user.entity'
 import { UserRole } from '../user/user-role.enum'
 import { canReceiveBezorgerRouteUpdate } from './bezorger-route-subscription.filter'
 import { isValidDeliveryDateString } from './delivery-date-validation.util'
+import { evaluateRouteCompletionEligibility } from './delivery-lifecycle.policy'
 import { DeliveryRoute } from './delivery-route.entity'
 import { DeliveryRouteEventsService } from './delivery-route-events.service'
 import {
@@ -24,6 +25,7 @@ import {
   InvalidDeliveryDateException,
   InvalidRouteStatusTransitionException,
   RouteCannotBeCancelledException,
+  RouteCompletionIncompleteStopsException,
 } from './exceptions/delivery-route.exceptions'
 import {
   DeliveryRouteGenerationResult,
@@ -42,6 +44,8 @@ import { RouteStatusHistoryEntry } from './route-status-history.type'
 
 @Injectable()
 export class RoutesService {
+  private readonly logger = new Logger(RoutesService.name)
+
   constructor(
     @InjectRepository(DeliveryRoute)
     private readonly deliveryRouteRepository: MongoRepository<DeliveryRoute>,
@@ -150,6 +154,10 @@ export class RoutesService {
   /**
    * Controlled route FSM transition. Does not modify orders or stock.
    * Same-status requests are idempotent (no history append, no publish).
+   *
+   * Phase 36D: COMPLETED requires every deliverable stop to have confirmed
+   * delivery (QR proof / consumed QR). Empty-order and zero-stop routes may
+   * complete. No silent exception path for undelivered stops.
    */
   async updateRouteStatus(
     actor: User,
@@ -165,6 +173,10 @@ export class RoutesService {
     }
 
     this.assertTransitionAllowed(actor, route.status, targetStatus)
+
+    if (targetStatus === RouteStatus.COMPLETED) {
+      this.assertRouteMayComplete(route)
+    }
 
     const previousStatus = route.status
     const now = this.clock.now()
@@ -207,6 +219,9 @@ export class RoutesService {
       }
 
       this.assertTransitionAllowed(actor, reloaded.status, targetStatus)
+      if (targetStatus === RouteStatus.COMPLETED) {
+        this.assertRouteMayComplete(reloaded)
+      }
       throw new InvalidRouteStatusTransitionException(
         reloaded.status,
         targetStatus,
@@ -223,7 +238,36 @@ export class RoutesService {
       await this.businessNotificationProducer.notifyPharmacyRouteStarted(saved)
     }
 
+    if (targetStatus === RouteStatus.COMPLETED) {
+      this.logger.log({
+        event: 'route_completion_recorded',
+        routeId: saved.id,
+        actorUserId: actor._id.toString(),
+        previousStatus,
+      })
+    }
+
     return saved
+  }
+
+  private assertRouteMayComplete(route: DeliveryRoute): void {
+    const eligibility = evaluateRouteCompletionEligibility(route.stops)
+    if (eligibility.ok) {
+      return
+    }
+
+    this.logger.warn({
+      event: 'route_completion_blocked_incomplete_stops',
+      routeId: route.id,
+      incompleteStopCount: eligibility.incompleteStopCount,
+      incompleteStopIds: eligibility.incompleteStops.map(
+        stop => stop.stopId ?? `seq:${stop.sequence}`,
+      ),
+    })
+
+    throw new RouteCompletionIncompleteStopsException(
+      eligibility.incompleteStopCount,
+    )
   }
 
   async filterRouteUpdateForSubscriber(

@@ -12,6 +12,9 @@ import { BezorgerProfile } from '../profile/bezorger/bezorger-profile.entity'
 import { RouteTemplate } from '../route-templates/route-template.entity'
 import { DeliveryRoute } from '../routes/delivery-route.entity'
 import { RouteStatus } from '../routes/route-status.enum'
+import { createGeneratedStopQrState } from '../routes/qr/create-generated-stop-qr-state'
+import { DELIVERY_QR_TEST_SIGNING_SECRET } from '../routes/qr/delivery-qr.constants'
+import { HmacDeliveryQrTokenService } from '../routes/qr/hmac-delivery-qr-token.service'
 import { ApplicationSettings } from '../settings/settings.entity'
 import {
   APPLICATION_SETTINGS_DEFAULTS,
@@ -32,11 +35,15 @@ export type PlaywrightSeedSummary = {
   bezorger1Email: string
   bezorger2Email: string
   todayRouteId: string
+  todayStopId: string
+  /** Test-only bearer for QR confirm REST — never log in production paths. */
+  todayStopQrToken: string
   todayDeliveryDate: string
   tomorrowDeliveryDate: string
   pharmacy1Name: string
   vaccineName: string
   todayOrderQuantity: number
+  todayOrderId: string
 }
 
 const DEFAULT_ADDRESS = {
@@ -297,7 +304,7 @@ export async function seedPlaywrightBrowserFixtures(
   )
 
   const now = new Date()
-  const todayRoute = await routeRepo.save(
+  const todayRouteDraft = await routeRepo.save(
     routeRepo.create({
       routeTemplateId: template._id.toString(),
       bezorgerProfileId: bezorger1Profile._id.toString(),
@@ -337,6 +344,24 @@ export async function seedPlaywrightBrowserFixtures(
     }),
   )
 
+  const routeId = todayRouteDraft._id.toString()
+  const tokenService = new HmacDeliveryQrTokenService(
+    process.env.DELIVERY_QR_SIGNING_SECRET ?? DELIVERY_QR_TEST_SIGNING_SECRET,
+  )
+  const { stopId, qrConfirmation } = createGeneratedStopQrState({
+    routeId,
+    tokenService,
+    issuedAt: now,
+  })
+
+  todayRouteDraft.stops[0] = {
+    ...todayRouteDraft.stops[0],
+    stopId,
+    qrConfirmation,
+    deliveryProof: null,
+  }
+  const todayRoute = await routeRepo.save(todayRouteDraft)
+
   return {
     adminEmail: adminIdentity.email,
     apotheker1Email: apotheker1Identity.email,
@@ -344,10 +369,13 @@ export async function seedPlaywrightBrowserFixtures(
     bezorger1Email: bezorger1Identity.email,
     bezorger2Email: bezorger2Identity.email,
     todayRouteId: todayRoute._id.toString(),
+    todayStopId: stopId,
+    todayStopQrToken: qrConfirmation.encodedToken,
     todayDeliveryDate: today,
     tomorrowDeliveryDate: tomorrow,
     pharmacy1Name: apotheker1Profile.pharmacyName,
     vaccineName: vaccine.name,
     todayOrderQuantity,
+    todayOrderId: todayOrder._id.toString(),
   }
 }

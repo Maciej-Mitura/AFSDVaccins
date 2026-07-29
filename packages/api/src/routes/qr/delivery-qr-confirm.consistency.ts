@@ -1,6 +1,7 @@
 import { ObjectId } from 'mongodb'
 import type { MongoRepository } from 'typeorm'
 
+import { countIncompleteDeliverableStops } from '../delivery-lifecycle.policy'
 import { DeliveryRoute } from '../delivery-route.entity'
 import { DeliveryStop } from '../delivery-stop.embed'
 import { RouteStatus } from '../route-status.enum'
@@ -370,11 +371,9 @@ export async function finaliseStopDeliveryByQr(
   return { ok: true, route: updated }
 }
 
+/** Remaining deliverable stops that still need QR confirmation. */
 export function countRemainingUndeliveredStops(
   stops: readonly DeliveryStop[] | null | undefined,
 ): number {
-  return (stops ?? []).filter(stop => {
-    const deliveredAt = stop.deliveryProof?.deliveredAt
-    return !(deliveredAt instanceof Date) || Number.isNaN(deliveredAt.getTime())
-  }).length
+  return countIncompleteDeliverableStops(stops)
 }

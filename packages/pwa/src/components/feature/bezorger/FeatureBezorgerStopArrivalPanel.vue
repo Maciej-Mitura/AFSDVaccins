@@ -44,6 +44,13 @@ function arrivalErrorLabel(code: string | null): string {
         })
       }}
     </p>
+    <p
+      v-if="viewModel.state === 'confirmed'"
+      class="text-sm text-toned"
+      data-testid="route-stop-arrived-not-delivered"
+    >
+      {{ t('arrival.notDeliveredYet') }}
+    </p>
 
     <p
       v-else-if="viewModel.state === 'syncing'"

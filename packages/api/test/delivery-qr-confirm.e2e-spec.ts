@@ -802,8 +802,18 @@ describe('Delivery QR confirm (e2e)', () => {
     expect(confirmBody(first).routeStatus).toBe(RouteStatus.IN_PROGRESS)
   })
 
-  it('35. existing route completion rules remain intact', async () => {
+  it('35. route completion succeeds only after QR confirmation (Phase 36D)', async () => {
     const seeded = await seedInProgressRoute()
+    const blocked = await graphqlRequest(app, {
+      query: UPDATE_ROUTE_STATUS,
+      token: E2E_TOKENS.bezorger1,
+      variables: {
+        id: seeded.routeId,
+        status: RouteStatus.COMPLETED,
+      },
+    })
+    expect(blocked.errors).toBeDefined()
+
     const confirmed = await confirm(seeded.encodedToken, E2E_TOKENS.bezorger1)
     expect(confirmed.status).toBe(200)
     expect(confirmBody(confirmed).routeStatus).toBe(RouteStatus.IN_PROGRESS)

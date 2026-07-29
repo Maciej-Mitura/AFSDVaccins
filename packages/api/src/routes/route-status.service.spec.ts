@@ -17,6 +17,7 @@ import {
   DeliveryRouteNotFoundException,
   InvalidRouteStatusTransitionException,
   RouteCannotBeCancelledException,
+  RouteCompletionIncompleteStopsException,
 } from './exceptions/delivery-route.exceptions'
 import { RouteGenerationService } from './route-generation.service'
 import { RoutePreviewService } from './route-preview.service'
@@ -112,17 +113,10 @@ describe('RoutesService.updateRouteStatus', () => {
             city: 'Gent',
             country: 'BE',
           },
-          orderIds: ['o1'],
-          orderCount: 1,
-          totalQuantity: 5,
-          lines: [
-            {
-              vaccineId: 'v1',
-              vaccineName: 'Flu',
-              manufacturer: 'M',
-              quantity: 5,
-            },
-          ],
+          orderIds: [],
+          orderCount: 0,
+          totalQuantity: 0,
+          lines: [],
         },
       ],
       skippedApothekerProfileIds: [],
@@ -313,6 +307,38 @@ describe('RoutesService.updateRouteStatus', () => {
 
     expect(result.status).toBe(RouteStatus.COMPLETED)
     expect(eventsService.publishBezorgerRouteUpdated).toHaveBeenCalledTimes(1)
+  })
+
+  it('IN_PROGRESS → COMPLETED is blocked while deliverable stops lack confirmation', async () => {
+    mockFindOne(
+      makeRoute(RouteStatus.IN_PROGRESS, {
+        stops: [
+          {
+            sequence: 1,
+            apothekerProfileId: 'a',
+            apothekerUserId: 'u',
+            pharmacyName: 'Apotheek',
+            address: {
+              street: 'S',
+              houseNumber: '1',
+              postalCode: '9000',
+              city: 'Gent',
+              country: 'BE',
+            },
+            orderIds: ['o1'],
+            orderCount: 1,
+            totalQuantity: 5,
+            lines: [],
+            stopId: 'stop-1',
+          },
+        ],
+      }),
+    )
+
+    await expect(
+      service.updateRouteStatus(bezorger, routeId, RouteStatus.COMPLETED),
+    ).rejects.toBeInstanceOf(RouteCompletionIncompleteStopsException)
+    expect(eventsService.publishBezorgerRouteUpdated).not.toHaveBeenCalled()
   })
 
   it('ADMIN can cancel ASSIGNED route with reason', async () => {

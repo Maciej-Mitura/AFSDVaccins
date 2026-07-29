@@ -144,6 +144,13 @@ export class DeliveryQrConfirmService {
     this.assertRouteStatusForConfirm(route.status)
     this.assertStopNotFullyConfirmed(stop)
 
+    this.logger.log({
+      event: 'delivery_qr_confirm_started',
+      routeId: parsedRouteId.stringValue,
+      stopId: stop.stopId,
+      actorId: courierUserId,
+    })
+
     try {
       verifySubmittedStopQrToken(this.tokenService, token, confirmation, {
         routeId: parsedRouteId.stringValue,
@@ -340,6 +347,16 @@ export class DeliveryQrConfirmService {
       completedStop,
       nextStopForNotify,
     )
+
+    this.logger.log({
+      event: 'delivery_qr_confirm_completed',
+      routeId: parsedRouteId.stringValue,
+      stopId: stop.stopId,
+      confirmationEventId,
+      orderCount: orderIds.length,
+      remainingStopCount: countRemainingUndeliveredStops(routeForPublish.stops),
+      actorId: courierUserId,
+    })
 
     return {
       routeId: parsedRouteId.stringValue,

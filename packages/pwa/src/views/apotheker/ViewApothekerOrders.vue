@@ -2,7 +2,7 @@
 import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 
-import { OrderStatus } from '@vaccin-delivery/types'
+import { NotificationType, OrderStatus } from '@vaccin-delivery/types'
 
 import CommonEmptyState from '@/components/common/CommonEmptyState.vue'
 import CommonErrorState from '@/components/common/CommonErrorState.vue'
@@ -13,7 +13,11 @@ import CommonRealtimeStatus from '@/components/common/CommonRealtimeStatus.vue'
 import FeatureApothekerPlannedDeliveries from '@/components/feature/apotheker/FeatureApothekerPlannedDeliveries.vue'
 import { shortOrderId } from '@/composables/order-history-filters'
 import { registerReconnectHandler } from '@/composables/useGraphQL'
-import { useNotifications } from '@/composables/useNotifications'
+import {
+  registerNotificationReceivedHandler,
+  useNotifications,
+  type NotificationListItem,
+} from '@/composables/useNotifications'
 import { useOrders } from '@/composables/useOrders'
 import {
   formatDate,
@@ -43,6 +47,22 @@ const cancellingId = ref<string | null>(null)
 const actionError = ref<string | null>(null)
 const expandedOrderIds = ref<Set<string>>(new Set())
 let reconnectCleanup: (() => void) | null = null
+let notificationHandlerCleanup: (() => void) | null = null
+let visibilityHandler: (() => void) | null = null
+
+const ORDER_REFRESH_NOTIFICATION_TYPES = new Set<NotificationType>([
+  NotificationType.ApothekerDeliveryConfirmed,
+  NotificationType.ApothekerRouteStarted,
+  NotificationType.ApothekerNextStop,
+])
+
+function onOrdersRelevantNotification(notification: NotificationListItem): void {
+  if (!ORDER_REFRESH_NOTIFICATION_TYPES.has(notification.type)) {
+    return
+  }
+  void loadMyOrders()
+  void loadWeeklySummary()
+}
 
 void loadMyOrders()
 
@@ -53,12 +73,25 @@ onMounted(() => {
     await loadMyOrders()
     await loadWeeklySummary()
   })
+  notificationHandlerCleanup = registerNotificationReceivedHandler(
+    onOrdersRelevantNotification,
+  )
+  visibilityHandler = () => {
+    if (document.visibilityState === 'visible') {
+      void loadMyOrders()
+    }
+  }
+  document.addEventListener('visibilitychange', visibilityHandler)
 })
 
 onUnmounted(() => {
   stopMyOrderSubscriptions()
   stopNotificationSubscription()
   reconnectCleanup?.()
+  notificationHandlerCleanup?.()
+  if (visibilityHandler) {
+    document.removeEventListener('visibilitychange', visibilityHandler)
+  }
 })
 
 function canCancel(status: OrderStatus): boolean {

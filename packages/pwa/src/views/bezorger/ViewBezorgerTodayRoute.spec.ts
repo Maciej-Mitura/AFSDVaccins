@@ -299,7 +299,7 @@ describe('ViewBezorgerTodayRoute Phase 35G5', () => {
     )
   })
 
-  it('shows IN_PROGRESS with QR, mark-arrived and complete', async () => {
+  it('shows IN_PROGRESS with QR, mark-arrived and blocked complete until delivered', async () => {
     arrivalVm.value = {
       ...arrivalVm.value,
       state: 'mark',
@@ -318,6 +318,55 @@ describe('ViewBezorgerTodayRoute Phase 35G5', () => {
       true,
     )
     expect(wrapper.find('[data-testid="route-complete"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="route-complete-blocked"]').exists()).toBe(
+      true,
+    )
+    expect(
+      wrapper.find('[data-testid="route-complete"]').attributes('disabled'),
+    ).toBeDefined()
+  })
+
+  it('enables complete after all deliverable stops are confirmed', async () => {
+    myTodayRoute.value = makeRoute(RouteStatus.InProgress, [
+      makeStop({
+        qrConsumed: true,
+        deliveredAt: '2026-07-29T10:00:00.000Z',
+      }),
+    ])
+    const wrapper = mountPage()
+    await nextTick()
+    expect(wrapper.find('[data-testid="route-complete-blocked"]').exists()).toBe(
+      false,
+    )
+    expect(
+      wrapper.find('[data-testid="route-complete"]').attributes('disabled'),
+    ).toBeUndefined()
+  })
+
+  it('shows arrived next-step after arrival confirmation', async () => {
+    arrivalVm.value = {
+      ...arrivalVm.value,
+      state: 'confirmed',
+      canMarkArrived: false,
+      clientArrivedAt: '2026-07-29T09:00:00.000Z',
+      recordedAt: '2026-07-29T09:00:01.000Z',
+    }
+    myTodayRoute.value = makeRoute(RouteStatus.InProgress, [
+      makeStop({
+        arrival: {
+          clientArrivedAt: '2026-07-29T09:00:00.000Z',
+          recordedAt: '2026-07-29T09:00:01.000Z',
+        },
+      }),
+    ])
+    const wrapper = mountPage()
+    await nextTick()
+    expect(
+      wrapper.find('[data-testid="route-stop-arrived-next-step"]').exists(),
+    ).toBe(true)
+    expect(wrapper.find('[data-testid="route-stop-qr-dominant"]').exists()).toBe(
+      true,
+    )
   })
 
   it('shows COMPLETED and CANCELLED without primary delivery actions', async () => {

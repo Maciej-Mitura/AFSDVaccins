@@ -10,6 +10,7 @@ import { User } from '../../user/user.entity'
 import { UserRole } from '../../user/user-role.enum'
 import { DeliveryRoute } from '../delivery-route.entity'
 import { DeliveryStop } from '../delivery-stop.embed'
+import { deriveStopLifecycleStatus } from '../delivery-lifecycle.policy'
 import { RouteStatus } from '../route-status.enum'
 import { DeliveryStopQrImageService } from '../qr/delivery-stop-qr-image.service'
 import {
@@ -595,10 +596,11 @@ export class DeliveryManifestDataService {
 }
 
 function deriveStopStatus(stop: DeliveryStop): ManifestStopStatus {
-  if (stop.deliveryProof != null || isStopQrConsumed(stop)) {
+  const lifecycle = deriveStopLifecycleStatus(stop)
+  if (lifecycle === 'delivery_confirmed') {
     return 'delivered'
   }
-  if (stop.arrival != null) {
+  if (lifecycle === 'arrived') {
     return 'arrived'
   }
   return 'pending'

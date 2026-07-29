@@ -80,3 +80,20 @@ export class RouteCannotBeCancelledException extends BadRequestException {
     })
   }
 }
+
+/**
+ * Phase 36D — route completion blocked while deliverable stops lack QR confirmation.
+ * Does not invent failed-delivery exception completion.
+ */
+export class RouteCompletionIncompleteStopsException extends BadRequestException {
+  constructor(incompleteStopCount: number) {
+    super({
+      message:
+        incompleteStopCount === 1
+          ? 'Route kan niet worden afgerond: 1 stop mist nog een bevestigde levering.'
+          : `Route kan niet worden afgerond: ${incompleteStopCount} stops missen nog een bevestigde levering.`,
+      error: 'ROUTE_COMPLETION_INCOMPLETE_STOPS',
+      incompleteStopCount,
+    })
+  }
+}

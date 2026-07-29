@@ -14,6 +14,14 @@ import FeatureRouteVoiceRecorder from '@/components/feature/voice-report/Feature
 import { toRouteLocationStatusCardProps } from '@/components/feature/routes/route-location-status'
 import { useCourierStopArrival } from '@/composables/useCourierStopArrival'
 import {
+  deriveStopLifecycleStatus,
+  evaluateRouteCompletionEligibility,
+  isStopArrived,
+  isStopDeliveryConfirmed,
+  listIncompleteDeliverableStops,
+  type DerivedStopLifecycleStatus,
+} from '@/composables/delivery-stop-lifecycle'
+import {
   RouteStatus,
   useDeliveryRoutes,
   type DeliveryStopItem,
@@ -163,7 +171,22 @@ const headerMeta = computed(() => {
 })
 
 function isStopDelivered(stop: DeliveryStopItem): boolean {
-  return Boolean(stop.qrConsumed || stop.deliveredAt)
+  return isStopDeliveryConfirmed(stop)
+}
+
+function stopLifecycleStatus(stop: DeliveryStopItem): DerivedStopLifecycleStatus {
+  return deriveStopLifecycleStatus(stop)
+}
+
+function stopLifecycleLabel(stop: DeliveryStopItem): string {
+  const status = stopLifecycleStatus(stop)
+  if (status === 'delivery_confirmed') {
+    return t('bezorger.route.stop.lifecycle.confirmed')
+  }
+  if (status === 'arrived') {
+    return t('bezorger.route.stop.lifecycle.arrived')
+  }
+  return t('bezorger.route.stop.lifecycle.pending')
 }
 
 function stopKey(stop: DeliveryStopItem): string {
@@ -182,6 +205,77 @@ const currentStop = computed((): DeliveryStopItem | null => {
     return null
   }
   return route.stops.find(stop => !isStopDelivered(stop)) ?? null
+})
+
+const incompleteStops = computed(() => {
+  const route = myTodayRoute.value
+  if (!route) {
+    return []
+  }
+  return listIncompleteDeliverableStops(route.stops)
+})
+
+const completionEligibility = computed(() => {
+  const route = myTodayRoute.value
+  if (!route) {
+    return { ok: true, incompleteStopCount: 0 }
+  }
+  return evaluateRouteCompletionEligibility(route.stops)
+})
+
+const canCompleteRoute = computed(
+  () =>
+    actionsEnabled.value &&
+    myTodayRoute.value?.status === RouteStatus.InProgress &&
+    completionEligibility.value.ok,
+)
+
+const incompleteStopsLabel = computed(() => {
+  const count = completionEligibility.value.incompleteStopCount
+  if (count <= 0) {
+    return null
+  }
+  return translatePlural('bezorger.route.complete.incompleteStops', count)
+})
+
+const currentStopArrived = computed(() => {
+  const stop = currentStop.value
+  if (!stop || isStopDelivered(stop)) {
+    return false
+  }
+  const stopId = stop.stopId
+  if (stopId) {
+    const vm = viewModelForStop(stopId)
+    if (
+      vm?.state === 'confirmed' ||
+      vm?.state === 'pending' ||
+      vm?.state === 'syncing'
+    ) {
+      return true
+    }
+  }
+  return isStopArrived(stop)
+})
+
+const showDominantQrForCurrentStop = computed(() => {
+  return (
+    myTodayRoute.value?.status === RouteStatus.InProgress &&
+    currentStop.value != null &&
+    !isStopDelivered(currentStop.value) &&
+    currentStopArrived.value
+  )
+})
+
+const showEarlyQrSection = computed(() => {
+  return (
+    myTodayRoute.value?.status === RouteStatus.InProgress &&
+    !showDominantQrForCurrentStop.value &&
+    !(
+      currentStop.value &&
+      isStopDelivered(currentStop.value) &&
+      incompleteStops.value.length === 0
+    )
+  )
 })
 
 const remainingStops = computed((): DeliveryStopItem[] => {
@@ -274,7 +368,7 @@ async function onStartRoute(): Promise<void> {
 }
 
 async function onCompleteRoute(): Promise<void> {
-  if (!myTodayRoute.value || !actionsEnabled.value) {
+  if (!myTodayRoute.value || !canCompleteRoute.value) {
     return
   }
 
@@ -620,21 +714,36 @@ watch([ownerUserId, ownerBezorgerProfileId, isOnline], () => {
                 {{ currentStop.address.city }}
               </p>
             </div>
-            <UBadge
-              v-if="stopRoleLabel(currentStop)"
-              variant="subtle"
-              color="primary"
-              data-testid="route-stop-role"
-            >
-              <span class="inline-flex items-center gap-1">
-                <UIcon
-                  name="i-lucide-map-pin"
-                  class="size-3.5"
-                  aria-hidden="true"
-                />
-                {{ stopRoleLabel(currentStop) }}
-              </span>
-            </UBadge>
+            <div class="flex flex-wrap items-center gap-2">
+              <UBadge
+                variant="subtle"
+                :color="
+                  isStopDelivered(currentStop)
+                    ? 'success'
+                    : currentStopArrived
+                      ? 'warning'
+                      : 'neutral'
+                "
+                data-testid="route-stop-lifecycle"
+              >
+                {{ stopLifecycleLabel(currentStop) }}
+              </UBadge>
+              <UBadge
+                v-if="stopRoleLabel(currentStop)"
+                variant="subtle"
+                color="primary"
+                data-testid="route-stop-role"
+              >
+                <span class="inline-flex items-center gap-1">
+                  <UIcon
+                    name="i-lucide-map-pin"
+                    class="size-3.5"
+                    aria-hidden="true"
+                  />
+                  {{ stopRoleLabel(currentStop) }}
+                </span>
+              </UBadge>
+            </div>
           </div>
 
           <p class="text-sm text-muted wrap-break-word">
@@ -649,29 +758,58 @@ watch([ownerUserId, ownerBezorgerProfileId, isOnline], () => {
           </p>
 
           <p
-            v-if="currentStop.qrConsumed || currentStop.deliveredAt"
+            v-if="isStopDelivered(currentStop)"
             class="text-sm font-medium text-success"
             data-testid="route-stop-delivered"
+            role="status"
           >
             {{
               currentStop.deliveredAt
                 ? t('bezorger.route.stop.deliveredAt', {
                     deliveredAt: formatDateTime(currentStop.deliveredAt),
                   })
-                : t('bezorger.route.stop.delivered')
+                : t('bezorger.route.stop.deliveryConfirmed')
             }}
           </p>
 
-          <FeatureBezorgerStopArrivalPanel
-            v-else-if="currentStop.stopId && showArrivalForStop(currentStop)"
-            :view-model="viewModelForStop(currentStop.stopId)!"
-            :confirm-cancel="confirmCancelArrivalStopId === currentStop.stopId"
-            @mark-arrived="onMarkArrived(currentStop.stopId!)"
-            @cancel-pending="onCancelPendingArrival(currentStop.stopId!)"
-            @dismiss-cancel="dismissCancelArrivalConfirm"
-            @retry="retrySync"
-            @discard="onDiscardPending(currentStop.stopId!)"
-          />
+          <template v-else>
+            <FeatureBezorgerStopArrivalPanel
+              v-if="currentStop.stopId && showArrivalForStop(currentStop)"
+              :view-model="viewModelForStop(currentStop.stopId)!"
+              :confirm-cancel="confirmCancelArrivalStopId === currentStop.stopId"
+              @mark-arrived="onMarkArrived(currentStop.stopId!)"
+              @cancel-pending="onCancelPendingArrival(currentStop.stopId!)"
+              @dismiss-cancel="dismissCancelArrivalConfirm"
+              @retry="retrySync"
+              @discard="onDiscardPending(currentStop.stopId!)"
+            />
+
+            <UAlert
+              v-if="currentStopArrived"
+              color="warning"
+              variant="subtle"
+              role="status"
+              data-testid="route-stop-arrived-next-step"
+              :title="t('arrival.notDeliveredYet')"
+              :description="t('bezorger.route.qr.nextStepAfterArrival')"
+            />
+
+            <div
+              v-if="showDominantQrForCurrentStop"
+              class="space-y-2"
+              data-testid="route-stop-qr-dominant"
+            >
+              <p class="text-sm font-medium text-highlighted">
+                {{ t('bezorger.route.qr.confirmDelivery') }}
+              </p>
+              <FeatureBezorgerDeliveryQrWorkflow
+                :enabled="canScanDeliveryQr"
+                :read-only-offline="todayRouteIsReadOnly"
+                :on-refresh-route="() => loadMyTodayRoute({ isRefresh: true })"
+                dominant
+              />
+            </div>
+          </template>
 
           <div>
             <button
@@ -709,12 +847,15 @@ watch([ownerUserId, ownerBezorgerProfileId, isOnline], () => {
         </div>
       </CommonPageSection>
 
-      <!-- QR in stop / delivery context (always available while in progress) -->
+      <!-- QR available before arrival (early confirmation allowed by backend) -->
       <CommonPageSection
-        v-if="myTodayRoute.status === RouteStatus.InProgress"
+        v-if="showEarlyQrSection"
         :title="t('bezorger.route.qr.scan')"
         data-testid="route-qr-section"
       >
+        <p class="mb-3 text-sm text-muted" data-testid="route-qr-early-hint">
+          {{ t('bezorger.route.qr.earlyConfirmHint') }}
+        </p>
         <FeatureBezorgerDeliveryQrWorkflow
           :enabled="canScanDeliveryQr"
           :read-only-offline="todayRouteIsReadOnly"
@@ -759,6 +900,19 @@ watch([ownerUserId, ownerBezorgerProfileId, isOnline], () => {
                 </p>
               </div>
               <div class="flex flex-wrap items-center gap-2">
+                <UBadge
+                  variant="subtle"
+                  :color="
+                    isStopDelivered(stop)
+                      ? 'success'
+                      : isStopArrived(stop)
+                        ? 'warning'
+                        : 'neutral'
+                  "
+                  data-testid="route-stop-lifecycle"
+                >
+                  {{ stopLifecycleLabel(stop) }}
+                </UBadge>
                 <span
                   v-if="stopRoleLabel(stop)"
                   class="inline-flex items-center gap-1 text-xs font-medium text-toned"
@@ -781,8 +935,15 @@ watch([ownerUserId, ownerBezorgerProfileId, isOnline], () => {
                       ? t('bezorger.route.stop.deliveredAt', {
                           deliveredAt: formatDateTime(stop.deliveredAt),
                         })
-                      : t('bezorger.route.stop.delivered')
+                      : t('bezorger.route.stop.deliveryConfirmed')
                   }}
+                </span>
+                <span
+                  v-else-if="!isStopDelivered(stop)"
+                  class="text-xs font-medium text-toned"
+                  data-testid="route-stop-incomplete"
+                >
+                  {{ t('bezorger.route.stop.incomplete') }}
                 </span>
               </div>
             </div>
@@ -892,7 +1053,36 @@ watch([ownerUserId, ownerBezorgerProfileId, isOnline], () => {
         class="space-y-3"
       >
         <UAlert
-          v-if="confirmComplete && actionsEnabled"
+          v-if="!completionEligibility.ok"
+          color="warning"
+          variant="subtle"
+          role="status"
+          data-testid="route-complete-blocked"
+          :title="t('bezorger.route.complete.cannotComplete')"
+        >
+          <template #description>
+            <p class="mb-2">
+              {{ incompleteStopsLabel }}.
+              {{ t('bezorger.route.complete.blocked') }}
+            </p>
+            <ul class="list-disc space-y-1 pl-4 text-sm">
+              <li
+                v-for="stop in incompleteStops"
+                :key="stopKey(stop)"
+                data-testid="route-complete-incomplete-stop"
+              >
+                {{
+                  t('bezorger.route.stop.label', { sequence: stop.sequence })
+                }}
+                — {{ stop.pharmacyName }}
+                ({{ stopLifecycleLabel(stop) }})
+              </li>
+            </ul>
+          </template>
+        </UAlert>
+
+        <UAlert
+          v-if="confirmComplete && canCompleteRoute"
           color="warning"
           variant="subtle"
           :title="t('bezorger.route.complete.title')"
@@ -907,23 +1097,25 @@ watch([ownerUserId, ownerBezorgerProfileId, isOnline], () => {
           variant="soft"
           data-testid="route-complete"
           :loading="updatingStatus"
-          :disabled="!actionsEnabled"
-          :aria-disabled="!actionsEnabled"
+          :disabled="!canCompleteRoute"
+          :aria-disabled="!canCompleteRoute"
           :title="
             todayRouteIsReadOnly
               ? t('offline.action.requiresConnection')
-              : undefined
+              : !completionEligibility.ok
+                ? t('bezorger.route.complete.blocked')
+                : undefined
           "
           @click="onCompleteRoute"
         >
           {{
-            confirmComplete && actionsEnabled
+            confirmComplete && canCompleteRoute
               ? t('bezorger.route.complete.confirm')
               : t('bezorger.route.complete')
           }}
         </UButton>
         <UButton
-          v-if="confirmComplete && actionsEnabled"
+          v-if="confirmComplete && canCompleteRoute"
           block
           size="lg"
           class="min-h-12"

@@ -548,15 +548,34 @@ describe('OrderService', () => {
   })
 
   it('retrieves only the current pharmacist orders', async () => {
-    repository.find.mockResolvedValue([pendingOrder])
+    repository.find
+      .mockResolvedValueOnce([pendingOrder])
+      .mockResolvedValueOnce([])
 
     const result = await service.findMyOrders(apotheker)
 
-    expect(repository.find).toHaveBeenCalledWith({
+    expect(repository.find).toHaveBeenCalledTimes(2)
+    const findCalls = repository.find.mock.calls
+    expect(findCalls[0]?.[0]).toEqual({
+      where: { apothekerId: new ObjectId(apothekerId) },
+      order: { submittedAt: 'DESC' },
+    })
+    expect(findCalls[1]?.[0]).toEqual({
       where: { apothekerId },
       order: { submittedAt: 'DESC' },
     })
     expect(result).toEqual([pendingOrder])
+  })
+
+  it('merges ObjectId and string apothekerId order matches without duplicates', async () => {
+    repository.find
+      .mockResolvedValueOnce([pendingOrder])
+      .mockResolvedValueOnce([pendingOrder])
+
+    const result = await service.findMyOrders(apotheker)
+
+    expect(result).toHaveLength(1)
+    expect(result[0]?.id).toBe(pendingOrder.id)
   })
 
   it('prevents cross-user order access', async () => {

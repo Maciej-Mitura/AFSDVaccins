@@ -1,5 +1,8 @@
-import { translate } from './translate'
-import { extractGraphQLErrorCode } from './graphql-error-code'
+import { translate, translatePlural } from './translate'
+import {
+  extractGraphQLErrorCode,
+  extractGraphQLOriginalError,
+} from './graphql-error-code'
 
 /** Known Firebase Auth error codes mapped to translation keys. */
 const FIREBASE_AUTH_ERROR_KEYS: Record<string, string> = {
@@ -23,6 +26,7 @@ const GRAPHQL_ERROR_KEYS: Record<string, string> = {
     'errors.routeTemplate.multipleActiveForCourier',
   MULTIPLE_ACTIVE_ROUTE_TEMPLATES:
     'errors.routeTemplate.multipleActiveForCourier',
+  ROUTE_COMPLETION_INCOMPLETE_STOPS: 'errors.route.completionIncompleteStops',
 }
 
 function logTechnicalError(scope: string, error: unknown): void {
@@ -61,6 +65,16 @@ export function mapFirebaseAuthError(error: unknown): string {
  */
 export function mapUserFacingGraphQLError(error: unknown): string {
   const code = extractGraphQLErrorCode(error)
+  if (code === 'ROUTE_COMPLETION_INCOMPLETE_STOPS') {
+    const original = extractGraphQLOriginalError(error)
+    const count =
+      typeof original?.incompleteStopCount === 'number' &&
+      Number.isFinite(original.incompleteStopCount)
+        ? original.incompleteStopCount
+        : 1
+    return translatePlural('errors.route.completionIncompleteStops', count)
+  }
+
   if (code && GRAPHQL_ERROR_KEYS[code]) {
     return translate(GRAPHQL_ERROR_KEYS[code])
   }
