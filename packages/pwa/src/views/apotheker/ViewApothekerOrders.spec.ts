@@ -61,6 +61,7 @@ vi.mock('@/composables/useNotifications', () => ({
     subscribeToNotificationEvents: vi.fn(),
     stopNotificationSubscription: vi.fn(),
   }),
+  registerNotificationReceivedHandler: () => () => undefined,
 }))
 
 vi.mock('@/composables/useGraphQL', () => ({
