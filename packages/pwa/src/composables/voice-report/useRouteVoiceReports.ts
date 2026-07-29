@@ -75,24 +75,29 @@ export type UseRouteVoiceReportsResult = {
 
 const REFETCH_DEBOUNCE_MS = 300
 
-/** Legacy = explicit flag or missing stopId (pre-36E route-level reports). */
-export function isLegacyRouteVoiceReport(report: {
-  isLegacyRouteReport?: boolean | null
+/** Minimal fields needed to classify / filter stop vs legacy reports. */
+export type RouteVoiceReportStopFilterFields = {
   stopId?: string | null
-}): boolean {
+  isLegacyRouteReport?: boolean | null
+}
+
+/** Legacy = explicit flag or missing stopId (pre-36E route-level reports). */
+export function isLegacyRouteVoiceReport(
+  report: RouteVoiceReportStopFilterFields,
+): boolean {
   return report.isLegacyRouteReport === true || !report.stopId
 }
 
-export function filterReportsByStopId(
-  reports: readonly RouteVoiceReportItem[],
+export function filterReportsByStopId<T extends RouteVoiceReportStopFilterFields>(
+  reports: readonly T[],
   stopId: string,
-): RouteVoiceReportItem[] {
+): T[] {
   return reports.filter(report => report.stopId === stopId)
 }
 
-export function filterLegacyRouteVoiceReports(
-  reports: readonly RouteVoiceReportItem[],
-): RouteVoiceReportItem[] {
+export function filterLegacyRouteVoiceReports<
+  T extends RouteVoiceReportStopFilterFields,
+>(reports: readonly T[]): T[] {
   return reports.filter(report => isLegacyRouteVoiceReport(report))
 }
 

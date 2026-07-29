@@ -310,7 +310,7 @@ describe('useRouteVoiceReports', () => {
         stopId: undefined,
         isLegacyRouteReport: false,
       },
-    ] as Parameters<typeof filterReportsByStopId>[0]
+    ]
 
     expect(filterReportsByStopId(reports, 'stop-1').map(r => r.id)).toEqual([
       'a',
