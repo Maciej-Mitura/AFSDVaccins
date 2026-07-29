@@ -30,30 +30,36 @@ describe('route-voice-report-recording.policy', () => {
   })
 
   it('rejects missing stopId', () => {
-    expect(
-      resolveStopForVoiceReport(
-        { status: RouteStatus.IN_PROGRESS, stops: [stop] },
-        '',
-      ).reason,
-    ).toBe('stop_id_required')
+    const decision = resolveStopForVoiceReport(
+      { status: RouteStatus.IN_PROGRESS, stops: [stop] },
+      '',
+    )
+    expect(decision.allowed).toBe(false)
+    if (!decision.allowed) {
+      expect(decision.reason).toBe('stop_id_required')
+    }
   })
 
   it('rejects stop not on route', () => {
-    expect(
-      resolveStopForVoiceReport(
-        { status: RouteStatus.IN_PROGRESS, stops: [stop] },
-        'ffffffff-bbbb-cccc-dddd-eeeeeeeeeeee',
-      ).reason,
-    ).toBe('stop_not_found')
+    const decision = resolveStopForVoiceReport(
+      { status: RouteStatus.IN_PROGRESS, stops: [stop] },
+      'ffffffff-bbbb-cccc-dddd-eeeeeeeeeeee',
+    )
+    expect(decision.allowed).toBe(false)
+    if (!decision.allowed) {
+      expect(decision.reason).toBe('stop_not_found')
+    }
   })
 
   it('rejects when route is not IN_PROGRESS', () => {
-    expect(
-      resolveStopForVoiceReport(
-        { status: RouteStatus.COMPLETED, stops: [stop] },
-        stop.stopId,
-      ).reason,
-    ).toBe('route_not_in_progress')
+    const decision = resolveStopForVoiceReport(
+      { status: RouteStatus.COMPLETED, stops: [stop] },
+      stop.stopId,
+    )
+    expect(decision.allowed).toBe(false)
+    if (!decision.allowed) {
+      expect(decision.reason).toBe('route_not_in_progress')
+    }
   })
 
   it('classifies legacy reports without guessing a stop', () => {
