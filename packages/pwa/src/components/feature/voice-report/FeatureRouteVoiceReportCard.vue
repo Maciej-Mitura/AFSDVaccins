@@ -5,16 +5,26 @@ import { useI18n } from 'vue-i18n'
 import { mapTranscriptionFailureCode } from '@/api/route-voice-report-errors'
 import { useAuthenticatedAudioSource } from '@/composables/voice-report/useAuthenticatedAudioSource'
 import { formatDurationSeconds } from '@/composables/voice-report/voice-recorder-types'
-import type { RouteVoiceReportItem } from '@/composables/voice-report/useRouteVoiceReports'
+import {
+  isLegacyRouteVoiceReport,
+  type RouteVoiceReportItem,
+} from '@/composables/voice-report/useRouteVoiceReports'
 import { formatDateTime } from '@/i18n'
 
-const props = defineProps<{
-  report: RouteVoiceReportItem
-  routeId: string
-  showCourierName: boolean
-  canRetryTranscription: boolean
-  retrying: boolean
-}>()
+const props = withDefaults(
+  defineProps<{
+    report: RouteVoiceReportItem
+    routeId: string
+    showCourierName: boolean
+    canRetryTranscription: boolean
+    retrying: boolean
+    /** Show stop/pharmacy context and legacy badge (admin). */
+    showStopContext?: boolean
+  }>(),
+  {
+    showStopContext: false,
+  },
+)
 
 const emit = defineEmits<{
   'retry-transcription': [reportId: string]
@@ -102,6 +112,20 @@ const showRetry = computed(() => {
   )
 })
 
+const isLegacy = computed(() => isLegacyRouteVoiceReport(props.report))
+
+const stopContextLabel = computed(() => {
+  if (!props.showStopContext || isLegacy.value) {
+    return null
+  }
+  const sequence = props.report.stopSequence
+  const pharmacy = props.report.pharmacyDisplayName
+  if (sequence != null && pharmacy) {
+    return t('routeVoiceReports.stop.stopContext', { sequence, pharmacy })
+  }
+  return pharmacy ?? null
+})
+
 async function onLoadRecording(): Promise<void> {
   await audio.load(props.routeId, props.report.id)
 }
@@ -132,6 +156,13 @@ watch(
           {{ formatDateTime(report.clientRecordedAt) }}
         </p>
         <p
+          v-if="stopContextLabel"
+          class="text-sm text-toned"
+          data-testid="route-voice-report-stop-context"
+        >
+          {{ stopContextLabel }}
+        </p>
+        <p
           v-if="showCourierName"
           class="text-sm"
           data-testid="route-voice-report-courier"
@@ -139,13 +170,23 @@ watch(
           {{ report.recordedByDisplayName }}
         </p>
       </div>
-      <UBadge
-        :color="statusBadgeColor"
-        variant="subtle"
-        data-testid="route-voice-transcription-badge"
-      >
-        {{ transcriptionStatusLabel }}
-      </UBadge>
+      <div class="flex flex-wrap items-center gap-2">
+        <UBadge
+          v-if="showStopContext && isLegacy"
+          color="neutral"
+          variant="subtle"
+          data-testid="route-voice-legacy-badge"
+        >
+          {{ t('routeVoiceReports.stop.legacyTitle') }}
+        </UBadge>
+        <UBadge
+          :color="statusBadgeColor"
+          variant="subtle"
+          data-testid="route-voice-transcription-badge"
+        >
+          {{ transcriptionStatusLabel }}
+        </UBadge>
+      </div>
     </header>
 
     <p class="text-sm text-muted">

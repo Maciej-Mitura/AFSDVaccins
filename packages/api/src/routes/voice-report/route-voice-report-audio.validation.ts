@@ -20,6 +20,8 @@ import {
   RouteVoiceReportClientUploadIdInvalidException,
   RouteVoiceReportDurationInvalidException,
   RouteVoiceReportLocaleInvalidException,
+  RouteVoiceReportStopIdRequiredException,
+  RouteVoiceReportStopInvalidException,
   RouteVoiceReportTimestampInvalidException,
 } from './route-voice-report.exceptions'
 
@@ -233,10 +235,28 @@ export function buildIdempotencyFingerprint(input: {
 }
 
 /**
- * Opaque blob path: route-voice-reports/{routeId}/{reportId}/audio.{ext}
+ * Opaque blob path (Phase 36E stop-scoped):
+ * route-voice-reports/{routeId}/stops/{stopId}/{reportId}/audio.{ext}
+ *
+ * Legacy (pre-36E) paths remain readable via {@link assertValidRouteVoiceReportBlobName}:
+ * route-voice-reports/{routeId}/{reportId}/audio.{ext}
+ *
  * Never includes courier/pharmacy display names.
  */
 export function generateRouteVoiceReportBlobName(input: {
+  routeId: string
+  stopId: string
+  reportId: string
+  extension: RouteVoiceReportValidatedAudio['extension']
+}): string {
+  const routeId = assertObjectIdSegment(input.routeId)
+  const stopId = assertSafeStopIdSegment(input.stopId)
+  const reportId = assertObjectIdSegment(input.reportId)
+  return `route-voice-reports/${routeId}/stops/${stopId}/${reportId}/audio.${input.extension}`
+}
+
+/** Legacy path helper for fixtures / read-path tests only. */
+export function generateLegacyRouteVoiceReportBlobName(input: {
   routeId: string
   reportId: string
   extension: RouteVoiceReportValidatedAudio['extension']
@@ -245,6 +265,11 @@ export function generateRouteVoiceReportBlobName(input: {
   const reportId = assertObjectIdSegment(input.reportId)
   return `route-voice-reports/${routeId}/${reportId}/audio.${input.extension}`
 }
+
+const LEGACY_BLOB_NAME_PATTERN =
+  /^route-voice-reports\/[a-f0-9]{24}\/[a-f0-9]{24}\/audio\.(webm|ogg|m4a)$/i
+const STOP_SCOPED_BLOB_NAME_PATTERN =
+  /^route-voice-reports\/[a-f0-9]{24}\/stops\/[A-Za-z0-9._:-]{8,64}\/[a-f0-9]{24}\/audio\.(webm|ogg|m4a)$/i
 
 export function assertValidRouteVoiceReportBlobName(blobName: string): string {
   if (typeof blobName !== 'string') {
@@ -262,19 +287,43 @@ export function assertValidRouteVoiceReportBlobName(blobName: string): string {
     throw new RouteVoiceReportAudioSignatureInvalidException()
   }
   if (
-    !/^route-voice-reports\/[a-f0-9]{24}\/[a-f0-9]{24}\/audio\.(webm|ogg|m4a)$/i.test(
-      trimmed,
-    )
+    !LEGACY_BLOB_NAME_PATTERN.test(trimmed) &&
+    !STOP_SCOPED_BLOB_NAME_PATTERN.test(trimmed)
   ) {
     throw new RouteVoiceReportAudioSignatureInvalidException()
   }
   return trimmed
 }
 
+export function parseStopId(raw: unknown): string {
+  if (typeof raw !== 'string') {
+    throw new RouteVoiceReportStopIdRequiredException()
+  }
+  const trimmed = raw.trim()
+  if (trimmed.length === 0) {
+    throw new RouteVoiceReportStopIdRequiredException()
+  }
+  return assertSafeStopIdSegment(trimmed)
+}
+
 function assertObjectIdSegment(value: string): string {
   const trimmed = value.trim().toLowerCase()
   if (!/^[a-f0-9]{24}$/.test(trimmed)) {
     throw new RouteVoiceReportAudioSignatureInvalidException()
+  }
+  return trimmed
+}
+
+/** Stop ids are UUIDs (or test fixtures); keep path segments opaque and bounded. */
+function assertSafeStopIdSegment(value: string): string {
+  const trimmed = value.trim()
+  if (
+    trimmed.length < 8 ||
+    trimmed.length > 64 ||
+    !/^[A-Za-z0-9._:-]+$/.test(trimmed) ||
+    trimmed.includes('..')
+  ) {
+    throw new RouteVoiceReportStopInvalidException()
   }
   return trimmed
 }

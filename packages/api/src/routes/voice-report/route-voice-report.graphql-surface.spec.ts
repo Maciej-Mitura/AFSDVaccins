@@ -39,6 +39,10 @@ describe('RouteVoiceReport GraphQL surface', () => {
     for (const name of [
       'id',
       'routeId',
+      'stopId',
+      'stopSequence',
+      'pharmacyDisplayName',
+      'isLegacyRouteReport',
       'sequenceNumber',
       'status',
       'mimeType',
@@ -75,6 +79,7 @@ describe('RouteVoiceReport GraphQL surface', () => {
       'fileExtension',
       'sizeBytes',
       'bezorgerProfileId',
+      'apothekerProfileId',
       'storageUrl',
       'azureUrl',
       'sasToken',
@@ -92,6 +97,7 @@ describe('RouteVoiceReport GraphQL surface', () => {
     for (const name of [
       'routeId',
       'reportId',
+      'stopId',
       'status',
       'transcriptionStatus',
       'eventType',
@@ -105,6 +111,7 @@ describe('RouteVoiceReport GraphQL surface', () => {
       'recordedByUserId',
       'transcript',
       'providerRequestId',
+      'apothekerProfileId',
     ]) {
       expect(updateFieldNames.has(name)).toBe(false)
     }
@@ -116,6 +123,7 @@ describe('RouteVoiceReport GraphQL surface', () => {
       'containerName',
       'sha256',
       'recordedByUserId',
+      'apothekerProfileId',
     ]) {
       expect(entitySource).toContain(column)
       expect(gqlFieldNames.has(column)).toBe(false)

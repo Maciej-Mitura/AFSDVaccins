@@ -9,6 +9,9 @@ export type RouteVoiceReportRestErrorCode =
   | 'ROUTE_VOICE_REPORT_ROUTE_NOT_FOUND'
   | 'ROUTE_VOICE_REPORT_FORBIDDEN'
   | 'ROUTE_VOICE_REPORT_ROUTE_NOT_IN_PROGRESS'
+  | 'ROUTE_VOICE_REPORT_STOP_ID_REQUIRED'
+  | 'ROUTE_VOICE_REPORT_STOP_NOT_FOUND'
+  | 'ROUTE_VOICE_REPORT_STOP_INVALID'
   | 'ROUTE_VOICE_REPORT_LIMIT_REACHED'
   | 'ROUTE_VOICE_REPORT_AUDIO_REQUIRED'
   | 'ROUTE_VOICE_REPORT_AUDIO_EMPTY'
@@ -68,6 +71,9 @@ const ERROR_CODE_KEYS: Record<string, string> = {
   ROUTE_VOICE_REPORT_FORBIDDEN: 'routeVoiceReports.error.forbidden',
   ROUTE_VOICE_REPORT_ROUTE_NOT_IN_PROGRESS:
     'routeVoiceReports.error.routeNotActive',
+  ROUTE_VOICE_REPORT_STOP_ID_REQUIRED: 'routeVoiceReports.error.stopIdRequired',
+  ROUTE_VOICE_REPORT_STOP_NOT_FOUND: 'routeVoiceReports.error.stopNotFound',
+  ROUTE_VOICE_REPORT_STOP_INVALID: 'routeVoiceReports.error.stopInvalid',
   ROUTE_VOICE_REPORT_LIMIT_REACHED: 'routeVoiceReports.error.limitReached',
   ROUTE_VOICE_REPORT_AUDIO_REQUIRED: 'routeVoiceReports.error.invalidAudio',
   ROUTE_VOICE_REPORT_AUDIO_EMPTY: 'routeVoiceReports.error.invalidAudio',

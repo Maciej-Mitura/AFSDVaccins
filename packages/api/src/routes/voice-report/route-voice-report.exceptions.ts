@@ -44,6 +44,34 @@ export class RouteVoiceReportRouteNotInProgressException extends BadRequestExcep
   }
 }
 
+export class RouteVoiceReportStopIdRequiredException extends BadRequestException {
+  constructor() {
+    super({
+      message:
+        'Een stop-id is verplicht voor nieuwe spraakrapporten. Oude route-only uploads worden niet meer geaccepteerd.',
+      error: 'ROUTE_VOICE_REPORT_STOP_ID_REQUIRED',
+    })
+  }
+}
+
+export class RouteVoiceReportStopNotFoundException extends BadRequestException {
+  constructor() {
+    super({
+      message: 'Stop hoort niet bij deze route of bestaat niet.',
+      error: 'ROUTE_VOICE_REPORT_STOP_NOT_FOUND',
+    })
+  }
+}
+
+export class RouteVoiceReportStopInvalidException extends BadRequestException {
+  constructor() {
+    super({
+      message: 'Ongeldige stop-id voor spraakrapport.',
+      error: 'ROUTE_VOICE_REPORT_STOP_INVALID',
+    })
+  }
+}
+
 export class RouteVoiceReportLimitReachedException extends ConflictException {
   constructor() {
     super({

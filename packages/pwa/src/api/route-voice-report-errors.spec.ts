@@ -36,6 +36,15 @@ describe('route-voice-report-errors', () => {
     expect(mapRouteVoiceReportErrorCode('ROUTE_VOICE_REPORT_FORBIDDEN')).toBe(
       translate('routeVoiceReports.error.forbidden'),
     )
+    expect(
+      mapRouteVoiceReportErrorCode('ROUTE_VOICE_REPORT_STOP_ID_REQUIRED'),
+    ).toBe(translate('routeVoiceReports.error.stopIdRequired'))
+    expect(
+      mapRouteVoiceReportErrorCode('ROUTE_VOICE_REPORT_STOP_NOT_FOUND'),
+    ).toBe(translate('routeVoiceReports.error.stopNotFound'))
+    expect(
+      mapRouteVoiceReportErrorCode('ROUTE_VOICE_REPORT_STOP_INVALID'),
+    ).toBe(translate('routeVoiceReports.error.stopInvalid'))
   })
 
   it('maps transcription failure codes without exposing raw provider text', () => {

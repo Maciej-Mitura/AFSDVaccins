@@ -125,6 +125,11 @@ export class FakeRouteVoiceReportStorageProvider
   }
 
   /** Test helper */
+  getMetadata(blobName: string): Record<string, string> | undefined {
+    return this.blobs.get(blobName)?.metadata
+  }
+
+  /** Test helper */
   getBytes(blobName: string): Buffer | undefined {
     return this.blobs.get(blobName)?.bytes
   }

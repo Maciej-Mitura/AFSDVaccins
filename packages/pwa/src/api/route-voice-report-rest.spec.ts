@@ -58,6 +58,7 @@ describe('route-voice-report-rest', () => {
 
     await uploadRouteVoiceReport('route-1', {
       audio,
+      stopId: 'stop-1',
       clientRecordedAt: '2026-07-27T10:00:00.000Z',
       durationSeconds: 2.1,
       selectedLocale: 'nl-NL',
@@ -76,6 +77,7 @@ describe('route-voice-report-rest', () => {
     expect(headers.get('Authorization')).toBe('Bearer token-1')
     expect(headers.get('Content-Type')).toBeNull()
     const form = init.body as FormData
+    expect(form.get('stopId')).toBe('stop-1')
     expect(form.get('clientRecordedAt')).toBe('2026-07-27T10:00:00.000Z')
     expect(form.get('durationSeconds')).toBe('2.1')
     expect(form.get('selectedLocale')).toBe('nl-NL')
@@ -121,6 +123,7 @@ describe('route-voice-report-rest', () => {
 
     await uploadRouteVoiceReport('route-1', {
       audio: new Blob(['x'], { type: 'audio/webm' }),
+      stopId: 'stop-1',
       clientRecordedAt: '2026-07-27T10:00:00.000Z',
       durationSeconds: 2,
       selectedLocale: 'AUTO',

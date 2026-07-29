@@ -22,6 +22,8 @@ import {
   RouteVoiceReportRangeInvalidException,
   RouteVoiceReportRouteNotFoundException,
   RouteVoiceReportRouteNotInProgressException,
+  RouteVoiceReportStopIdRequiredException,
+  RouteVoiceReportStopNotFoundException,
   RouteVoiceReportStorageFailedException,
   RouteVoiceReportAudioEmptyException,
   RouteVoiceReportAudioRequiredException,
@@ -44,6 +46,9 @@ describe('RouteVoiceReportService', () => {
   const bezorgerProfileId = new ObjectId()
   const unrelatedProfileId = new ObjectId()
   const routeId = new ObjectId()
+  const apothekerProfileId = new ObjectId()
+  const stopId = 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee'
+  const otherStopId = 'bbbbbbbb-bbbb-cccc-dddd-eeeeeeeeeeee'
   const clientUploadId = 'client-upload-id-001'
 
   const courierActor = {
@@ -66,13 +71,28 @@ describe('RouteVoiceReportService', () => {
     role: undefined,
   } as never
 
+  function buildStop(id = stopId, sequence = 1) {
+    return {
+      stopId: id,
+      sequence,
+      apothekerProfileId: apothekerProfileId.toString(),
+      apothekerUserId: new ObjectId().toString(),
+      pharmacyName: 'Apotheek Centrum',
+      address: { street: 'Main', number: '1', postalCode: '1000', city: 'Brussels' },
+      orderIds: ['order-1'],
+      orderCount: 1,
+      totalQuantity: 2,
+      lines: [],
+    }
+  }
+
   function buildRoute(status: RouteStatus = RouteStatus.IN_PROGRESS) {
     return {
       _id: routeId,
       status,
       bezorgerProfileId,
       deliveryDate: '2026-07-26',
-      stops: [],
+      stops: [buildStop(stopId, 1), buildStop(otherStopId, 2)],
     }
   }
 
@@ -99,6 +119,7 @@ describe('RouteVoiceReportService', () => {
       overrides?.blobName ??
       generateRouteVoiceReportBlobName({
         routeId: routeId.toString(),
+        stopId,
         reportId: id.toString(),
         extension: 'webm',
       })
@@ -106,6 +127,8 @@ describe('RouteVoiceReportService', () => {
     const report = {
       _id: id,
       routeId: routeId.toString(),
+      stopId,
+      apothekerProfileId: apothekerProfileId.toString(),
       bezorgerProfileId: bezorgerProfileId.toString(),
       recordedByUserId: courierUserId.toString(),
       sequenceNumber: 1,
@@ -344,6 +367,7 @@ describe('RouteVoiceReportService', () => {
     selectedLocale: 'nl-NL',
     clientUploadId,
     browserFormatLabel: 'audio/webm;codecs=opus',
+    stopId,
   }
 
   it('assigned BEZORGER uploads successfully on IN_PROGRESS route', async () => {
@@ -376,16 +400,95 @@ describe('RouteVoiceReportService', () => {
     expect(savedReports).toHaveLength(1)
     const saved = savedReports[0]
     expect(saved.sha256).toBe(sha256Hex(baseUploadInput.audioBytes))
+    expect(saved.stopId).toBe(stopId)
+    expect(saved.apothekerProfileId).toBe(apothekerProfileId.toString())
     expect(saved.blobName).toMatch(
       new RegExp(
-        `^route-voice-reports/${routeId.toString()}/[a-f0-9]{24}/audio\\.webm$`,
+        `^route-voice-reports/${routeId.toString()}/stops/${stopId}/[a-f0-9]{24}/audio\\.webm$`,
       ),
     )
     expect(saved.blobName.toLowerCase()).not.toContain('jan')
     expect(saved.blobName.toLowerCase()).not.toContain('courier')
+    expect(saved.blobName.toLowerCase()).not.toContain('apotheek')
     expect(storage.has(saved.blobName)).toBe(true)
+    const storedMeta = storage.getMetadata?.(saved.blobName)
+    if (storedMeta) {
+      expect(storedMeta.routeid).toBe(routeId.toString())
+      expect(storedMeta.stopid).toBe(stopId)
+      expect(storedMeta.reportid).toBe(
+        typeof saved.id === 'string' ? saved.id : String(saved._id),
+      )
+    }
     expect(auditRecordCreated).toHaveBeenCalledTimes(1)
     expect(publishCreated).toHaveBeenCalledTimes(1)
+  })
+
+  it('requires stopId for new uploads', async () => {
+    const { service } = buildService({})
+    await expect(
+      service.uploadForCourier(courierActor, routeId.toString(), {
+        ...baseUploadInput,
+        stopId: '',
+      }),
+    ).rejects.toBeInstanceOf(RouteVoiceReportStopIdRequiredException)
+  })
+
+  it('rejects stop that does not belong to the route', async () => {
+    const { service } = buildService({})
+    await expect(
+      service.uploadForCourier(courierActor, routeId.toString(), {
+        ...baseUploadInput,
+        stopId: 'cccccccc-bbbb-cccc-dddd-eeeeeeeeeeee',
+      }),
+    ).rejects.toBeInstanceOf(RouteVoiceReportStopNotFoundException)
+  })
+
+  it('allows multiple reports on the same stop', async () => {
+    const { service, reportRepository } = buildService({})
+    await service.uploadForCourier(courierActor, routeId.toString(), {
+      ...baseUploadInput,
+      clientUploadId: 'client-upload-id-aaa1',
+    })
+    await service.uploadForCourier(courierActor, routeId.toString(), {
+      ...baseUploadInput,
+      clientUploadId: 'client-upload-id-aaa2',
+      audioBytes: webmFixture(80),
+    })
+    const saved = (
+      reportRepository.save as jest.MockedFunction<
+        (doc: RouteVoiceReport) => Promise<RouteVoiceReport>
+      >
+    ).mock.calls.map(call => call[0])
+    expect(saved).toHaveLength(2)
+    expect(saved.every(report => report.stopId === stopId)).toBe(true)
+    expect(saved[0].sequenceNumber).not.toBe(saved[1].sequenceNumber)
+  })
+
+  it('lists legacy no-stopId reports without guessing a stop', async () => {
+    const legacy = buildAvailableReport({
+      stopId: null,
+      apothekerProfileId: null,
+      blobName: `route-voice-reports/${routeId.toString()}/${new ObjectId().toString()}/audio.webm`,
+    })
+    const { service } = buildService({ reports: [legacy] })
+    const listed = await service.listForActor(adminActor, routeId.toString())
+    expect(listed).toHaveLength(1)
+    expect(listed[0].isLegacyRouteReport).toBe(true)
+    expect(listed[0].stopId).toBeNull()
+    expect(listed[0].pharmacyDisplayName).toBeNull()
+    expect(listed[0].stopSequence).toBeNull()
+  })
+
+  it('groups stop context for ADMIN list without exposing private blob fields', async () => {
+    const stopReport = buildAvailableReport({ stopId, sequenceNumber: 1 })
+    const { service } = buildService({ reports: [stopReport] })
+    const listed = await service.listForActor(adminActor, routeId.toString())
+    expect(listed[0].stopId).toBe(stopId)
+    expect(listed[0].stopSequence).toBe(1)
+    expect(listed[0].pharmacyDisplayName).toBe('Apotheek Centrum')
+    expect(listed[0].isLegacyRouteReport).toBe(false)
+    expect(listed[0]).not.toHaveProperty('blobName')
+    expect(listed[0]).not.toHaveProperty('apothekerProfileId')
   })
 
   it('rejects ADMIN, APOTHEKER, anonymous, and unrelated BEZORGER on create', async () => {

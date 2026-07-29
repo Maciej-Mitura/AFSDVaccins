@@ -324,6 +324,7 @@ export class RouteVoiceReportTranscriptionRunner implements OnModuleInit {
     await this.eventsService.publishTranscriptionUpdate({
       routeId: report.routeId,
       reportId: report.id,
+      stopId: report.stopId ?? null,
       status: RouteVoiceReportStatus.AVAILABLE,
       transcriptionStatus: RouteVoiceTranscriptionStatus.PENDING,
       eventType: 'ROUTE_VOICE_REPORT_TRANSCRIPTION_RETRIED',
@@ -368,6 +369,7 @@ export class RouteVoiceReportTranscriptionRunner implements OnModuleInit {
     await this.eventsService.publishTranscriptionUpdate({
       routeId: report.routeId,
       reportId: report.id,
+      stopId: report.stopId ?? null,
       status: RouteVoiceReportStatus.AVAILABLE,
       transcriptionStatus: RouteVoiceTranscriptionStatus.PROCESSING,
       eventType: 'ROUTE_VOICE_REPORT_TRANSCRIPTION_PROCESSING',
@@ -667,6 +669,7 @@ export class RouteVoiceReportTranscriptionRunner implements OnModuleInit {
       await this.eventsService.publishTranscriptionUpdate({
         routeId: input.report.routeId,
         reportId: input.report.id,
+        stopId: input.report.stopId ?? null,
         status: RouteVoiceReportStatus.AVAILABLE,
         transcriptionStatus: RouteVoiceTranscriptionStatus.COMPLETED,
         eventType: 'ROUTE_VOICE_REPORT_TRANSCRIPTION_COMPLETED',
@@ -731,6 +734,7 @@ export class RouteVoiceReportTranscriptionRunner implements OnModuleInit {
       await this.eventsService.publishTranscriptionUpdate({
         routeId: input.report.routeId,
         reportId: input.report.id,
+        stopId: input.report.stopId ?? null,
         status: RouteVoiceReportStatus.AVAILABLE,
         transcriptionStatus: RouteVoiceTranscriptionStatus.FAILED,
         eventType: 'ROUTE_VOICE_REPORT_TRANSCRIPTION_FAILED',

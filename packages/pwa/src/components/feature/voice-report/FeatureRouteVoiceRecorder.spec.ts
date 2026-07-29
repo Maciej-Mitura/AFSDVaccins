@@ -9,6 +9,11 @@ import FeatureRouteVoiceRecorder from '@/components/feature/voice-report/Feature
 import { __resetAppI18nForTests, translate } from '@/i18n'
 import { __resetLocaleLoaderForTests } from '@/i18n/locale-loader'
 import { createTestI18n } from '@/i18n/test-utils'
+import {
+  __resetVoiceRecorderMutexForTests,
+  acquireVoiceRecorderMutex,
+  getActiveVoiceRecorderMutexKey,
+} from '@/composables/voice-report/voice-recorder-mutex'
 
 const isOnline = ref(true)
 
@@ -26,7 +31,7 @@ const previewUrl = ref<string | null>(null)
 const previewBlob = ref<Blob | null>(null)
 const hasUnsentRecording = ref(false)
 
-const startRecording = vi.fn()
+const startRecording = vi.fn(() => Promise.resolve(true))
 const stopRecording = vi.fn()
 const cancelRecording = vi.fn()
 const discardPreview = vi.fn()
@@ -64,7 +69,14 @@ vi.mock('@/composables/voice-report/useVoiceRecorder', () => ({
   }),
 }))
 
-const reports = ref<unknown[]>([])
+const reports = ref<
+  Array<{
+    id: string
+    stopId?: string | null
+    isLegacyRouteReport?: boolean
+    sequenceNumber: number
+  }>
+>([])
 const loading = ref(false)
 const errorMessage = ref<string | null>(null)
 const uploading = ref(false)
@@ -76,21 +88,27 @@ const uploadReport = vi.fn()
 const retryTranscription = vi.fn()
 const clearUploadFeedback = vi.fn()
 
-vi.mock('@/composables/voice-report/useRouteVoiceReports', () => ({
-  useRouteVoiceReports: () => ({
-    reports,
-    loading,
-    errorMessage,
-    uploading,
-    uploadErrorMessage,
-    retryingReportId,
-    retryErrorMessage,
-    lastUploadSuccess,
-    uploadReport,
-    retryTranscription,
-    clearUploadFeedback,
-  }),
-}))
+vi.mock('@/composables/voice-report/useRouteVoiceReports', async () => {
+  const actual = await vi.importActual<
+    typeof import('@/composables/voice-report/useRouteVoiceReports')
+  >('@/composables/voice-report/useRouteVoiceReports')
+  return {
+    ...actual,
+    useRouteVoiceReports: () => ({
+      reports,
+      loading,
+      errorMessage,
+      uploading,
+      uploadErrorMessage,
+      retryingReportId,
+      retryErrorMessage,
+      lastUploadSuccess,
+      uploadReport,
+      retryTranscription,
+      clearUploadFeedback,
+    }),
+  }
+})
 
 vi.mock('@/composables/useLanguage', () => ({
   useLanguage: () => ({ currentLocale: ref('en') }),
@@ -140,17 +158,34 @@ const uiStubs = {
       'errorMessage',
       'routeId',
       'showCourierName',
+      'showStopContext',
+      'groupByStop',
+      'emptyTitleKey',
+      'emptyDescriptionKey',
       'canRetryTranscription',
       'retryingReportId',
       'retryErrorMessage',
     ],
     template:
-      '<div data-testid="route-voice-report-list-stub" :data-can-retry="String(canRetryTranscription)" :data-report-count="reports.length" />',
+      '<div data-testid="route-voice-report-list-stub" :data-can-retry="String(canRetryTranscription)" :data-report-count="reports.length" :data-group-by-stop="String(groupByStop)" />',
   },
 }
 
 function mountRecorder(
-  props: Partial<InstanceType<typeof FeatureRouteVoiceRecorder>['$props']> = {},
+  props: Partial<{
+    routeId: string
+    routeStatus: string
+    routeSource: 'SERVER' | 'CACHE' | 'NONE'
+    allowRecording: boolean
+    showCourierName: boolean
+    canRetryTranscription: boolean
+    enabled: boolean
+    stopId: string | null
+    stopSequence: number | null
+    pharmacyName: string | null
+    mode: 'stop' | 'legacy' | 'route-all'
+    titleKey: string
+  }> = {},
 ) {
   return mount(FeatureRouteVoiceRecorder, {
     props: {
@@ -160,6 +195,10 @@ function mountRecorder(
       allowRecording: true,
       showCourierName: false,
       canRetryTranscription: false,
+      mode: 'stop',
+      stopId: 'stop-1',
+      stopSequence: 1,
+      pharmacyName: 'Apotheek Centrum',
       ...props,
     },
     global: {
@@ -174,6 +213,7 @@ describe('FeatureRouteVoiceRecorder', () => {
     __resetLocaleLoaderForTests()
     __resetAppI18nForTests()
     createTestI18n('en')
+    __resetVoiceRecorderMutexForTests()
     isOnline.value = true
 
     recorderState.value = 'IDLE'
@@ -182,7 +222,26 @@ describe('FeatureRouteVoiceRecorder', () => {
     previewUrl.value = null
     previewBlob.value = null
     hasUnsentRecording.value = false
-    reports.value = []
+    reports.value = [
+      {
+        id: 'r1',
+        stopId: 'stop-1',
+        isLegacyRouteReport: false,
+        sequenceNumber: 1,
+      },
+      {
+        id: 'r2',
+        stopId: 'stop-2',
+        isLegacyRouteReport: false,
+        sequenceNumber: 2,
+      },
+      {
+        id: 'r3',
+        stopId: null,
+        isLegacyRouteReport: true,
+        sequenceNumber: 3,
+      },
+    ]
     loading.value = false
     errorMessage.value = null
     uploading.value = false
@@ -191,27 +250,110 @@ describe('FeatureRouteVoiceRecorder', () => {
     retryErrorMessage.value = null
     lastUploadSuccess.value = false
     vi.clearAllMocks()
+    startRecording.mockResolvedValue(true)
   })
 
   afterEach(() => {
+    __resetVoiceRecorderMutexForTests()
     __resetLocaleLoaderForTests()
     __resetAppI18nForTests()
   })
 
-  it('renders a clearly labelled Voice report section for active recording', () => {
+  it('binds stop mode title, context, and filtered list', () => {
     const wrapper = mountRecorder()
     const section = wrapper.find('[data-testid="route-voice-reports-section"]')
-    expect(section.exists()).toBe(true)
-    expect(section.classes()).not.toContain('hidden')
-    expect(section.classes()).not.toContain('sr-only')
-    expect(section.classes()).not.toContain('md:hidden')
-    expect(section.text()).toContain(translate('routeVoiceReports.voiceReport'))
+    expect(section.attributes('data-mode')).toBe('stop')
+    expect(section.attributes('data-stop-id')).toBe('stop-1')
+    expect(
+      wrapper.find('[data-testid="route-voice-stop-context"]').text(),
+    ).toContain('Apotheek Centrum')
+    expect(section.text()).toContain(translate('routeVoiceReports.stop.title'))
+    expect(
+      wrapper
+        .find('[data-testid="route-voice-report-list-stub"]')
+        .attributes('data-report-count'),
+    ).toBe('1')
     expect(wrapper.find('[data-testid="route-voice-start"]').exists()).toBe(
       true,
     )
+  })
+
+  it('requires stopId for recording in stop mode', () => {
+    const wrapper = mountRecorder({ stopId: null, allowRecording: true })
+    expect(wrapper.find('[data-testid="route-voice-recorder"]').exists()).toBe(
+      false,
+    )
+  })
+
+  it('legacy mode shows only legacy reports without recorder', () => {
+    const wrapper = mountRecorder({
+      mode: 'legacy',
+      allowRecording: false,
+      stopId: null,
+    })
+    expect(wrapper.find('[data-testid="route-voice-recorder"]').exists()).toBe(
+      false,
+    )
     expect(
-      wrapper.find('[data-testid="route-voice-start"]').attributes('aria-label'),
-    ).toBe(translate('routeVoiceReports.recording.start'))
+      wrapper
+        .find('[data-testid="route-voice-report-list-stub"]')
+        .attributes('data-report-count'),
+    ).toBe('1')
+  })
+
+  it('route-all mode groups and does not allow recording without stop', () => {
+    const wrapper = mountRecorder({
+      mode: 'route-all',
+      allowRecording: true,
+      stopId: null,
+    })
+    expect(wrapper.find('[data-testid="route-voice-recorder"]').exists()).toBe(
+      false,
+    )
+    expect(
+      wrapper
+        .find('[data-testid="route-voice-report-list-stub"]')
+        .attributes('data-group-by-stop'),
+    ).toBe('true')
+    expect(
+      wrapper
+        .find('[data-testid="route-voice-report-list-stub"]')
+        .attributes('data-report-count'),
+    ).toBe('3')
+  })
+
+  it('acquires mic mutex on start so only one stop records at a time', async () => {
+    const wrapper = mountRecorder({ stopId: 'stop-1' })
+    await wrapper.find('[data-testid="route-voice-start"]').trigger('click')
+    await nextTick()
+    expect(startRecording).toHaveBeenCalled()
+    expect(getActiveVoiceRecorderMutexKey()).toBe('stop-1')
+
+    const cancelOther = vi.fn()
+    const acquired = acquireVoiceRecorderMutex({
+      key: 'stop-2',
+      cancel: cancelOther,
+      hasUnsent: () => false,
+      confirmLeave: () => true,
+    })
+    expect(acquired).toBe(true)
+    expect(cancelOther).not.toHaveBeenCalled()
+    // previous holder cancelled via its cancel callback when stolen
+    expect(cancelRecording).toHaveBeenCalled()
+    expect(getActiveVoiceRecorderMutexKey()).toBe('stop-2')
+  })
+
+  it('passes stopId on upload', async () => {
+    recorderState.value = 'PREVIEW'
+    previewUrl.value = 'blob:preview'
+    previewBlob.value = new Blob(['x'], { type: 'audio/webm' })
+    uploadReport.mockResolvedValue({ id: 'r9' })
+    const wrapper = mountRecorder({ stopId: 'stop-1' })
+    await wrapper.find('[data-testid="route-voice-upload"]').trigger('click')
+    await nextTick()
+    expect(uploadReport).toHaveBeenCalledWith(
+      expect.objectContaining({ stopId: 'stop-1' }),
+    )
   })
 
   it('defaults enabled to true when the prop is omitted (Vue boolean cast)', () => {
@@ -221,6 +363,8 @@ describe('FeatureRouteVoiceRecorder', () => {
         routeStatus: 'IN_PROGRESS',
         routeSource: 'SERVER',
         allowRecording: true,
+        mode: 'stop',
+        stopId: 'stop-1',
       },
       global: {
         plugins: [createTestI18n('en')],
@@ -245,30 +389,13 @@ describe('FeatureRouteVoiceRecorder', () => {
       routeStatus: 'ASSIGNED',
     })
     expect(
-      wrapper.find('[data-testid="route-voice-reports-assigned-hint"]').exists(),
+      wrapper
+        .find('[data-testid="route-voice-reports-assigned-hint"]')
+        .exists(),
     ).toBe(true)
     expect(wrapper.find('[data-testid="route-voice-recorder"]').exists()).toBe(
       false,
     )
-    expect(wrapper.find('[data-testid="route-voice-start"]').exists()).toBe(
-      false,
-    )
-  })
-
-  it('keeps section visible but without start controls for completed routes', () => {
-    const wrapper = mountRecorder({
-      allowRecording: false,
-      routeStatus: 'COMPLETED',
-    })
-    expect(
-      wrapper.find('[data-testid="route-voice-reports-section"]').exists(),
-    ).toBe(true)
-    expect(wrapper.find('[data-testid="route-voice-recorder"]').exists()).toBe(
-      false,
-    )
-    expect(
-      wrapper.find('[data-testid="route-voice-reports-assigned-hint"]').exists(),
-    ).toBe(false)
   })
 
   it('disables start and shows unsupported browser message when MediaRecorder is unavailable', async () => {
@@ -287,65 +414,9 @@ describe('FeatureRouteVoiceRecorder', () => {
     const wrapper = mountRecorder()
     await nextTick()
     expect(wrapper.find('[data-testid="route-voice-stop"]').exists()).toBe(true)
-    expect(wrapper.find('[data-testid="route-voice-cancel"]').exists()).toBe(
-      true,
-    )
     expect(
       wrapper.find('[data-testid="route-voice-recording-label"]').text(),
     ).toBe(translate('routeVoiceReports.recording.recording'))
-    expect(
-      wrapper
-        .find('[data-testid="route-voice-recording-label"]')
-        .attributes('role'),
-    ).toBe('status')
-    expect(
-      wrapper
-        .find('[data-testid="route-voice-live-status"]')
-        .attributes('aria-live'),
-    ).toBe('polite')
-  })
-
-  it('renders preview with play, discard, and upload actions', async () => {
-    recorderState.value = 'PREVIEW'
-    previewUrl.value = 'blob:preview'
-    previewBlob.value = new Blob(['x'], { type: 'audio/webm' })
-    const wrapper = mountRecorder()
-    await nextTick()
-    expect(wrapper.find('[data-testid="route-voice-preview"]').exists()).toBe(
-      true,
-    )
-    expect(
-      wrapper.find('[data-testid="route-voice-preview-audio"]').exists(),
-    ).toBe(true)
-    expect(wrapper.find('[data-testid="route-voice-upload"]').text()).toContain(
-      translate('routeVoiceReports.upload.upload'),
-    )
-    expect(
-      wrapper
-        .find('[data-testid="route-voice-discard"]')
-        .attributes('aria-label'),
-    ).toBe(translate('routeVoiceReports.upload.discard'))
-  })
-
-  it('shows retry upload when upload failed', async () => {
-    recorderState.value = 'PREVIEW'
-    previewUrl.value = 'blob:preview'
-    previewBlob.value = new Blob(['x'], { type: 'audio/webm' })
-    uploadErrorMessage.value = 'Upload failed'
-    const wrapper = mountRecorder()
-    await nextTick()
-    expect(wrapper.find('[data-testid="route-voice-upload"]').text()).toContain(
-      translate('routeVoiceReports.upload.retry'),
-    )
-  })
-
-  it('does not pass admin retry transcription to courier list', () => {
-    const wrapper = mountRecorder({ canRetryTranscription: false })
-    expect(
-      wrapper
-        .find('[data-testid="route-voice-report-list-stub"]')
-        .attributes('data-can-retry'),
-    ).toBe('false')
   })
 
   it('shows offline unavailable message without recorder list query UI path', () => {

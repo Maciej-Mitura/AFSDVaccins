@@ -811,6 +811,29 @@ watch([ownerUserId, ownerBezorgerProfileId, isOnline], () => {
             </div>
           </template>
 
+          <div
+            v-if="currentStop.stopId"
+            class="pt-1"
+            data-testid="route-stop-voice-recorder"
+          >
+            <FeatureRouteVoiceRecorder
+              :route-id="myTodayRoute.id"
+              :route-status="myTodayRoute.status"
+              :route-source="todayRouteSource"
+              mode="stop"
+              :stop-id="currentStop.stopId"
+              :stop-sequence="currentStop.sequence"
+              :pharmacy-name="currentStop.pharmacyName"
+              :allow-recording="
+                myTodayRoute.status === RouteStatus.InProgress &&
+                todayRouteSource === 'SERVER' &&
+                isOnline
+              "
+              :show-courier-name="false"
+              :can-retry-transcription="false"
+            />
+          </div>
+
           <div>
             <button
               type="button"
@@ -974,6 +997,29 @@ watch([ownerUserId, ownerBezorgerProfileId, isOnline], () => {
               @discard="onDiscardPending(stop.stopId!)"
             />
 
+            <div
+              v-if="stop.stopId"
+              class="pt-1"
+              data-testid="route-stop-voice-recorder"
+            >
+              <FeatureRouteVoiceRecorder
+                :route-id="myTodayRoute.id"
+                :route-status="myTodayRoute.status"
+                :route-source="todayRouteSource"
+                mode="stop"
+                :stop-id="stop.stopId"
+                :stop-sequence="stop.sequence"
+                :pharmacy-name="stop.pharmacyName"
+                :allow-recording="
+                  myTodayRoute.status === RouteStatus.InProgress &&
+                  todayRouteSource === 'SERVER' &&
+                  isOnline
+                "
+                :show-courier-name="false"
+                :can-retry-transcription="false"
+              />
+            </div>
+
             <div>
               <button
                 type="button"
@@ -1017,34 +1063,39 @@ watch([ownerUserId, ownerBezorgerProfileId, isOnline], () => {
         :description="t('bezorger.route.today.emptyStops.description')"
       />
 
-      <!-- 7. Secondary tools: location, voice; QR already in stop context -->
+      <!-- 7. Secondary tools: location only (voice is per-stop near QR) -->
       <CommonPageSection
         :title="t('bezorger.route.tools.title')"
         data-testid="route-tools-section"
       >
-        <div class="grid gap-4 sm:grid-cols-2 sm:items-start">
-          <FeatureRouteLocationStatusCard
-            v-bind="
-              toRouteLocationStatusCardProps({
-                locationStatus: myTodayRoute.locationStatus,
-                routeStatus: myTodayRoute.status,
-                viewerRole: 'BEZORGER',
-                isOfflineSnapshot: todayRouteSource === 'CACHE',
-              })
-            "
-            variant="inset"
-          />
+        <FeatureRouteLocationStatusCard
+          v-bind="
+            toRouteLocationStatusCardProps({
+              locationStatus: myTodayRoute.locationStatus,
+              routeStatus: myTodayRoute.status,
+              viewerRole: 'BEZORGER',
+              isOfflineSnapshot: todayRouteSource === 'CACHE',
+            })
+          "
+          variant="inset"
+        />
+      </CommonPageSection>
 
-          <FeatureRouteVoiceRecorder
-            :route-id="myTodayRoute.id"
-            :route-status="myTodayRoute.status"
-            :route-source="todayRouteSource"
-            :allow-recording="myTodayRoute.status === RouteStatus.InProgress"
-            :show-courier-name="false"
-            :can-retry-transcription="false"
-            title-key="routeVoiceReports.voiceReport"
-          />
-        </div>
+      <CommonPageSection
+        v-if="myTodayRoute.id"
+        :title="t('routeVoiceReports.stop.legacyTitle')"
+        data-testid="route-voice-legacy-section"
+      >
+        <FeatureRouteVoiceRecorder
+          :route-id="myTodayRoute.id"
+          :route-status="myTodayRoute.status"
+          :route-source="todayRouteSource"
+          mode="legacy"
+          :allow-recording="false"
+          :show-courier-name="false"
+          :can-retry-transcription="false"
+          title-key="routeVoiceReports.stop.legacyTitle"
+        />
       </CommonPageSection>
 
       <!-- Complete route (end of operational flow) -->

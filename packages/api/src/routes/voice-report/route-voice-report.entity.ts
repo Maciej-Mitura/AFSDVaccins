@@ -13,11 +13,11 @@ import { RouteVoiceReportTranscription } from './route-voice-report-transcriptio
 import { RouteVoiceTranscriptionStatus } from './route-voice-transcription-status.enum'
 
 /**
- * Route-scoped operational voice report metadata (Phase 34A + 34B).
+ * Route-scoped operational voice report metadata (Phase 34A + 34B + 36E).
  * Audio bytes live in private Azure Blob Storage — never in Mongo.
  *
- * Storage status (UPLOADING / AVAILABLE / UPLOAD_FAILED) is unchanged from 34A.
- * Transcription lifecycle lives in nested `transcription` (PENDING…FAILED).
+ * Phase 36E: new uploads require stopId (and denormalised apothekerProfileId
+ * derived from the stop). Legacy rows may omit stopId and remain readable.
  *
  * Unique (routeId, sequenceNumber) protects concurrent sequence allocation.
  * Unique (recordedByUserId, routeId, clientUploadId) scopes idempotency.
@@ -26,7 +26,9 @@ import { RouteVoiceTranscriptionStatus } from './route-voice-transcription-statu
 @Index(['routeId', 'sequenceNumber'], { unique: true })
 @Index(['recordedByUserId', 'routeId', 'clientUploadId'], { unique: true })
 @Index(['routeId', 'createdAt'])
+@Index(['routeId', 'stopId', 'createdAt'])
 @Index(['bezorgerProfileId'])
+@Index(['apothekerProfileId', 'createdAt'])
 @Index(['transcription.status', 'transcription.processingLeaseExpiresAt'])
 @Index(['status', 'transcription.status', 'updatedAt'])
 export class RouteVoiceReport {
@@ -40,6 +42,20 @@ export class RouteVoiceReport {
   @Index()
   @Column()
   routeId!: string
+
+  /**
+   * Stop this report belongs to (Phase 36E).
+   * Null/absent on legacy route-level reports — never guess a stop.
+   */
+  @Column({ nullable: true })
+  stopId!: string | null
+
+  /**
+   * Denormalised from the stop at upload time (not client-trusted).
+   * Null on legacy route-level reports.
+   */
+  @Column({ nullable: true })
+  apothekerProfileId!: string | null
 
   @Column()
   bezorgerProfileId!: string

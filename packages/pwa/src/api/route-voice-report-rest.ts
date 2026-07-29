@@ -27,6 +27,8 @@ export type RouteVoiceReportSelectedLocale =
 
 export type RouteVoiceReportUploadPayload = {
   audio: Blob
+  /** Required stop scope for Phase 36E+ uploads. */
+  stopId: string
   clientRecordedAt: string
   durationSeconds: number
   selectedLocale: RouteVoiceReportSelectedLocale
@@ -38,6 +40,8 @@ export type RouteVoiceReportUploadPayload = {
 export type RouteVoiceReportUploadResponse = {
   id: string
   routeId: string
+  /** Present for stop-scoped reports; null for legacy route-level. */
+  stopId?: string | null
   sequenceNumber: number
   status: string
   mimeType: string
@@ -50,6 +54,8 @@ export type RouteVoiceReportUploadResponse = {
   transcriptionStatus: string | null
   requestedLocale: string | null
   effectiveDurationSeconds: number
+  /** True when the report has no stopId (pre-36E route-level). */
+  isLegacyRouteReport?: boolean
 }
 
 export type RouteVoiceTranscriptionRetryResponse = {
@@ -159,6 +165,7 @@ export async function uploadRouteVoiceReport(
   const mime = payload.audio.type || 'application/octet-stream'
   const filename = payload.filename ?? `voice-report.${extensionForMime(mime)}`
   formData.append('audio', payload.audio, filename)
+  formData.append('stopId', payload.stopId)
   formData.append('clientRecordedAt', payload.clientRecordedAt)
   formData.append('durationSeconds', String(payload.durationSeconds))
   formData.append('selectedLocale', payload.selectedLocale)

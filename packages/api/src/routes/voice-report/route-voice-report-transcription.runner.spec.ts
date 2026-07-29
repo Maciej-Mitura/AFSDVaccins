@@ -46,6 +46,7 @@ describe('RouteVoiceReportTranscriptionRunner', () => {
       overrides?.blobName ??
       generateRouteVoiceReportBlobName({
         routeId,
+        stopId: 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee',
         reportId: id.toString(),
         extension: 'webm',
       })
@@ -53,6 +54,8 @@ describe('RouteVoiceReportTranscriptionRunner', () => {
     return {
       _id: id,
       routeId,
+      stopId: 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee',
+      apothekerProfileId: new ObjectId().toString(),
       bezorgerProfileId: new ObjectId().toString(),
       recordedByUserId: new ObjectId().toString(),
       sequenceNumber: 1,

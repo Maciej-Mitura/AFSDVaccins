@@ -13,7 +13,6 @@ import { BezorgerProfileService } from '../../profile/bezorger/bezorger-profile.
 import { User } from '../../user/user.entity'
 import { UserRole } from '../../user/user-role.enum'
 import { DeliveryRoute } from '../delivery-route.entity'
-import { RouteStatus } from '../route-status.enum'
 import {
   buildIdempotencyFingerprint,
   generateRouteVoiceReportBlobName,
@@ -22,6 +21,7 @@ import {
   parseClientUploadId,
   parseDurationSeconds,
   parseSelectedLocale,
+  parseStopId,
   validateRouteVoiceReportAudio,
 } from './route-voice-report-audio.validation'
 import { RouteVoiceReportAuditService } from './route-voice-report-audit.service'
@@ -32,6 +32,10 @@ import {
 } from './route-voice-report.constants'
 import { RouteVoiceReport } from './route-voice-report.entity'
 import { RouteVoiceReportEventsService } from './route-voice-report-events.service'
+import {
+  isLegacyRouteVoiceReport,
+  resolveStopForVoiceReport,
+} from './route-voice-report-recording.policy'
 import {
   createPendingTranscription,
   mapSelectedLocaleToRequested,
@@ -48,6 +52,8 @@ import {
   RouteVoiceReportRangeInvalidException,
   RouteVoiceReportRouteNotFoundException,
   RouteVoiceReportRouteNotInProgressException,
+  RouteVoiceReportStopIdRequiredException,
+  RouteVoiceReportStopNotFoundException,
   RouteVoiceReportStorageFailedException,
   RouteVoiceReportStreamFailedException,
 } from './route-voice-report.exceptions'
@@ -116,6 +122,8 @@ export class RouteVoiceReportService {
       selectedLocale?: unknown
       clientUploadId: unknown
       browserFormatLabel?: unknown
+      /** Required for Phase 36E+ uploads. */
+      stopId: unknown
     },
   ): Promise<RouteVoiceReportUploadResponseDto> {
     if (actor.role !== UserRole.BEZORGER) {
@@ -135,9 +143,31 @@ export class RouteVoiceReportService {
     }
 
     const profile = await this.assertAssignedCourier(actor, route)
-    if (route.status !== RouteStatus.IN_PROGRESS) {
-      throw new RouteVoiceReportRouteNotInProgressException()
+
+    let stopId: string
+    try {
+      stopId = parseStopId(input.stopId)
+    } catch (error) {
+      if (error instanceof RouteVoiceReportStopIdRequiredException) {
+        throw error
+      }
+      throw error
     }
+
+    const stopDecision = resolveStopForVoiceReport(route, stopId)
+    if (!stopDecision.allowed) {
+      if (stopDecision.reason === 'route_not_in_progress') {
+        throw new RouteVoiceReportRouteNotInProgressException()
+      }
+      if (stopDecision.reason === 'stop_id_required') {
+        throw new RouteVoiceReportStopIdRequiredException()
+      }
+      throw new RouteVoiceReportStopNotFoundException()
+    }
+
+    const apothekerProfileId = String(
+      stopDecision.stop.apothekerProfileId,
+    ).trim()
 
     const clientUploadId = parseClientUploadId(input.clientUploadId)
     const durationSeconds = parseDurationSeconds(input.durationSeconds)
@@ -170,6 +200,9 @@ export class RouteVoiceReportService {
     })
 
     if (existing) {
+      if ((existing.stopId ?? null) !== stopId) {
+        throw new RouteVoiceReportIdempotencyConflictException()
+      }
       return this.resolveIdempotentExisting({
         existing,
         fingerprint,
@@ -186,6 +219,7 @@ export class RouteVoiceReportService {
     const reportId = reportObjectId.toString()
     const blobName = generateRouteVoiceReportBlobName({
       routeId: routeIdStr,
+      stopId,
       reportId,
       extension: audio.extension,
     })
@@ -193,9 +227,15 @@ export class RouteVoiceReportService {
       this.storage.containerName || ROUTE_VOICE_REPORT_DEFAULT_CONTAINER_NAME
 
     const now = new Date()
+    this.logger.log(
+      `voice_report_upload_started reportId=${reportId} routeId=${routeIdStr} stopId=${stopId}`,
+    )
+
     const reservation = await this.reserveReportWithSequenceRetry({
       reportObjectId,
       routeId: routeIdStr,
+      stopId,
+      apothekerProfileId,
       bezorgerProfileId,
       recordedByUserId: courierUserId,
       blobName,
@@ -231,13 +271,17 @@ export class RouteVoiceReportService {
         mimeType: audio.mimeType,
         metadata: {
           reportid: reportId,
+          routeid: routeIdStr,
+          stopid: stopId,
           // Bounded ASCII-only integrity hint (not a secret).
           sha256prefix: audio.sha256.slice(0, 16),
         },
       })
     } catch {
       await this.markUploadFailed(reservedReport)
-      this.logger.warn(`voice_report_blob_upload_failed correlation=${reportId}`)
+      this.logger.warn(
+        `voice_report_blob_upload_failed reportId=${reportId} routeId=${routeIdStr} stopId=${stopId}`,
+      )
       throw new RouteVoiceReportStorageFailedException()
     }
 
@@ -289,6 +333,7 @@ export class RouteVoiceReportService {
       await this.eventsService.publishCreated({
         routeId: routeIdStr,
         reportId,
+        stopId,
         status: RouteVoiceReportStatus.AVAILABLE,
         transcriptionStatus:
           finalised.transcription?.status ??
@@ -296,6 +341,9 @@ export class RouteVoiceReportService {
       })
     }
 
+    this.logger.log(
+      `voice_report_upload_completed reportId=${reportId} routeId=${routeIdStr} stopId=${stopId}`,
+    )
     this.transcriptionRunner.schedule(finalised.id)
     return this.toUploadResponse(finalised)
   }
@@ -331,7 +379,9 @@ export class RouteVoiceReportService {
         }
         return a.id.localeCompare(b.id)
       })
-      .map(report => this.toGql(report, displayName, actor.role))
+      .map(report =>
+        this.toGql(report, displayName, actor.role, route),
+      )
   }
 
   async streamAudioForActor(
@@ -562,6 +612,8 @@ export class RouteVoiceReportService {
           mimeType: input.mimeType,
           metadata: {
             reportid: existing.id,
+            routeid: existing.routeId,
+            ...(existing.stopId ? { stopid: existing.stopId } : {}),
             sha256prefix: input.sha256.slice(0, 16),
           },
         })
@@ -613,6 +665,7 @@ export class RouteVoiceReportService {
       await this.eventsService.publishCreated({
         routeId: finalised.routeId,
         reportId: finalised.id,
+        stopId: finalised.stopId ?? null,
         status: RouteVoiceReportStatus.AVAILABLE,
         transcriptionStatus:
           finalised.transcription?.status ??
@@ -631,6 +684,8 @@ export class RouteVoiceReportService {
   private async reserveReportWithSequenceRetry(input: {
     reportObjectId: ObjectId
     routeId: string
+    stopId: string
+    apothekerProfileId: string
     bezorgerProfileId: string
     recordedByUserId: string
     blobName: string
@@ -661,6 +716,8 @@ export class RouteVoiceReportService {
         const report = await this.reportRepository.save({
           _id: input.reportObjectId,
           routeId: input.routeId,
+          stopId: input.stopId,
+          apothekerProfileId: input.apothekerProfileId,
           bezorgerProfileId: input.bezorgerProfileId,
           recordedByUserId: input.recordedByUserId,
           sequenceNumber,
@@ -843,6 +900,7 @@ export class RouteVoiceReportService {
     return {
       id: report.id,
       routeId: report.routeId,
+      stopId: report.stopId ?? null,
       sequenceNumber: report.sequenceNumber,
       status: report.status,
       mimeType: report.mimeType,
@@ -858,6 +916,7 @@ export class RouteVoiceReportService {
         clientDurationSeconds: report.durationSeconds,
         transcriptionAudioDurationSeconds: tx?.audioDurationSeconds,
       }),
+      isLegacyRouteReport: isLegacyRouteVoiceReport(report),
     }
   }
 
@@ -865,6 +924,7 @@ export class RouteVoiceReportService {
     report: RouteVoiceReport,
     recordedByDisplayName: string,
     actorRole: UserRole,
+    route: DeliveryRoute,
   ): RouteVoiceReportGql {
     const tx = report.transcription
     const canRetry =
@@ -872,9 +932,18 @@ export class RouteVoiceReportService {
       report.status === RouteVoiceReportStatus.AVAILABLE &&
       tx?.status === RouteVoiceTranscriptionStatus.FAILED
 
+    const stopContext = this.resolveStopContext(route, report.stopId ?? null)
+
     return {
       id: report.id,
       routeId: report.routeId,
+      stopId: report.stopId ?? null,
+      stopSequence: stopContext?.sequence ?? null,
+      pharmacyDisplayName:
+        stopContext?.pharmacyName && stopContext.pharmacyName.length > 0
+          ? stopContext.pharmacyName
+          : null,
+      isLegacyRouteReport: isLegacyRouteVoiceReport(report),
       sequenceNumber: report.sequenceNumber,
       status: RouteVoiceReportStatus.AVAILABLE,
       mimeType: report.mimeType,
@@ -897,6 +966,35 @@ export class RouteVoiceReportService {
         transcriptionAudioDurationSeconds: tx?.audioDurationSeconds,
       }),
       canRetryTranscription: canRetry,
+    }
+  }
+
+  /**
+   * Resolve stop display context from the live route document.
+   * Never invents a stop for legacy reports (null stopId).
+   * If the stop was removed from a regenerated route, returns nulls
+   * rather than guessing another pharmacy.
+   */
+  private resolveStopContext(
+    route: DeliveryRoute,
+    stopId: string | null,
+  ): { sequence: number; pharmacyName: string } | null {
+    if (!stopId) {
+      return null
+    }
+    const stop = (route.stops ?? []).find(
+      candidate => candidate.stopId === stopId,
+    )
+    if (!stop) {
+      return null
+    }
+    const pharmacyName = String(stop.pharmacyName ?? '').trim()
+    if (!pharmacyName) {
+      return { sequence: stop.sequence, pharmacyName: '' }
+    }
+    return {
+      sequence: stop.sequence,
+      pharmacyName,
     }
   }
 }

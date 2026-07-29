@@ -75,7 +75,7 @@ export class RouteVoiceReportController {
       limits: {
         fileSize: ROUTE_VOICE_REPORT_MAX_AUDIO_BYTES,
         files: 1,
-        fields: 8,
+        fields: 10,
       },
     }),
   )
@@ -99,6 +99,7 @@ export class RouteVoiceReportController {
       selectedLocale: body.selectedLocale,
       clientUploadId: body.clientUploadId,
       browserFormatLabel: body.browserFormatLabel,
+      stopId: body.stopId,
     })
   }
 

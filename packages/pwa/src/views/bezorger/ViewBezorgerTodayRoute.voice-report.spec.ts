@@ -1,7 +1,7 @@
 /**
  * @vitest-environment happy-dom
  *
- * Placement / visibility of route voice reports on the courier today route.
+ * Placement / visibility of stop-scoped voice reports on the courier today route.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { mount } from '@vue/test-utils'
@@ -109,6 +109,10 @@ vi.mock(
         'showCourierName',
         'canRetryTranscription',
         'titleKey',
+        'stopId',
+        'stopSequence',
+        'pharmacyName',
+        'mode',
       ],
       template: `
       <section
@@ -117,9 +121,11 @@ vi.mock(
         :data-route-status="routeStatus"
         :data-can-retry="canRetryTranscription"
         :data-title-key="titleKey"
+        :data-mode="mode"
+        :data-stop-id="stopId"
         class="rounded-lg border border-default px-4 py-3"
       >
-        <h2>{{ titleKey }}</h2>
+        <h2>{{ titleKey || mode }}</h2>
       </section>
     `,
     },
@@ -177,7 +183,33 @@ const uiStubs = {
   },
 }
 
-function makeRoute(status: RouteStatus) {
+function makeStop(overrides: Record<string, unknown> = {}) {
+  return {
+    stopId: 'stop-1',
+    sequence: 1,
+    apothekerProfileId: 'apo-1',
+    pharmacyName: 'Apotheek Centrum',
+    address: {
+      street: 'Hoofdstraat',
+      houseNumber: '1',
+      postalCode: '1000AA',
+      city: 'Amsterdam',
+      country: 'NL',
+    },
+    orderIds: ['ord-1'],
+    orderCount: 1,
+    totalQuantity: 12,
+    lines: [{ vaccineId: 'v1', vaccineName: 'Vac A', quantity: 12 }],
+    qrConsumed: false,
+    deliveredAt: null,
+    ...overrides,
+  }
+}
+
+function makeRoute(
+  status: RouteStatus,
+  stops: Record<string, unknown>[] = [makeStop()],
+) {
   return {
     id: 'route-1',
     routeTemplateId: 'tpl-1',
@@ -193,7 +225,7 @@ function makeRoute(status: RouteStatus) {
       hasNextStop: false,
       nextStop: null,
     },
-    stops: [],
+    stops,
     skippedApothekerProfileIds: [],
     statusHistory: [],
     generatedAt: '2026-07-28T00:00:00.000Z',
@@ -238,35 +270,60 @@ describe('ViewBezorgerTodayRoute voice report placement', () => {
     __resetAppI18nForTests()
   })
 
-  it('shows Voice report section for assigned courier on active IN_PROGRESS route', async () => {
+  it('mounts per-stop voice recorder near QR / current stop, not in tools', async () => {
     const wrapper = mountPage()
     await nextTick()
-    const section = wrapper.find('[data-testid="route-voice-reports-section"]')
-    expect(section.exists()).toBe(true)
-    expect(section.attributes('data-allow-recording')).toBe('true')
-    expect(section.attributes('data-route-status')).toBe(RouteStatus.InProgress)
-    expect(section.attributes('data-can-retry')).toBe('false')
-    expect(section.attributes('data-title-key')).toBe(
-      'routeVoiceReports.voiceReport',
+
+    const stopRecorders = wrapper.findAll(
+      '[data-testid="route-stop-voice-recorder"]',
     )
-    expect(section.classes()).not.toContain('hidden')
-    expect(section.classes()).not.toContain('sr-only')
-    expect(section.classes()).not.toContain('md:hidden')
+    expect(stopRecorders.length).toBeGreaterThanOrEqual(1)
+
+    const stopSection = stopRecorders[0].find(
+      '[data-testid="route-voice-reports-section"]',
+    )
+    expect(stopSection.exists()).toBe(true)
+    expect(stopSection.attributes('data-mode')).toBe('stop')
+    expect(stopSection.attributes('data-stop-id')).toBe('stop-1')
+    expect(stopSection.attributes('data-allow-recording')).toBe('true')
+
+    const tools = wrapper.find('[data-testid="route-tools-section"]')
+    expect(tools.exists()).toBe(true)
+    expect(
+      tools.find('[data-testid="route-voice-reports-section"]').exists(),
+    ).toBe(false)
+    expect(
+      tools.find('[data-testid="route-location-status-card"]').exists(),
+    ).toBe(true)
   })
 
-  it('places Voice report after location status and before route actions', async () => {
+  it('keeps stop recording allowed after delivery while IN_PROGRESS', async () => {
+    myTodayRoute.value = makeRoute(RouteStatus.InProgress, [
+      makeStop({
+        qrConsumed: true,
+        deliveredAt: '2026-07-28T10:00:00.000Z',
+      }),
+    ])
     const wrapper = mountPage()
     await nextTick()
-    const html = wrapper.html()
-    const locationIdx = html.indexOf('data-testid="route-location-status-card"')
-    const voiceIdx = html.indexOf('data-testid="route-voice-reports-section"')
-    const completeIdx = html.indexOf('data-testid="route-complete"')
-    expect(locationIdx).toBeGreaterThan(-1)
-    expect(voiceIdx).toBeGreaterThan(locationIdx)
-    expect(completeIdx).toBeGreaterThan(voiceIdx)
+    const stopSection = wrapper
+      .find('[data-testid="route-stop-voice-recorder"]')
+      .find('[data-testid="route-voice-reports-section"]')
+    expect(stopSection.exists()).toBe(true)
+    expect(stopSection.attributes('data-allow-recording')).toBe('true')
   })
 
-  it('hides Voice report section when courier has no today route (unassigned)', async () => {
+  it('mounts a legacy route reports section without recording', async () => {
+    const wrapper = mountPage()
+    await nextTick()
+    const legacy = wrapper.find('[data-testid="route-voice-legacy-section"]')
+    expect(legacy.exists()).toBe(true)
+    const section = legacy.find('[data-testid="route-voice-reports-section"]')
+    expect(section.attributes('data-mode')).toBe('legacy')
+    expect(section.attributes('data-allow-recording')).toBe('false')
+  })
+
+  it('hides Voice report sections when courier has no today route', async () => {
     myTodayRoute.value = null
     const wrapper = mountPage()
     await nextTick()
@@ -275,22 +332,37 @@ describe('ViewBezorgerTodayRoute voice report placement', () => {
     ).toBe(false)
   })
 
-  it('keeps section visible but recording disabled for ASSIGNED route', async () => {
+  it('disables stop recording for ASSIGNED route', async () => {
     myTodayRoute.value = makeRoute(RouteStatus.Assigned)
     const wrapper = mountPage()
     await nextTick()
-    const section = wrapper.find('[data-testid="route-voice-reports-section"]')
-    expect(section.exists()).toBe(true)
-    expect(section.attributes('data-allow-recording')).toBe('false')
-    expect(wrapper.find('[data-testid="route-start"]').exists()).toBe(true)
+    const stopSection = wrapper
+      .find('[data-testid="route-stop-voice-recorder"]')
+      .find('[data-testid="route-voice-reports-section"]')
+    expect(stopSection.exists()).toBe(true)
+    expect(stopSection.attributes('data-allow-recording')).toBe('false')
   })
 
-  it('keeps section visible but recording disabled for COMPLETED route', async () => {
+  it('disables stop recording for COMPLETED route', async () => {
     myTodayRoute.value = makeRoute(RouteStatus.Completed)
     const wrapper = mountPage()
     await nextTick()
-    const section = wrapper.find('[data-testid="route-voice-reports-section"]')
-    expect(section.exists()).toBe(true)
-    expect(section.attributes('data-allow-recording')).toBe('false')
+    const stopSection = wrapper
+      .find('[data-testid="route-stop-voice-recorder"]')
+      .find('[data-testid="route-voice-reports-section"]')
+    expect(stopSection.exists()).toBe(true)
+    expect(stopSection.attributes('data-allow-recording')).toBe('false')
+  })
+
+  it('places stop voice near QR before tools and complete', async () => {
+    const wrapper = mountPage()
+    await nextTick()
+    const html = wrapper.html()
+    const voiceIdx = html.indexOf('data-testid="route-stop-voice-recorder"')
+    const toolsIdx = html.indexOf('data-testid="route-tools-section"')
+    const completeIdx = html.indexOf('data-testid="route-complete"')
+    expect(voiceIdx).toBeGreaterThan(-1)
+    expect(toolsIdx).toBeGreaterThan(voiceIdx)
+    expect(completeIdx).toBeGreaterThan(toolsIdx)
   })
 })

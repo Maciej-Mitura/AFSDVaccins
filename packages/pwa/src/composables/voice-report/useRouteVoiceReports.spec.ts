@@ -51,7 +51,12 @@ vi.mock('@/api/route-voice-report-errors', () => ({
   mapRouteVoiceReportErrorCode: (code: string) => `mapped:${code}`,
 }))
 
-import { useRouteVoiceReports } from '@/composables/voice-report/useRouteVoiceReports'
+import {
+  filterLegacyRouteVoiceReports,
+  filterReportsByStopId,
+  isLegacyRouteVoiceReport,
+  useRouteVoiceReports,
+} from '@/composables/voice-report/useRouteVoiceReports'
 
 function mockSubscription() {
   const unsubscribe = vi.fn()
@@ -188,6 +193,7 @@ describe('useRouteVoiceReports', () => {
 
     const first = api.uploadReport({
       audio: new Blob(['a'], { type: 'audio/webm' }),
+      stopId: 'stop-1',
       clientRecordedAt: '2026-07-27T10:00:00.000Z',
       durationSeconds: 2,
       selectedLocale: 'AUTO',
@@ -195,6 +201,7 @@ describe('useRouteVoiceReports', () => {
     })
     const second = await api.uploadReport({
       audio: new Blob(['a'], { type: 'audio/webm' }),
+      stopId: 'stop-1',
       clientRecordedAt: '2026-07-27T10:00:00.000Z',
       durationSeconds: 2,
       selectedLocale: 'AUTO',
@@ -202,6 +209,10 @@ describe('useRouteVoiceReports', () => {
     })
     expect(second).toBeNull()
     expect(uploadRouteVoiceReport).toHaveBeenCalledTimes(1)
+    expect(uploadRouteVoiceReport).toHaveBeenCalledWith(
+      'route-1',
+      expect.objectContaining({ stopId: 'stop-1' }),
+    )
 
     resolveUpload({
       id: 'r2',
@@ -254,5 +265,63 @@ describe('useRouteVoiceReports', () => {
     await vi.waitFor(() => expect(subscribe).toHaveBeenCalled())
     api.stopSubscription()
     expect(unsubscribe).toHaveBeenCalled()
+  })
+
+  it('rejects upload without stopId', async () => {
+    const routeId = ref('route-1')
+    const routeSource = ref<'SERVER' | 'CACHE' | 'NONE'>('SERVER')
+    const api = useRouteVoiceReports({ routeId, routeSource })
+    await vi.waitFor(() => expect(api.reports.value.length).toBe(1))
+
+    const result = await api.uploadReport({
+      audio: new Blob(['a'], { type: 'audio/webm' }),
+      stopId: '',
+      clientRecordedAt: '2026-07-27T10:00:00.000Z',
+      durationSeconds: 2,
+      selectedLocale: 'AUTO',
+      clientUploadId: 'id-1',
+    })
+    expect(result).toBeNull()
+    expect(uploadRouteVoiceReport).not.toHaveBeenCalled()
+    expect(api.uploadErrorMessage.value).toBe(
+      'mapped:ROUTE_VOICE_REPORT_STOP_ID_REQUIRED',
+    )
+  })
+
+  it('filters reports by stopId and legacy helpers', () => {
+    const reports = [
+      {
+        id: 'a',
+        stopId: 'stop-1',
+        isLegacyRouteReport: false,
+      },
+      {
+        id: 'b',
+        stopId: null,
+        isLegacyRouteReport: true,
+      },
+      {
+        id: 'c',
+        stopId: 'stop-2',
+        isLegacyRouteReport: false,
+      },
+      {
+        id: 'd',
+        stopId: undefined,
+        isLegacyRouteReport: false,
+      },
+    ] as Parameters<typeof filterReportsByStopId>[0]
+
+    expect(filterReportsByStopId(reports, 'stop-1').map(r => r.id)).toEqual([
+      'a',
+    ])
+    expect(filterLegacyRouteVoiceReports(reports).map(r => r.id)).toEqual([
+      'b',
+      'd',
+    ])
+    expect(isLegacyRouteVoiceReport({ stopId: null })).toBe(true)
+    expect(
+      isLegacyRouteVoiceReport({ stopId: 's1', isLegacyRouteReport: false }),
+    ).toBe(false)
   })
 })

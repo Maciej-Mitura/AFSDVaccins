@@ -1,5 +1,7 @@
 import {
+  assertValidRouteVoiceReportBlobName,
   buildIdempotencyFingerprint,
+  generateLegacyRouteVoiceReportBlobName,
   generateRouteVoiceReportBlobName,
   parseClientRecordedAt,
   parseClientUploadId,
@@ -164,20 +166,31 @@ describe('route-voice-report-audio.validation', () => {
     )
   })
 
-  it('builds opaque blob names without courier/pharmacy display names', () => {
+  it('builds opaque stop-scoped blob names without courier/pharmacy display names', () => {
     const routeId = '507f1f77bcf86cd799439011'
+    const stopId = 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee'
     const reportId = '507f1f77bcf86cd799439012'
     const blob = generateRouteVoiceReportBlobName({
       routeId,
+      stopId,
       reportId,
       extension: 'webm',
     })
     expect(blob).toBe(
-      `route-voice-reports/${routeId}/${reportId}/audio.webm`,
+      `route-voice-reports/${routeId}/stops/${stopId}/${reportId}/audio.webm`,
     )
     expect(blob.toLowerCase()).not.toContain('jan')
     expect(blob.toLowerCase()).not.toContain('apotheek')
     expect(blob.toLowerCase()).not.toContain('courier')
+  })
+
+  it('still accepts legacy blob paths for cleanup and playback', () => {
+    const legacy = generateLegacyRouteVoiceReportBlobName({
+      routeId: '507f1f77bcf86cd799439011',
+      reportId: '507f1f77bcf86cd799439012',
+      extension: 'webm',
+    })
+    expect(assertValidRouteVoiceReportBlobName(legacy)).toBe(legacy)
   })
 
   it('builds deterministic idempotency fingerprints', () => {

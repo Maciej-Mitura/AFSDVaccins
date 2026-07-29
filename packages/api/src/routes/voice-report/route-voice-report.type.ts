@@ -17,6 +17,22 @@ export class RouteVoiceReportGql {
   @Field(() => ID)
   routeId!: string
 
+  /** Present for Phase 36E+ stop reports; null for legacy route-level reports. */
+  @Field(() => ID, { nullable: true })
+  stopId!: string | null
+
+  /** Stop sequence on the route when stopId resolves; null for legacy. */
+  @Field(() => Int, { nullable: true })
+  stopSequence!: number | null
+
+  /** Pharmacy display name when authorised and stop resolves; null for legacy. */
+  @Field(() => String, { nullable: true })
+  pharmacyDisplayName!: string | null
+
+  /** True when the report has no stopId (pre-36E route-level). */
+  @Field()
+  isLegacyRouteReport!: boolean
+
   @Field(() => Int)
   sequenceNumber!: number
 
@@ -86,6 +102,9 @@ export class RouteVoiceReportUpdateGql {
   @Field(() => ID)
   reportId!: string
 
+  @Field(() => ID, { nullable: true })
+  stopId!: string | null
+
   @Field(() => RouteVoiceReportStatus)
   status!: RouteVoiceReportStatus
 
@@ -99,6 +118,7 @@ export class RouteVoiceReportUpdateGql {
 export type RouteVoiceReportUploadResponseDto = {
   id: string
   routeId: string
+  stopId: string | null
   sequenceNumber: number
   status: RouteVoiceReportStatus
   mimeType: string
@@ -111,6 +131,7 @@ export type RouteVoiceReportUploadResponseDto = {
   transcriptionStatus: RouteVoiceTranscriptionStatus | null
   requestedLocale: RouteVoiceTranscriptionLocale | null
   effectiveDurationSeconds: number
+  isLegacyRouteReport: boolean
 }
 
 export type RouteVoiceTranscriptionRetryResponseDto = {

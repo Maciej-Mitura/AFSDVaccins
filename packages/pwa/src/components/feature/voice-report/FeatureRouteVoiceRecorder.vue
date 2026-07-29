@@ -8,14 +8,24 @@ import type { RouteVoiceReportSelectedLocale } from '@/api/route-voice-report-re
 import { useLanguage } from '@/composables/useLanguage'
 import { useOnlineStatus } from '@/composables/useOnlineStatus'
 import { type RouteStatusValue } from '@/composables/useDeliveryRoutes'
-import { useRouteVoiceReports } from '@/composables/voice-report/useRouteVoiceReports'
+import {
+  filterLegacyRouteVoiceReports,
+  filterReportsByStopId,
+  useRouteVoiceReports,
+} from '@/composables/voice-report/useRouteVoiceReports'
 import { useVoiceRecorder } from '@/composables/voice-report/useVoiceRecorder'
+import {
+  acquireVoiceRecorderMutex,
+  releaseVoiceRecorderMutex,
+} from '@/composables/voice-report/voice-recorder-mutex'
 import {
   defaultSelectedLocaleFromUi,
   formatDurationSeconds,
   formatFileSizeBytes,
 } from '@/composables/voice-report/voice-recorder-types'
 import type { RouteDataSource } from '@/offline/ui-error-category'
+
+export type RouteVoiceRecorderMode = 'stop' | 'legacy' | 'route-all'
 
 const props = withDefaults(
   defineProps<{
@@ -35,11 +45,25 @@ const props = withDefaults(
      * Default must be true: Vue casts omitted Boolean props to false.
      */
     enabled?: boolean
+    /** Stop scope for courier recording / filtering. */
+    stopId?: string | null
+    stopSequence?: number | null
+    pharmacyName?: string | null
+    /**
+     * stop — courier stop-bound list + upload
+     * legacy — read-only legacy reports
+     * route-all — admin full list with stop grouping (default)
+     */
+    mode?: RouteVoiceRecorderMode
   }>(),
   {
     showCourierName: false,
     canRetryTranscription: false,
     enabled: true,
+    stopId: null,
+    stopSequence: null,
+    pharmacyName: null,
+    mode: 'route-all',
   },
 )
 
@@ -51,6 +75,20 @@ const routeIdRef = toRef(props, 'routeId')
 const routeSourceRef = toRef(props, 'routeSource')
 const enabledRef = computed(() => props.enabled !== false)
 const canRetryRef = computed(() => props.canRetryTranscription === true)
+
+const resolvedMode = computed<RouteVoiceRecorderMode>(() => {
+  if (props.mode === 'legacy' || props.mode === 'route-all') {
+    return props.mode
+  }
+  if (props.mode === 'stop' || props.stopId) {
+    return 'stop'
+  }
+  return 'route-all'
+})
+
+const mutexKey = computed(() =>
+  resolvedMode.value === 'legacy' ? 'legacy' : (props.stopId ?? 'route-all'),
+)
 
 const {
   reports,
@@ -90,16 +128,98 @@ const localeOptions = computed(() => [
   { value: 'pl-PL' as const, label: t('routeVoiceReports.language.polish') },
 ])
 
+const sectionTitle = computed(() => {
+  if (props.titleKey) {
+    return t(props.titleKey)
+  }
+  if (resolvedMode.value === 'legacy') {
+    return t('routeVoiceReports.stop.legacyTitle')
+  }
+  if (resolvedMode.value === 'stop') {
+    return t('routeVoiceReports.stop.title')
+  }
+  return t('routeVoiceReports.voiceReport')
+})
+
+const sectionDescription = computed(() => {
+  if (resolvedMode.value === 'legacy') {
+    return t('routeVoiceReports.stop.legacyDescription')
+  }
+  if (resolvedMode.value === 'stop') {
+    return t('routeVoiceReports.description')
+  }
+  return t('routeVoiceReports.description')
+})
+
+const stopContextLabel = computed(() => {
+  if (resolvedMode.value !== 'stop') {
+    return null
+  }
+  const sequence = props.stopSequence
+  const pharmacy = props.pharmacyName
+  if (sequence != null && pharmacy) {
+    return t('routeVoiceReports.stop.stopContext', {
+      sequence,
+      pharmacy,
+    })
+  }
+  if (pharmacy) {
+    return pharmacy
+  }
+  if (sequence != null) {
+    return t('bezorger.route.stop.label', { sequence })
+  }
+  return null
+})
+
+const filteredReports = computed(() => {
+  if (resolvedMode.value === 'stop' && props.stopId) {
+    return filterReportsByStopId(reports.value, props.stopId)
+  }
+  if (resolvedMode.value === 'legacy') {
+    return filterLegacyRouteVoiceReports(reports.value)
+  }
+  return reports.value
+})
+
+const emptyTitleKey = computed(() =>
+  resolvedMode.value === 'stop'
+    ? 'routeVoiceReports.stop.empty'
+    : 'routeVoiceReports.empty.title',
+)
+
+const emptyDescriptionKey = computed(() =>
+  resolvedMode.value === 'stop'
+    ? 'routeVoiceReports.stop.previousReports'
+    : 'routeVoiceReports.empty.description',
+)
+
 const showAssignedHint = computed(
   () =>
     props.allowRecording === false &&
     String(props.routeStatus) === 'ASSIGNED' &&
-    props.routeSource === 'SERVER',
+    props.routeSource === 'SERVER' &&
+    resolvedMode.value !== 'legacy',
+)
+
+const recordingAllowedByMode = computed(() => {
+  if (resolvedMode.value === 'legacy') {
+    return false
+  }
+  if (resolvedMode.value === 'stop') {
+    return Boolean(props.stopId)
+  }
+  // route-all: courier must not record without a stop — admin uses allowRecording=false
+  return false
+})
+
+const canShowRecorderUi = computed(
+  () => props.allowRecording && recordingAllowedByMode.value,
 )
 
 const canShowRecorder = computed(
   () =>
-    props.allowRecording &&
+    canShowRecorderUi.value &&
     String(props.routeStatus) === 'IN_PROGRESS' &&
     props.routeSource === 'SERVER' &&
     isOnline.value &&
@@ -107,6 +227,9 @@ const canShowRecorder = computed(
 )
 
 const recordingDisabledReason = computed(() => {
+  if (resolvedMode.value === 'stop' && !props.stopId) {
+    return t('routeVoiceReports.error.stopIdRequired')
+  }
   if (!isOnline.value) {
     return t('routeVoiceReports.recording.requiresInternet')
   }
@@ -115,6 +238,9 @@ const recordingDisabledReason = computed(() => {
   }
   if (!recorder.isSupported.value) {
     return t('routeVoiceReports.recording.unsupportedBrowser')
+  }
+  if (String(props.routeStatus) !== 'IN_PROGRESS') {
+    return t('routeVoiceReports.stop.unavailableAfterCompletion')
   }
   return null
 })
@@ -148,9 +274,40 @@ const remainingLabel = computed(() =>
   formatDurationSeconds(recorder.remainingSeconds.value),
 )
 
+function confirmLeaveUnsaved(): boolean {
+  if (!recorder.hasUnsentRecording.value) {
+    return true
+  }
+  return window.confirm(t('routeVoiceReports.recording.unsavedWillBeLost'))
+}
+
+function releaseMutexIfOwned(): void {
+  releaseVoiceRecorderMutex(mutexKey.value)
+}
+
 async function onStart(): Promise<void> {
+  if (!canShowRecorder.value || !props.stopId) {
+    return
+  }
+
+  const acquired = acquireVoiceRecorderMutex({
+    key: mutexKey.value,
+    cancel: () => {
+      recorder.cancelRecording()
+      clearUploadFeedback()
+    },
+    hasUnsent: () => recorder.hasUnsentRecording.value,
+    confirmLeave: confirmLeaveUnsaved,
+  })
+  if (!acquired) {
+    return
+  }
+
   clearUploadFeedback()
-  await recorder.startRecording()
+  const started = await recorder.startRecording()
+  if (!started) {
+    releaseMutexIfOwned()
+  }
 }
 
 async function onStop(): Promise<void> {
@@ -160,18 +317,20 @@ async function onStop(): Promise<void> {
 function onCancel(): void {
   recorder.cancelRecording()
   clearUploadFeedback()
+  releaseMutexIfOwned()
 }
 
 function onDiscard(): void {
   recorder.discardPreview()
   clearUploadFeedback()
   selectedLocale.value = defaultSelectedLocaleFromUi(currentLocale.value)
+  releaseMutexIfOwned()
 }
 
 async function onUpload(): Promise<void> {
   const blob = recorder.previewBlob.value
   const recordedAt = recorder.clientRecordedAt.value
-  if (!blob || !recordedAt) {
+  if (!blob || !recordedAt || !props.stopId) {
     return
   }
 
@@ -184,6 +343,7 @@ async function onUpload(): Promise<void> {
 
   const result = await uploadReport({
     audio: blob,
+    stopId: props.stopId,
     clientRecordedAt: recordedAt,
     durationSeconds: recorder.durationSeconds.value,
     selectedLocale: selectedLocale.value,
@@ -193,6 +353,7 @@ async function onUpload(): Promise<void> {
   if (result) {
     recorder.markUploaded()
     selectedLocale.value = defaultSelectedLocaleFromUi(currentLocale.value)
+    releaseMutexIfOwned()
   } else {
     recorder.markUploadFailed()
   }
@@ -204,13 +365,6 @@ async function onRetryUpload(): Promise<void> {
 
 async function onRetryTranscription(reportId: string): Promise<void> {
   await retryTranscription(reportId)
-}
-
-function confirmLeaveUnsaved(): boolean {
-  if (!recorder.hasUnsentRecording.value) {
-    return true
-  }
-  return window.confirm(t('routeVoiceReports.recording.unsavedWillBeLost'))
 }
 
 onBeforeRouteLeave(() => confirmLeaveUnsaved())
@@ -237,6 +391,7 @@ watch(
         recorder.state.value === 'REQUESTING_PERMISSION'
       ) {
         recorder.cancelRecording()
+        releaseMutexIfOwned()
       }
     }
   },
@@ -245,6 +400,7 @@ watch(
 watch(enabledRef, enabled => {
   if (!enabled) {
     recorder.reset()
+    releaseMutexIfOwned()
   }
 })
 
@@ -252,6 +408,10 @@ onBeforeUnmount(() => {
   if (typeof window !== 'undefined') {
     window.removeEventListener('beforeunload', onBeforeUnload)
   }
+  if (recorder.hasUnsentRecording.value) {
+    recorder.cancelRecording()
+  }
+  releaseMutexIfOwned()
 })
 </script>
 
@@ -260,14 +420,23 @@ onBeforeUnmount(() => {
     v-if="enabled"
     class="space-y-4"
     data-testid="route-voice-reports-section"
-    :aria-label="t(titleKey ?? 'routeVoiceReports.voiceReport')"
+    :data-mode="resolvedMode"
+    :data-stop-id="stopId ?? undefined"
+    :aria-label="sectionTitle"
   >
     <div class="space-y-1">
       <h2 class="text-base font-semibold text-highlighted">
-        {{ t(titleKey ?? 'routeVoiceReports.voiceReport') }}
+        {{ sectionTitle }}
       </h2>
+      <p
+        v-if="stopContextLabel"
+        class="text-sm text-toned"
+        data-testid="route-voice-stop-context"
+      >
+        {{ stopContextLabel }}
+      </p>
       <p class="text-sm text-toned">
-        {{ t('routeVoiceReports.description') }}
+        {{ sectionDescription }}
       </p>
     </div>
 
@@ -291,11 +460,11 @@ onBeforeUnmount(() => {
       </p>
 
       <div
-        v-if="allowRecording"
+        v-if="canShowRecorderUi"
         class="space-y-3"
         data-testid="route-voice-recorder"
         role="region"
-        :aria-label="t('routeVoiceReports.voiceReport')"
+        :aria-label="sectionTitle"
       >
         <p class="text-sm text-muted" data-testid="route-voice-privacy-notice">
           {{ t('routeVoiceReports.privacy.notice') }}
@@ -377,14 +546,15 @@ onBeforeUnmount(() => {
             size="xl"
             class="min-h-14 text-base"
             color="primary"
+            variant="soft"
             data-testid="route-voice-start"
             :disabled="!canShowRecorder"
             :title="recordingDisabledReason ?? undefined"
             :aria-disabled="!canShowRecorder"
-            :aria-label="t('routeVoiceReports.recording.start')"
+            :aria-label="t('routeVoiceReports.stop.record')"
             @click="onStart"
           >
-            {{ t('routeVoiceReports.recording.start') }}
+            {{ t('routeVoiceReports.stop.record') }}
           </UButton>
         </div>
 
@@ -599,11 +769,15 @@ onBeforeUnmount(() => {
       </div>
 
       <FeatureRouteVoiceReportList
-        :reports="reports"
+        :reports="filteredReports"
         :loading="loading"
         :error-message="errorMessage"
         :route-id="routeId"
         :show-courier-name="showCourierName === true"
+        :show-stop-context="resolvedMode === 'route-all'"
+        :group-by-stop="resolvedMode === 'route-all'"
+        :empty-title-key="emptyTitleKey"
+        :empty-description-key="emptyDescriptionKey"
         :can-retry-transcription="canRetryTranscription === true"
         :retrying-report-id="retryingReportId"
         :retry-error-message="retryErrorMessage"

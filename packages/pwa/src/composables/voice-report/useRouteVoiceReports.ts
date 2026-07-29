@@ -43,6 +43,15 @@ export type UseRouteVoiceReportsOptions = {
   canRetryTranscription?: Ref<boolean> | ComputedRef<boolean>
 }
 
+export type RouteVoiceReportUploadInput = {
+  audio: Blob
+  stopId: string
+  clientRecordedAt: string
+  durationSeconds: number
+  selectedLocale: RouteVoiceReportSelectedLocale
+  clientUploadId: string
+}
+
 export type UseRouteVoiceReportsResult = {
   reports: Readonly<Ref<RouteVoiceReportItem[]>>
   loading: Readonly<Ref<boolean>>
@@ -57,18 +66,35 @@ export type UseRouteVoiceReportsResult = {
   refetchReports: () => Promise<void>
   subscribe: () => () => void
   stopSubscription: () => void
-  uploadReport: (input: {
-    audio: Blob
-    clientRecordedAt: string
-    durationSeconds: number
-    selectedLocale: RouteVoiceReportSelectedLocale
-    clientUploadId: string
-  }) => Promise<RouteVoiceReportUploadResponse | null>
+  uploadReport: (
+    input: RouteVoiceReportUploadInput,
+  ) => Promise<RouteVoiceReportUploadResponse | null>
   retryTranscription: (reportId: string) => Promise<boolean>
   clearUploadFeedback: () => void
 }
 
 const REFETCH_DEBOUNCE_MS = 300
+
+/** Legacy = explicit flag or missing stopId (pre-36E route-level reports). */
+export function isLegacyRouteVoiceReport(report: {
+  isLegacyRouteReport?: boolean | null
+  stopId?: string | null
+}): boolean {
+  return report.isLegacyRouteReport === true || !report.stopId
+}
+
+export function filterReportsByStopId(
+  reports: readonly RouteVoiceReportItem[],
+  stopId: string,
+): RouteVoiceReportItem[] {
+  return reports.filter(report => report.stopId === stopId)
+}
+
+export function filterLegacyRouteVoiceReports(
+  reports: readonly RouteVoiceReportItem[],
+): RouteVoiceReportItem[] {
+  return reports.filter(report => isLegacyRouteVoiceReport(report))
+}
 
 /**
  * Query + PubSub refetch + multipart upload + ADMIN transcription retry
@@ -230,15 +256,19 @@ export function useRouteVoiceReports(
     return cleanup
   }
 
-  async function uploadReport(input: {
-    audio: Blob
-    clientRecordedAt: string
-    durationSeconds: number
-    selectedLocale: RouteVoiceReportSelectedLocale
-    clientUploadId: string
-  }): Promise<RouteVoiceReportUploadResponse | null> {
+  async function uploadReport(
+    input: RouteVoiceReportUploadInput,
+  ): Promise<RouteVoiceReportUploadResponse | null> {
     const routeId = options.routeId.value
     if (!routeId || uploading.value) {
+      return null
+    }
+
+    if (!input.stopId) {
+      uploadErrorMessage.value = mapRouteVoiceReportErrorCode(
+        'ROUTE_VOICE_REPORT_STOP_ID_REQUIRED',
+      )
+      lastUploadSuccess.value = false
       return null
     }
 

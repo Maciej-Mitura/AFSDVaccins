@@ -783,6 +783,7 @@ onMounted(() => {
             :route-id="route.id"
             :route-status="route.status"
             route-source="SERVER"
+            mode="route-all"
             :allow-recording="false"
             :show-courier-name="true"
             :can-retry-transcription="true"

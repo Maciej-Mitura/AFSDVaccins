@@ -28,6 +28,7 @@ export type RouteVoiceReportUpdateEventPayload = {
   routeVoiceReportUpdates: {
     routeId: string
     reportId: string
+    stopId: string | null
     status: RouteVoiceReportStatus
     transcriptionStatus: RouteVoiceTranscriptionStatus | null
     eventType: RouteVoiceReportUpdateEventType
@@ -49,12 +50,14 @@ export class RouteVoiceReportEventsService {
   async publishCreated(input: {
     routeId: string
     reportId: string
+    stopId?: string | null
     status: RouteVoiceReportStatus
     transcriptionStatus?: RouteVoiceTranscriptionStatus | null
   }): Promise<void> {
     await this.publish({
       routeId: input.routeId,
       reportId: input.reportId,
+      stopId: input.stopId ?? null,
       status: input.status,
       transcriptionStatus:
         input.transcriptionStatus ?? RouteVoiceTranscriptionStatus.PENDING,
@@ -65,6 +68,7 @@ export class RouteVoiceReportEventsService {
   async publishTranscriptionUpdate(input: {
     routeId: string
     reportId: string
+    stopId?: string | null
     status: RouteVoiceReportStatus
     transcriptionStatus: RouteVoiceTranscriptionStatus
     eventType:
@@ -74,12 +78,16 @@ export class RouteVoiceReportEventsService {
       | typeof ROUTE_VOICE_TRANSCRIPTION_EVENT_TYPE_FAILED
       | typeof ROUTE_VOICE_TRANSCRIPTION_EVENT_TYPE_RETRIED
   }): Promise<void> {
-    await this.publish(input)
+    await this.publish({
+      ...input,
+      stopId: input.stopId ?? null,
+    })
   }
 
   private async publish(input: {
     routeId: string
     reportId: string
+    stopId: string | null
     status: RouteVoiceReportStatus
     transcriptionStatus: RouteVoiceTranscriptionStatus | null
     eventType: RouteVoiceReportUpdateEventType
@@ -88,6 +96,7 @@ export class RouteVoiceReportEventsService {
       routeVoiceReportUpdates: {
         routeId: input.routeId,
         reportId: input.reportId,
+        stopId: input.stopId,
         status: input.status,
         transcriptionStatus: input.transcriptionStatus,
         eventType: input.eventType,
