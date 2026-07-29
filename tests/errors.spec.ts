@@ -26,7 +26,10 @@ test.describe('Error states', () => {
       })
     })
 
-    await page.getByRole('link', { name: 'Mijn bestellingen' }).click()
+    await page
+      .getByTestId('app-shell-primary-nav')
+      .getByRole('link', { name: 'Mijn bestellingen' })
+      .click()
 
     await expect(
       page.getByText(/mislukt|storing|fout|unavailable|Failed/i).first(),
@@ -38,7 +41,10 @@ test.describe('Error states', () => {
     page,
   }) => {
     await loginAs(page, E2E_ACCOUNTS.apotheker1)
-    await page.getByRole('link', { name: 'Nieuwe bestelling' }).click()
+    await page
+      .getByTestId('app-shell-primary-nav')
+      .getByRole('link', { name: 'Nieuwe bestelling' })
+      .click()
 
     // Empty order: submit control stays disabled and not stuck loading.
     await expect(page.getByTestId('place-order')).toBeDisabled()
