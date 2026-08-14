@@ -1,5 +1,7 @@
 import {
   buildMongoUrl,
+  DATABASE_BOOTSTRAP_CONFIRMATION_PHRASE,
+  DATABASE_RESET_CONFIRMATION_PHRASE,
   envValidationSchema,
   safeMongoHostname,
 } from './env.validation'
@@ -110,7 +112,7 @@ describe('envValidationSchema', () => {
     expect(result.error).toBeDefined()
   })
 
-  it('defaults ALLOW_DATABASE_SEED and ALLOW_E2E_AUTH_BYPASS to false', () => {
+  it('defaults ALLOW_DATABASE_SEED, ALLOW_DATABASE_RESET, and ALLOW_E2E_AUTH_BYPASS to false', () => {
     const result = envValidationSchema.validate({
       ...BASE_DEV,
     })
@@ -118,6 +120,9 @@ describe('envValidationSchema', () => {
     expect(result.error).toBeUndefined()
     expect(
       (result.value as { ALLOW_DATABASE_SEED: boolean }).ALLOW_DATABASE_SEED,
+    ).toBe(false)
+    expect(
+      (result.value as { ALLOW_DATABASE_RESET: boolean }).ALLOW_DATABASE_RESET,
     ).toBe(false)
     expect(
       (result.value as { ALLOW_E2E_AUTH_BYPASS: boolean })
@@ -189,6 +194,9 @@ describe('envValidationSchema', () => {
       (result.value as { ALLOW_DATABASE_BOOTSTRAP: boolean })
         .ALLOW_DATABASE_BOOTSTRAP,
     ).toBe(false)
+    expect(
+      (result.value as { ALLOW_DATABASE_RESET: boolean }).ALLOW_DATABASE_RESET,
+    ).toBe(false)
   })
 
   it('accepts seed-related optional variables', () => {
@@ -206,6 +214,53 @@ describe('envValidationSchema', () => {
     expect(
       (result.value as { ALLOW_DATABASE_SEED: boolean }).ALLOW_DATABASE_SEED,
     ).toBe(true)
+    expect(
+      (result.value as { SEED_DEMO_PASSWORD: string }).SEED_DEMO_PASSWORD,
+    ).toBe('demo-only')
+    expect(
+      (result.value as { SEED_TEACHER_ADMIN_PASSWORD: string })
+        .SEED_TEACHER_ADMIN_PASSWORD,
+    ).toBe('teacher-only')
+  })
+
+  it('keeps seed passwords optional for production API startup and accepts them for bootstrap', () => {
+    const withoutPasswords = envValidationSchema.validate({
+      ...BASE_PRODUCTION,
+    })
+    expect(withoutPasswords.error).toBeUndefined()
+
+    const withBootstrapPasswords = envValidationSchema.validate({
+      ...BASE_PRODUCTION,
+      ALLOW_DATABASE_BOOTSTRAP: 'true',
+      CONFIRM_DATABASE_BOOTSTRAP: DATABASE_BOOTSTRAP_CONFIRMATION_PHRASE,
+      SEED_DEMO_PASSWORD: 'demo-only',
+      SEED_TEACHER_ADMIN_PASSWORD: 'teacher-only',
+      SEED_PERSONAL_ADMIN_EMAIL: 'owner@example.com',
+    })
+    expect(withBootstrapPasswords.error).toBeUndefined()
+    expect(
+      (withBootstrapPasswords.value as { SEED_TEACHER_ADMIN_PASSWORD: string })
+        .SEED_TEACHER_ADMIN_PASSWORD,
+    ).toBe('teacher-only')
+  })
+
+  it('accepts local database reset gates without enabling them by default', () => {
+    const enabled = envValidationSchema.validate({
+      ...BASE_DEV,
+      ALLOW_DATABASE_RESET: 'true',
+      CONFIRM_DATABASE_RESET: DATABASE_RESET_CONFIRMATION_PHRASE,
+    })
+    expect(enabled.error).toBeUndefined()
+    expect(
+      (enabled.value as { ALLOW_DATABASE_RESET: boolean }).ALLOW_DATABASE_RESET,
+    ).toBe(true)
+    expect(
+      (enabled.value as { CONFIRM_DATABASE_RESET: string })
+        .CONFIRM_DATABASE_RESET,
+    ).toBe(DATABASE_RESET_CONFIRMATION_PHRASE)
+    expect(DATABASE_RESET_CONFIRMATION_PHRASE).toBe(
+      'RESET_LOCAL_DEMO_DATABASE',
+    )
   })
 
   it('defaults vaccine image providers to fake outside production', () => {

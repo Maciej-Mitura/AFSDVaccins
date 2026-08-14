@@ -20,6 +20,8 @@
     "test:e2e:pwa:stack": "npm run build && cross-env NODE_ENV=test node dist/playwright-e2e/start-api.js",
     "seed:database:all": "nest build && node dist/cli.js",
     "seed:database:cli": "node dist/cli.js",
+    "reset:database:demo": "nest build && node dist/reset-cli.js",
+    "reset:database:demo:cli": "node dist/reset-cli.js",
     "bootstrap:database:demo": "nest build && node dist/bootstrap-cli.js",
     "bootstrap:database:demo:cli": "node dist/bootstrap-cli.js",
     "diagnose:voice-reports:azure": "ts-node --transpile-only scripts/diagnose-voice-reports-azure.ts",

@@ -65,6 +65,7 @@ describe('production readiness (offline)', () => {
     const dockerfile = read('packages/api/Dockerfile')
     assert.match(dockerfile, /CMD \["node", "dist\/main\.js"\]/)
     assert.doesNotMatch(dockerfile, /bootstrap-cli/)
+    assert.doesNotMatch(dockerfile, /reset-cli/)
     assert.doesNotMatch(dockerfile, /cli\.js/)
   })
 
@@ -76,6 +77,9 @@ describe('production readiness (offline)', () => {
     assert.match(example, /ALLOW_DATABASE_BOOTSTRAP=/)
     assert.match(example, /CONFIRM_DATABASE_BOOTSTRAP=/)
     assert.match(example, /BOOTSTRAP_PUBLIC_DEMO_DATABASE/)
+    assert.match(example, /ALLOW_DATABASE_RESET=/)
+    assert.match(example, /CONFIRM_DATABASE_RESET=/)
+    assert.match(example, /RESET_LOCAL_DEMO_DATABASE/)
     assert.match(example, /mongodb\+srv:\/\/<user>:<password>@<cluster-host>\//)
     assert.match(example, /DELIVERY_QR_SIGNING_SECRET=/)
     assert.match(example, /PUSH_PROVIDER=/)

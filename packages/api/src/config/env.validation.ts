@@ -13,6 +13,8 @@ import {
 export const DATABASE_BOOTSTRAP_CONFIRMATION_PHRASE =
   'BOOTSTRAP_PUBLIC_DEMO_DATABASE'
 
+export const DATABASE_RESET_CONFIRMATION_PHRASE = 'RESET_LOCAL_DEMO_DATABASE'
+
 export const envValidationSchema = Joi.object({
   NODE_ENV: Joi.string()
     .valid('development', 'test', 'production')
@@ -68,6 +70,19 @@ export const envValidationSchema = Joi.object({
    * Enforced by BootstrapSafetyService (not Joi alone).
    */
   CONFIRM_DATABASE_BOOTSTRAP: Joi.string().allow('').optional(),
+  /**
+   * Explicit opt-in for the local exam/demo Mongo reset CLI.
+   * Never used by API startup, Docker CMD, or production bootstrap.
+   */
+  ALLOW_DATABASE_RESET: Joi.boolean()
+    .truthy('true')
+    .falsy('false')
+    .default(false),
+  /**
+   * Must equal DATABASE_RESET_CONFIRMATION_PHRASE when resetting.
+   * Enforced by DatabaseResetSafetyService (not Joi alone).
+   */
+  CONFIRM_DATABASE_RESET: Joi.string().allow('').optional(),
   /**
    * Playwright / browser E2E only: accept deterministic Bearer tokens.
    * Requires NODE_ENV=test as well (enforced in FirebaseService).
@@ -486,6 +501,8 @@ export type EnvConfig = {
   ALLOW_DATABASE_SEED: boolean
   ALLOW_DATABASE_BOOTSTRAP: boolean
   CONFIRM_DATABASE_BOOTSTRAP?: string
+  ALLOW_DATABASE_RESET: boolean
+  CONFIRM_DATABASE_RESET?: string
   ALLOW_E2E_AUTH_BYPASS: boolean
   SEED_DEMO_PASSWORD?: string
   SEED_TEACHER_ADMIN_PASSWORD?: string

@@ -20,6 +20,7 @@ function baseEnv(overrides: Partial<EnvConfig> = {}): EnvConfig {
     TRUST_PROXY: false,
     ALLOW_DATABASE_SEED: false,
     ALLOW_DATABASE_BOOTSTRAP: false,
+    ALLOW_DATABASE_RESET: false,
     ALLOW_E2E_AUTH_BYPASS: false,
     THROTTLE_DEFAULT_TTL_MS: 60_000,
     THROTTLE_DEFAULT_LIMIT: 120,

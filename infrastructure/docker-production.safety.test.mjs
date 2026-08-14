@@ -42,6 +42,7 @@ describe('production Docker safety', () => {
     const compose = read(composePath)
     assert.match(compose, /NODE_ENV:\s*production/)
     assert.match(compose, /ALLOW_DATABASE_SEED:\s*'false'/)
+    assert.match(compose, /ALLOW_DATABASE_RESET:\s*'false'/)
     assert.match(compose, /ALLOW_E2E_AUTH_BYPASS:\s*'false'/)
     assert.match(compose, /DELIVERY_QR_SIGNING_SECRET/)
     assert.match(compose, /WEB_PUSH_VAPID_PUBLIC_KEY/)

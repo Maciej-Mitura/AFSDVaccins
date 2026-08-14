@@ -388,10 +388,11 @@ key, fixed order ObjectIds, `(bezorgerProfileId, deliveryDate)`). Reruns do not
 duplicate users, profiles, vaccines, stock adjustments, order/route history, or
 active templates.
 
-There is **no** `seed:reset` command: entities lack reliable seed-ownership
-markers, so selective cleanup cannot be guaranteed. Use the normal seed to
-reconcile the deterministic dataset, or clear Mongo collections manually in
-development if needed. Firebase Auth accounts are never deleted by the seed.
+There is **no** selective `seed:reset` that deletes individual seed documents:
+entities lack reliable seed-ownership markers. To start the local demo from a
+clean Mongo application database, use `npm run reset:database:demo` (below),
+then rerun `npm run seed:database:all`. Firebase Auth accounts are never
+deleted by seed or by database reset.
 
 ### Verify
 
@@ -400,6 +401,40 @@ development if needed. Firebase Auth accounts are never deleted by the seed.
    today route (ASSIGNED), and tomorrow preview.
 3. Confirm no automatic DELIVERED orders and no duplicate Mongo documents for
    seed keys.
+
+## Local demo database reset (exam presentation)
+
+Drops **only** the configured local Mongo application database so the next seed
+starts empty. It does **not** delete Firebase Authentication users, Docker
+volumes, or other databases on the Mongo server.
+
+### Exam / demo sequence
+
+1. Start local Mongo if necessary (`docker compose -f infrastructure/docker-compose-dev.yml up -d`).
+2. Enable the local reset gates in `packages/api/.env` (`NODE_ENV=development`,
+   `ALLOW_DATABASE_RESET=true`, `CONFIRM_DATABASE_RESET=RESET_LOCAL_DEMO_DATABASE`).
+3. `npm run reset:database:demo`
+4. `npm run seed:database:all`
+5. `npm run dev`
+
+Keep `ALLOW_DATABASE_SEED=true` and the usual seed passwords/email in `.env` for
+step 4. After the demo, set `ALLOW_DATABASE_RESET=false` (and unset the
+confirmation phrase).
+
+### Safety
+
+Reset is refused unless **all** of the following are true:
+
+- `NODE_ENV=development` (`production` is always refused)
+- `ALLOW_DATABASE_RESET=true`
+- `CONFIRM_DATABASE_RESET=RESET_LOCAL_DEMO_DATABASE` (exact phrase)
+- `DB_HOST` is `mongodb://` to a local hostname used by this repo:
+  `localhost`, `127.0.0.1`, `mongo`, or `vaccin-delivery-mongo-dev`
+- `DB_NAME=vaccin-delivery` (the Compose/dev application database)
+
+`mongodb+srv`, Atlas (`mongodb.net`), remote hosts, empty names, and system
+databases (`admin`, `local`, `config`, `test`) are refused. The CLI logs only
+database name, Mongo hostname, and environment — never the full URI or secrets.
 
 ## Development
 
@@ -884,6 +919,8 @@ npm run typecheck:api
 npm run test:api
 npm run test:e2e:api
 npm run generate:schema
+npm run seed:database:all
+npm run reset:database:demo
 ```
 
 ## Backend GraphQL E2E (Phase 17)

@@ -34,6 +34,7 @@ function applyPlaywrightEnv(dbHost: string): void {
   process.env.NODE_ENV = 'test'
   process.env.ALLOW_E2E_AUTH_BYPASS = 'true'
   process.env.ALLOW_DATABASE_SEED = 'false'
+  process.env.ALLOW_DATABASE_RESET = 'false'
   process.env.PORT = String(PLAYWRIGHT_API_PORT)
   process.env.URL_FRONTEND = `http://127.0.0.1:${PLAYWRIGHT_PWA_PORT}`
   process.env.DB_HOST = dbHost

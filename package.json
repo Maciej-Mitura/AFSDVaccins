@@ -48,6 +48,7 @@
     "test:e2e:pwa:report": "playwright show-report",
     "prepush:check": "npm run typecheck:api && npm run typecheck:pwa && npm run test:api && npm run test:pwa",
     "seed:database:all": "npm run seed:database:all --workspace=@vaccin-delivery/api",
+    "reset:database:demo": "npm run reset:database:demo --workspace=@vaccin-delivery/api",
     "test:docker:safety": "node --test infrastructure/docker-production.safety.test.mjs",
     "diagnose:voice-reports:azure": "npm run diagnose:voice-reports:azure --workspace=@vaccin-delivery/api",
     "diagnose:route-template-assignments": "npm run diagnose:route-template-assignments --workspace=@vaccin-delivery/api",
