@@ -19,6 +19,8 @@ infrastructure/docker-compose.production.override.yml
 # Firebase Admin and local credentials
 firebase-service-account.json
 *firebase*sa*.json
+*-firebase-adminsdk-*.json
+maciejafsdvaccin*.json
 *.pem
 *.p12
 .firebaserc
