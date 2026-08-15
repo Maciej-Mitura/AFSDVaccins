@@ -5,9 +5,28 @@ import { join } from 'node:path'
 import { AuthenticationModule } from '../authentication/authentication.module'
 import { DATABASE_RESET_CONFIRMATION_PHRASE } from '../config/env.validation'
 import { SeedModule } from './seed.module'
-import { DatabaseResetAppModule } from './database-reset-app.module'
 import { DatabaseResetService } from './database-reset.service'
 import { DatabaseResetSafetyService } from './database-reset.safety'
+
+/**
+ * DatabaseResetAppModule calls ConfigModule.forRoot at import time. Locally a
+ * packages/api/.env may satisfy validation; CI has no .env, so set minimal env
+ * before requiring the module (same pattern as bootstrap-app.compilation.spec).
+ */
+function loadDatabaseResetAppModule(): new () => unknown {
+  process.env.NODE_ENV = process.env.NODE_ENV ?? 'test'
+  process.env.PORT = process.env.PORT ?? '3000'
+  process.env.URL_FRONTEND =
+    process.env.URL_FRONTEND ?? 'http://localhost:5173'
+  process.env.DB_HOST = process.env.DB_HOST ?? 'mongodb://localhost:27017'
+  process.env.DB_NAME = process.env.DB_NAME ?? 'vaccin-delivery'
+
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const { DatabaseResetAppModule } = require('./database-reset-app.module') as {
+    DatabaseResetAppModule: new () => unknown
+  }
+  return DatabaseResetAppModule
+}
 
 function moduleImports(
   metatype: abstract new (...args: never[]) => unknown,
@@ -27,6 +46,8 @@ function moduleProviders(
 }
 
 describe('DatabaseResetAppModule', () => {
+  const DatabaseResetAppModule = loadDatabaseResetAppModule()
+
   it('does not import Firebase, seed, or TypeORM modules', () => {
     const imports = moduleImports(DatabaseResetAppModule)
     expect(imports).not.toContain(AuthenticationModule)
