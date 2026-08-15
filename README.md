@@ -1,242 +1,225 @@
 # Vaccinatie-levering
 
-Full-stack realtime PWA for vaccine ordering and delivery-route management.
+Realtime progressive web app for **vaccine ordering** and **courier delivery**.
 
-Pharmacists (apothekers) order vaccines within daily and weekly limits. Administrators manage catalogue, stock, orders, and delivery planning. Couriers (bezorgers) execute assigned routes on a mobile-first client and confirm deliveries with secure QR codes. Order, route, and notification changes reach relevant users over GraphQL subscriptions.
+Pharmacies order vaccines within daily and weekly limits. Admins manage stock, orders, and delivery planning. Couriers run assigned routes on a mobile-first client and confirm deliveries with secure QR codes. Relevant users get live updates over GraphQL subscriptions.
+
+**Public demo**
+
+| Layer  | URL                                                  |
+| ------ | ---------------------------------------------------- |
+| PWA    | https://maciejafsdvaccin.web.app                     |
+| API    | https://afsdvaccins-production.up.railway.app        |
+| Health | https://afsdvaccins-production.up.railway.app/health |
 
 ---
 
-## 1. Core workflow
+## What it does
 
 ```text
-Apotheker  →  places vaccine order (same-day or next-day by closing time)
-     ↓
-Admin      →  manages stock & orders
-           →  maintains route templates
-           →  generates / assigns delivery routes
-     ↓
-Bezorger   →  follows today’s route
-           →  marks stop arrival
-           →  confirms delivery via secure QR scan
-     ↓
-System     →  updates stock, order status, notifications
-           →  pushes realtime updates to relevant roles
+Apotheker  →  places an order (same-day or next-day by closing time)
+Admin      →  manages stock & orders, templates, generates daily routes
+Bezorger   →  runs today’s route, marks arrival, confirms delivery via QR
+System     →  updates stock / order status / notifications in realtime
 ```
 
-Orders placed before the configured closing time are eligible for same-day delivery; later orders move to the next day. Weekly and per-type daily dose caps are enforced when the pharmacist submits an order.
+| Role          | Typical work                                                        |
+| ------------- | ------------------------------------------------------------------- |
+| **ADMIN**     | Catalogue, stock, all orders, route templates & planning, analytics |
+| **APOTHEKER** | Browse vaccines, place/cancel own orders, history, show stop QR     |
+| **BEZORGER**  | Today’s route, tomorrow preview, arrival, QR confirm, voice reports |
+
+Authorization is enforced on the **API** (Firebase ID token + role/ownership). The PWA only hides screens; the server is authoritative.
 
 ---
 
-## 2. Roles
+## Main flows
 
-| Role          | Who                    | Capabilities (summary)                                                                                                                           |
-| ------------- | ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
-| **ADMIN**     | Backoffice / evaluator | Vaccine catalogue & images, stock, all orders, settings, route templates, route generation, courier analytics, QR/PDF tools, voice-report review |
-| **APOTHEKER** | Pharmacy               | Own profile, catalogue browse, place/cancel own orders, order history, planned-delivery QR view, notifications                                   |
-| **BEZORGER**  | Courier                | Own profile, today’s route & tomorrow preview, stop arrival, QR preview/confirm, route PDF, voice reports, notifications                         |
+### 1. Pharmacist order (realtime)
 
-Authorization is enforced on the API (Firebase ID token + MongoDB role/ownership checks). The PWA also routes by role; server rules remain authoritative.
+1. Sign in as `apotheker1@demo.be`.
+2. Create a small order (respect daily/weekly limits).
+3. With an admin session open on **Orders**, the new order appears **without reload** (`orderCreated` subscription).
 
-Public self-registration creates **APOTHEKER** or **BEZORGER** only. **ADMIN** accounts are provisioned via seed/bootstrap.
+Orders before closing time are eligible for same-day delivery; later orders go to the next day.
 
----
+### 2. Courier delivery (seeded today route)
 
-## 3. Main features
+1. Sign in as `bezorger1@demo.be` → today’s route (seeded as **ASSIGNED**).
+2. **Start** the route → **IN_PROGRESS**.
+3. **Mark arrived** at a stop (arrival ≠ delivery).
+4. Pharmacist/admin **Show QR** for that stop; courier **scans → preview → confirm**.
+5. Stock and order status update; complete the route when all deliverable stops are done.
 
-- **Vaccine catalogue** — admin CRUD/activation; pharmacists see active vaccines
-- **Stock management** — admin adjustments with audit history; low-stock awareness; stock decremented on delivered confirmation
-- **Ordering** — daily/weekly limits, closing-time delivery date, order history and status
-- **Realtime updates** — GraphQL subscriptions for orders, admin operations feed, notifications, courier route updates, voice-report updates
-- **Route templates & planning** — fixed pharmacy stop sequences; generate daily routes; skip pharmacies without orders
-- **Courier route UI** — today route, tomorrow preview, stop details
-- **Secure QR delivery confirmation** — HMAC-signed stop tokens; courier preview + confirm; replay protection
-- **PDF manifests** — full-route and per-stop delivery PDFs (REST)
-- **PWA / offline** — installable app, service worker, offline fallback page; IndexedDB cache for courier routes/notifications; offline queue for **stop arrival only** (QR confirm is never queued offline)
-- **Web Push** — VAPID-based push (backend + service worker); in-app notification centre
-- **Coarse courier location** — derived city/context from route stop data (no GPS tracking)
-- **Admin courier analytics** — performance views and CSV export
-- **Vaccine images** — admin upload; Azure Blob storage + Azure Vision analysis (local/dev can use fake providers)
-- **Voice delivery reports** — courier audio upload; Azure Speech transcription; admin/courier review
-- **Internationalization** — `nl` (default), `en`, `zh`, `es`
-- **Responsive UI** — shared shell with mobile navigation; courier flows oriented for phone use
+A live order created in flow 1 is **not** automatically part of an already-generated today route. Demo delivery uses the **seeded** route.
+
+### 3. Offline arrival (courier)
+
+On `http://localhost:5173` (Vite), with today’s route already open:
+
+1. DevTools → Network → Offline.
+2. Route remains readable from IndexedDB.
+3. **Mark arrived** queues locally (`COURIER_STOP_ARRIVED` only).
+4. Go online again → queue syncs; server remains source of truth.
+
+QR confirmation is **online-only** (never queued). Full installability / service worker is clearest on the Hosting URL above (normal `npm run dev` does not register the production SW unless `VITE_PWA_DEV=true`).
 
 ---
 
-## 4. Architecture
+## Stack
 
 ```text
-Browser / PWA
-    ↓
-Vue 3 + Apollo Client (+ graphql-ws)
-    ↓
-GraphQL / REST / WebSocket  (/graphql)
-    ↓
+Vue 3 PWA (Vite, Apollo, vue-i18n, Workbox)
+        │  GraphQL HTTP + graphql-ws (+ selected REST)
+        ▼
 NestJS API
-    ↓
+        │
 MongoDB · Firebase Auth · Azure (Blob / Vision / Speech) · Web Push
 ```
 
-| Layer            | Technology                                                                             |
-| ---------------- | -------------------------------------------------------------------------------------- |
-| Frontend         | Vue 3, Vite, TypeScript, Nuxt UI, Apollo Client, vue-i18n, Workbox (`vite-plugin-pwa`) |
-| API              | NestJS, code-first GraphQL, selected REST endpoints                                    |
-| Database         | MongoDB via TypeORM                                                                    |
-| Authentication   | Firebase Authentication (client) + Firebase Admin (API token verify)                   |
-| Realtime         | GraphQL subscriptions over `graphql-ws`; in-process PubSub                             |
-| Cloud (deployed) | Firebase Hosting (PWA), Railway (API), MongoDB Atlas, Azure services above             |
-| Monorepo         | npm workspaces                                                                         |
-
-Shared GraphQL types are generated into `@vaccin-delivery/types` (not committed; produced by `npm run generate:graphql`).
+| Package                | Role                                                           |
+| ---------------------- | -------------------------------------------------------------- |
+| `packages/api`         | NestJS GraphQL/REST API, seed / reset / bootstrap CLIs         |
+| `packages/pwa`         | Vue 3 PWA                                                      |
+| `packages/types`       | Generated GraphQL TypeScript types                             |
+| `packages/i18n-export` | Dev-only Sheet → locale JSON exporter                          |
+| `infrastructure/`      | Docker Compose + safety tests                                  |
+| `tests/`               | Playwright browser E2E                                         |
+| `docs/`                | `project-fiche.md`, `project-architecture.md`, `deployment.md` |
 
 ---
 
-## 5. Repository structure
+## Prerequisites
 
-| Path                   | Purpose                                                                      |
-| ---------------------- | ---------------------------------------------------------------------------- |
-| `packages/api`         | NestJS GraphQL/REST API, seed/reset/bootstrap CLIs                           |
-| `packages/pwa`         | Vue 3 progressive web app                                                    |
-| `packages/types`       | Generated GraphQL TypeScript types                                           |
-| `packages/i18n-export` | Dev-only Google Sheet → locale JSON exporter                                 |
-| `infrastructure/`      | Docker Compose (dev Mongo + local production-like stack) and readiness tests |
-| `docs/`                | Assignment, deployment, and presentation documentation                       |
-| `.github/workflows/`   | CI for API, API E2E, PWA, Playwright, Docker smoke                           |
-| `tests/`               | Playwright browser E2E specs                                                 |
+- **Node.js** `>= 22.16.0` (see `.nvmrc`)
+- **npm** `>= 10`
+- **Docker Desktop** (local Mongo)
+- A **Firebase** project with Email/Password auth, web app config, and an Admin **service-account JSON**
+- Optional locally: Azure / Web Push (fake providers work for most local demos)
 
 ---
 
-## 6. Prerequisites
+## Quick start (after cloning)
 
-Derived from this repository:
+From the repository root:
 
-- **Node.js** `>=22.16.0` (`.nvmrc` / `package.json` engines: **22.16.0**)
-- **npm** `>=10.0.0`
-- **Docker Desktop** (recommended for local Mongo; required for Compose presentation stack)
-- **Firebase project** with Email/Password auth, web app config, and Admin service-account JSON
-- **MongoDB** — local via Compose, or Atlas for cloud
-- **Azure** (optional locally with fake providers; required for real image/voice features in production): Blob Storage, Vision, Speech
-- For push in production: VAPID key pair (`web-push`)
-
----
-
-## 7. Local setup
-
-### Install
+### 1. Install
 
 ```bash
 npm install
 ```
 
-Root `typecheck:pwa` / `build:pwa` run GraphQL generation automatically when needed. After a clean clone you can also run:
-
-```bash
-npm run generate:graphql
-```
-
-### Environment files
+### 2. Environment files
 
 ```bash
 cp packages/pwa/.env.example packages/pwa/.env
 cp packages/api/.env.example packages/api/.env
 ```
 
-Do **not** commit real secrets. Categories of variables:
+**PWA** (`packages/pwa/.env`) — public Firebase web config + API URLs:
 
-| Surface            | Examples                                                                                 | Notes                                                        |
-| ------------------ | ---------------------------------------------------------------------------------------- | ------------------------------------------------------------ |
-| PWA (public)       | `VITE_BACKEND_URL`, `VITE_BACKEND_WS_URL`, `VITE_FIREBASE_*`, optional `VITE_WEB_PUSH_*` | Safe in the browser bundle                                   |
-| API core           | `PORT`, `URL_FRONTEND`, `DB_HOST`, `DB_NAME`, `NODE_ENV`                                 | Local defaults: API `3000`, PWA `5173`, DB `vaccin-delivery` |
-| Firebase Admin     | `GOOGLE_APPLICATION_CREDENTIALS` (local file path)                                       | Railway uses `FIREBASE_SERVICE_ACCOUNT_JSON` instead         |
-| Seed / reset gates | `ALLOW_DATABASE_SEED`, `ALLOW_DATABASE_RESET`, confirmation phrases, `SEED_*`            | Never enable on the long-running API process                 |
-| Security           | `DELIVERY_QR_SIGNING_SECRET` (≥32 chars), throttle/cache/GraphQL limits                  | Backend-only                                                 |
-| Azure / push       | storage, Vision, Speech, VAPID private key                                               | Backend-only; local may use `fake` providers                 |
-
-Point `GOOGLE_APPLICATION_CREDENTIALS` at a service-account JSON file stored **outside** Git. Ensure `localhost` is an authorized Firebase Auth domain for local login.
-
-### Start MongoDB
-
-```bash
-docker compose -f infrastructure/docker-compose-dev.yml up -d
+```env
+VITE_BACKEND_URL=http://localhost:3000/graphql
+VITE_BACKEND_WS_URL=ws://localhost:3000/graphql
+VITE_FIREBASE_API_KEY=...
+VITE_FIREBASE_AUTH_DOMAIN=...
+VITE_FIREBASE_PROJECT_ID=...
+VITE_FIREBASE_STORAGE_BUCKET=...
+VITE_FIREBASE_MESSAGING_SENDER_ID=...
+VITE_FIREBASE_APP_ID=...
 ```
 
-### Start the app
-
-```bash
-npm run dev
-```
-
-This runs API (`nest start --watch`) and PWA (`vite`) together.
-
-| Service | URL                           |
-| ------- | ----------------------------- |
-| PWA     | http://localhost:5173         |
-| API     | http://localhost:3000         |
-| GraphQL | http://localhost:3000/graphql |
-| Health  | http://localhost:3000/health  |
-
----
-
-## 8. Database seeding and demo reset
-
-Local presentation flow (after `.env` and Mongo are ready):
-
-```bash
-npm run reset:database:demo
-npm run seed:database:all
-npm run dev
-```
-
-| Command                           | Effect                                                                                                                                                               |
-| --------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `npm run reset:database:demo`     | Drops **only** the guarded local application database (`DB_NAME=vaccin-delivery` on an allowed local Mongo host). **Does not** delete Firebase Authentication users. |
-| `npm run seed:database:all`       | Idempotent demo seed: Firebase identities (create-or-reuse) + Mongo domain data                                                                                      |
-| `npm run bootstrap:database:demo` | Separate **one-off** public/demo bootstrap (not used for normal local reset→seed)                                                                                    |
-
-### Safety variables (placeholders only)
-
-**Reset** (`packages/api/.env`):
+**API** (`packages/api/.env`) — minimum for local demo:
 
 ```env
 NODE_ENV=development
-ALLOW_DATABASE_RESET=true
-CONFIRM_DATABASE_RESET=RESET_LOCAL_DEMO_DATABASE
+PORT=3000
+URL_FRONTEND=http://localhost:5173
 DB_HOST=mongodb://localhost:27017
 DB_NAME=vaccin-delivery
-```
 
-**Seed**:
+# Absolute path to your Firebase Admin service-account JSON (not committed)
+GOOGLE_APPLICATION_CREDENTIALS=/absolute/path/to/firebase-service-account.json
 
-```env
-NODE_ENV=development
+# Required (≥32 characters). Example generator:
+# node -e "console.log(require('crypto').randomBytes(32).toString('base64url'))"
+DELIVERY_QR_SIGNING_SECRET=replace-with-at-least-32-random-chars
+
+# Local seed / reset (CLI only — never leave these on a long-running production API)
 ALLOW_DATABASE_SEED=true
+ALLOW_DATABASE_RESET=true
+CONFIRM_DATABASE_RESET=RESET_LOCAL_DEMO_DATABASE
 SEED_DEMO_PASSWORD=your-demo-password
 SEED_TEACHER_ADMIN_PASSWORD=your-teacher-password
 SEED_PERSONAL_ADMIN_EMAIL=you@example.com
 ```
 
-Unset or keep `ALLOW_DATABASE_SEED` / `ALLOW_DATABASE_RESET` false on any long-running API, Docker API `CMD`, or Railway service.
+Notes:
 
-### Demo accounts
+- Store the service-account JSON **outside** Git. Copy from `firebase-service-account.json.example` only as a shape reference.
+- In Firebase Console → Authentication → Authorized domains, allow **`localhost`**.
+- Local image/voice features default to **fake** Azure providers unless you configure real Azure keys.
+- Web Push defaults to **fake** locally; production needs real VAPID keys (see `.env.example`).
 
-| Email                                | Role              | Password source               |
-| ------------------------------------ | ----------------- | ----------------------------- |
-| `docent@howest.be`                   | ADMIN (evaluator) | `SEED_TEACHER_ADMIN_PASSWORD` |
-| value of `SEED_PERSONAL_ADMIN_EMAIL` | ADMIN             | `SEED_DEMO_PASSWORD`          |
-| `apotheker1@demo.be`                 | APOTHEKER         | `SEED_DEMO_PASSWORD`          |
-| `apotheker2@demo.be`                 | APOTHEKER         | `SEED_DEMO_PASSWORD`          |
-| `apotheker3@demo.be`                 | APOTHEKER         | `SEED_DEMO_PASSWORD`          |
-| `bezorger1@demo.be`                  | BEZORGER          | `SEED_DEMO_PASSWORD`          |
-| `bezorger2@demo.be`                  | BEZORGER          | `SEED_DEMO_PASSWORD`          |
+### 3. Start MongoDB
 
-Missing Firebase users for these emails are created by the seed; existing users are reused.
+```bash
+docker compose -f infrastructure/docker-compose-dev.yml up -d
+```
+
+### 4. Reset + seed demo data
+
+```bash
+npm run reset:database:demo
+npm run seed:database:all
+```
+
+| Command               | Effect                                                                                                                   |
+| --------------------- | ------------------------------------------------------------------------------------------------------------------------ |
+| `reset:database:demo` | Drops the **local** app DB `vaccin-delivery` only. Does **not** delete Firebase Auth users.                              |
+| `seed:database:all`   | Creates/reuses Firebase users and fills Mongo with deterministic demo data (vaccines, orders, bezorger1 today route, …). |
+
+`npm run bootstrap:database:demo` is a **separate** one-off for public/Atlas demo init — not part of normal local startup. See [`docs/deployment.md`](docs/deployment.md).
+
+### 5. Run the app
+
+```bash
+npm run dev
+```
+
+| Service            | URL                           |
+| ------------------ | ----------------------------- |
+| PWA                | http://localhost:5173         |
+| API                | http://localhost:3000         |
+| GraphQL / GraphiQL | http://localhost:3000/graphql |
+| Health             | http://localhost:3000/health  |
+
+Optional after a clean clone (also runs automatically from several typecheck/build scripts):
+
+```bash
+npm run generate:graphql
+```
 
 ---
 
-## 9. Testing
+## Demo accounts (after seed)
 
-Useful root scripts (verified against `package.json`):
+| Email                            | Role      | Password                               |
+| -------------------------------- | --------- | -------------------------------------- |
+| `docent@howest.be`               | ADMIN     | value of `SEED_TEACHER_ADMIN_PASSWORD` |
+| your `SEED_PERSONAL_ADMIN_EMAIL` | ADMIN     | value of `SEED_DEMO_PASSWORD`          |
+| `apotheker1@demo.be`             | APOTHEKER | `SEED_DEMO_PASSWORD`                   |
+| `apotheker2@demo.be`             | APOTHEKER | `SEED_DEMO_PASSWORD`                   |
+| `apotheker3@demo.be`             | APOTHEKER | `SEED_DEMO_PASSWORD`                   |
+| `bezorger1@demo.be`              | BEZORGER  | `SEED_DEMO_PASSWORD`                   |
+| `bezorger2@demo.be`              | BEZORGER  | `SEED_DEMO_PASSWORD`                   |
+
+---
+
+## Useful scripts
 
 ```bash
+# Quality
 npm run typecheck:api
 npm run typecheck:pwa
 npm run test:api
@@ -245,132 +228,64 @@ npm run test:pwa
 npm run test:e2e:pwa
 npm run test:e2e:pwa:ui
 npm run audit:i18n:check
-npm run validate:production-readiness
 npm run test:docker:safety
-```
 
-| Suite          | Tooling                              | What it covers                                   |
-| -------------- | ------------------------------------ | ------------------------------------------------ |
-| API unit       | Jest                                 | Domain services, guards, helpers                 |
-| API E2E        | Jest + Supertest + MongoMemoryServer | Full Nest app: GraphQL/REST, authz, QR, security |
-| PWA unit       | Vitest                               | Composables, offline IndexedDB, UI logic         |
-| Browser E2E    | Playwright                           | Real browser against built PWA + test API        |
-| Infrastructure | Node test runner                     | Docker/Hosting production-readiness invariants   |
-
-CI workflows: `ci-api`, `ci-api-e2e`, `ci-pwa`, `ci-playwright`, `ci-docker-smoke`.
-
-For a focused demo of strong tests, see [`docs/presentation-test-showcase.md`](docs/presentation-test-showcase.md).
-
----
-
-## 10. Docker
-
-| File                                           | Role                                                             |
-| ---------------------------------------------- | ---------------------------------------------------------------- |
-| `infrastructure/docker-compose-dev.yml`        | Local MongoDB only (`localhost:27017`)                           |
-| `infrastructure/docker-compose-production.yml` | Local production-like stack: Mongo + API + PWA (nginx)           |
-| `packages/api/Dockerfile`                      | API image; `CMD` is `node dist/main.js` (no seed/reset on start) |
-| `packages/pwa/Dockerfile`                      | Static PWA build served via nginx                                |
-
-Local presentation Compose example:
-
-```bash
+# Production-like local Compose (separate from `npm run dev`)
 cp infrastructure/.env.prod.example infrastructure/.env.prod
-# configure FIREBASE_CREDENTIALS_HOST_PATH, secrets, and VITE_* values
+# fill secrets + FIREBASE_CREDENTIALS_HOST_PATH + VITE_*
 docker compose -f infrastructure/docker-compose-production.yml --env-file infrastructure/.env.prod up -d --build
+# PWA http://localhost:8080  ·  API http://localhost:3000
 ```
 
-Defaults: PWA http://localhost:8080 , API http://localhost:3000 .
+| Suite         | Tooling                              |
+| ------------- | ------------------------------------ |
+| API unit      | Jest                                 |
+| API E2E       | Jest + Supertest + MongoMemoryServer |
+| PWA unit      | Vitest                               |
+| Browser E2E   | Playwright (Chromium)                |
+| Docker safety | Node test runner                     |
 
-`npm run test:docker:safety` checks important Docker/production safety invariants.
+CI (GitHub Actions): `ci-api`, `ci-api-e2e`, `ci-pwa`, `ci-playwright`, `ci-docker-smoke`. CI verifies; it does **not** deploy Hosting or Railway.
 
 ---
 
-## 11. Deployment
+## Production (summary)
 
-Current public stack:
+| Layer      | Platform                                                          |
+| ---------- | ----------------------------------------------------------------- |
+| PWA        | Firebase Hosting                                                  |
+| API        | Railway — **one replica** (process-local PubSub, cache, throttle) |
+| Database   | MongoDB Atlas                                                     |
+| Auth       | Firebase                                                          |
+| Media / AI | Azure Blob, Vision, Speech                                        |
 
-| Layer             | Platform                                            | URL                                           |
-| ----------------- | --------------------------------------------------- | --------------------------------------------- |
-| PWA               | Firebase Hosting                                    | https://maciejafsdvaccin.web.app              |
-| API               | Railway (single replica; serverless/sleep disabled) | https://afsdvaccins-production.up.railway.app |
-| GraphQL HTTP / WS | Railway `/graphql`                                  | HTTPS + WSS on the API host                   |
-| Database          | MongoDB Atlas                                       | configured via Railway `DB_HOST` / `DB_NAME`  |
-| Media / AI        | Azure Blob, Vision, Speech                          | API-only credentials                          |
+API container start command is `node dist/main.js` — no automatic seed/reset/bootstrap.
 
-Railway runs the normal API entry point (`node dist/main.js`). It does **not** automatically seed, reset, or bootstrap the database.
-
-Production/demo data bootstrap is a **guarded manual** one-off:
+PWA production build + Hosting deploy (when you intentionally redeploy):
 
 ```bash
-npm run bootstrap:database:demo
+npm run build:pwa:production
+firebase deploy --only hosting
 ```
 
-Requires `ALLOW_DATABASE_BOOTSTRAP=true` and `CONFIRM_DATABASE_BOOTSTRAP=BOOTSTRAP_PUBLIC_DEMO_DATABASE`, plus seed password/email variables. Remove those gates after a successful run.
-
-Full runbook: [`docs/deployment.md`](docs/deployment.md).
+Details: [`docs/deployment.md`](docs/deployment.md).
 
 ---
 
-## 12. Security
+## Security highlights
 
-Implemented measures (from source):
-
-- Firebase ID token verification (HTTP Bearer + WebSocket connection auth)
-- Role and ownership authorization on GraphQL/REST resolvers and controllers
-- Helmet security headers; CORS locked to `URL_FRONTEND`
-- Global validation pipe (whitelist / forbid non-whitelisted)
-- Rate limiting (default + stricter limits on sensitive REST paths)
-- GraphQL query depth and complexity limits
-- Request body size limit
+- Firebase ID token verification (HTTP + WebSocket)
+- Role and ownership checks on GraphQL/REST
+- Helmet, CORS locked to `URL_FRONTEND`, validation pipe
+- Rate limiting; GraphQL depth/complexity limits
 - HMAC-signed delivery QR tokens (`DELIVERY_QR_SIGNING_SECRET`)
-- Secret/environment separation (no private keys in the PWA)
-- Guarded database seed, local reset, and public bootstrap CLIs
-- Azure, VAPID private, and QR signing secrets stay backend-only
-- Production rejects fake Azure/push providers and E2E auth bypass
+- Backend-only secrets (Admin SA, Azure, VAPID private, QR signing)
+- Guarded seed / reset / bootstrap CLIs
 
 ---
 
-## 13. Realtime / PWA
+## Further reading
 
-**Realtime**
-
-- Apollo Client splits HTTP queries/mutations and WebSocket subscriptions (`graphql-ws`)
-- NestJS publishes domain events through in-process PubSub
-- Subscriptions include order create/update, admin operations feed, in-app notifications, courier route updates, and voice-report updates
-- Single API replica is required so PubSub, cache, and throttling stay consistent
-
-**PWA**
-
-- `vite-plugin-pwa` with Workbox `injectManifest` (`packages/pwa/src/sw.ts`)
-- Installable standalone app; precached assets; navigation fallback to `/offline.html`
-- IndexedDB offline store for courier routes and notifications
-- Queued offline **stop arrival** with later sync; delivery QR confirmation remains online-only
-- Optional Web Push via service worker + VAPID
-
----
-
-## 14. Internationalization
-
-```text
-Google Sheet (source of truth)
-    →  npm run export:i18n  (packages/i18n-export)
-    →  packages/pwa/src/locales/{nl,en,zh,es}.json
-    →  vue-i18n at runtime
-```
-
-Supported locales: **nl** (default), **en** (fallback), **zh**, **es**. Locale preference is stored under `vaccin-delivery:locale`. The PWA never talks to Google Sheets at runtime.
-
-Related scripts: `npm run export:i18n`, `npm run audit:i18n:check`, `npm run sync:i18n:keys`.
-
----
-
-## 15. Documentation
-
-Useful current docs in this repository:
-
-- [`docs/project-fiche.md`](docs/project-fiche.md) — business rules and roles
-- [`docs/description.md`](docs/description.md) — assignment context
-- [`docs/deployment.md`](docs/deployment.md) — public deploy runbook (Hosting + Railway + Atlas)
-- [`docs/presentation-test-showcase.md`](docs/presentation-test-showcase.md) — recommended tests to demonstrate
-- [`docs/requirements-matrix.md`](docs/requirements-matrix.md) — requirement traceability
+- [`docs/project-fiche.md`](docs/project-fiche.md) — business rules
+- [`docs/project-architecture.md`](docs/project-architecture.md) — as-built architecture
+- [`docs/deployment.md`](docs/deployment.md) — Hosting, Railway, Atlas, bootstrap
