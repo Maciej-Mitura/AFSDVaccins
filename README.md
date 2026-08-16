@@ -33,39 +33,6 @@ Authorization is enforced on the **API** (Firebase ID token + role/ownership). T
 
 ---
 
-## Main flows
-
-### 1. Pharmacist order (realtime)
-
-1. Sign in as `apotheker1@demo.be`.
-2. Create a small order (respect daily/weekly limits).
-3. With an admin session open on **Orders**, the new order appears **without reload** (`orderCreated` subscription).
-
-Orders before closing time are eligible for same-day delivery; later orders go to the next day.
-
-### 2. Courier delivery (seeded today route)
-
-1. Sign in as `bezorger1@demo.be` → today’s route (seeded as **ASSIGNED**).
-2. **Start** the route → **IN_PROGRESS**.
-3. **Mark arrived** at a stop (arrival ≠ delivery).
-4. Pharmacist/admin **Show QR** for that stop; courier **scans → preview → confirm**.
-5. Stock and order status update; complete the route when all deliverable stops are done.
-
-A live order created in flow 1 is **not** automatically part of an already-generated today route. Demo delivery uses the **seeded** route.
-
-### 3. Offline arrival (courier)
-
-On `http://localhost:5173` (Vite), with today’s route already open:
-
-1. DevTools → Network → Offline.
-2. Route remains readable from IndexedDB.
-3. **Mark arrived** queues locally (`COURIER_STOP_ARRIVED` only).
-4. Go online again → queue syncs; server remains source of truth.
-
-QR confirmation is **online-only** (never queued). Full installability / service worker is clearest on the Hosting URL above (normal `npm run dev` does not register the production SW unless `VITE_PWA_DEV=true`).
-
----
-
 ## Stack
 
 ```text
